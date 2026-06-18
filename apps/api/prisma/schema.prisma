@@ -37,6 +37,11 @@ enum SpecificationStatus {
   REJECTED
 }
 
+enum ArtifactBundleStatus {
+  GENERATED
+  EXPORTED
+}
+
 model User {
   id             String            @id @default(uuid())
   email          String            @unique
@@ -85,6 +90,7 @@ model Project {
   workspace    Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   idea         Idea?
   specifications Specification[]
+  artifactBundles ArtifactBundle[]
 }
 
 model Idea {
@@ -112,4 +118,17 @@ model Specification {
   createdAt DateTime            @default(now())
   updatedAt DateTime            @updatedAt
   project   Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  artifactBundles ArtifactBundle[]
+}
+
+model ArtifactBundle {
+  id              String               @id @default(uuid())
+  projectId       String
+  specificationId String
+  status          ArtifactBundleStatus @default(GENERATED)
+  manifest        Json
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  project         Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  specification   Specification        @relation(fields: [specificationId], references: [id], onDelete: Cascade)
 }

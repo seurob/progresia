@@ -4,6 +4,7 @@ import { PrismaModule } from "../database/prisma.module";
 import { AuthModule } from "./auth/auth.module";
 import { HealthModule } from "./health/health.module";
 import { AiServiceModule } from "./ai-service/ai-service.module";
+import { ArtifactsModule } from "./artifacts/artifacts.module";
 import { IdeasModule } from "./ideas/ideas.module";
 import { ProjectsModule } from "./projects/projects.module";
 import { SpecificationsModule } from "./specifications/specifications.module";
@@ -21,7 +22,8 @@ import { WorkspacesModule } from "./workspaces/workspaces.module";
     WorkspacesModule,
     ProjectsModule,
     IdeasModule,
-    SpecificationsModule
+    SpecificationsModule,
+    ArtifactsModule
   ]
 })
 export class AppModule {}

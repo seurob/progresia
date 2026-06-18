@@ -10,6 +10,10 @@ Tags: #backlog #issues
 - [[../issues/004-generated-artifacts|004 Generated artifacts]]
 - [[../issues/005-obsidian-project-knowledge|005 Obsidian project knowledge]]
 
+## Estado actual
+
+- `0005-generated-artifacts`: manifiesto de kit MVP persistido desde la ultima OpenSpec generada.
+
 ## Politica
 
 Cada issue debe enlazar a un cambio OpenSpec o explicar por que es mantenimiento/documentacion.

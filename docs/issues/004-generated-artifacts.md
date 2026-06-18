@@ -2,9 +2,9 @@
 
 Labels: `openspec`, `backend`, `devops`, `task`
 
-OpenSpec change: `TBD-generated-artifacts`
+OpenSpec change: `0005-generated-artifacts`
 
-Spec path: `openspec/changes/TBD-generated-artifacts/specs/progresia-studio/spec.md`
+Spec path: `openspec/changes/0005-generated-artifacts/specs/progresia-studio/spec.md`
 
 ## Outcome
 
@@ -12,17 +12,17 @@ Generate and persist the first artifact set for a controlled MVP pattern.
 
 ## Tasks
 
-- [ ] Create OpenSpec change before implementation.
-- [ ] Define generated artifact manifest.
-- [ ] Generate README, requirements, architecture and OpenSpec files.
-- [ ] Store artifact metadata in API.
+- [x] Create OpenSpec change before implementation.
+- [x] Define generated artifact manifest.
+- [x] Generate README, requirements, architecture and OpenSpec manifest entries.
+- [x] Store artifact metadata in API.
 - [ ] Prepare ZIP export boundary.
-- [ ] Add validation tests for artifact manifest.
+- [x] Add validation tests for artifact manifest.
 
 ## Validation
 
-- [ ] `npm run openspec:check`
-- [ ] `npm run lint`
-- [ ] `npm run typecheck`
-- [ ] `npm run test`
-- [ ] `npm run build`
+- [x] `npm run openspec:check`
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `npm run test`
+- [x] `npm run build`

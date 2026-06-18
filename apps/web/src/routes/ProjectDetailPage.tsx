@@ -1,13 +1,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Bot, Save } from "lucide-react";
+import { ArrowLeft, Bot, Package, Save } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useParams } from "react-router";
 import { z } from "zod";
 import { FormField } from "../components/FormField";
 import { api, getErrorMessage } from "../lib/api";
-import { Project, Specification } from "../types/api";
+import { ArtifactBundle, Project, Specification } from "../types/api";
 
 const ideaSchema = z.object({
   problem: z.string().min(10),
@@ -69,6 +69,15 @@ export function ProjectDetailPage() {
     onSuccess: async () => queryClient.invalidateQueries({ queryKey: ["project", projectId] }),
     onError: (error) => setServerError(getErrorMessage(error))
   });
+  const generateArtifactBundle = useMutation({
+    mutationFn: async () =>
+      (await api.post<ArtifactBundle>(`/artifacts/project/${projectId}/generate`)).data,
+    onSuccess: async () => {
+      setServerError(null);
+      await queryClient.invalidateQueries({ queryKey: ["project", projectId] });
+    },
+    onError: (error) => setServerError(getErrorMessage(error))
+  });
 
   const project = projectQuery.data;
 
@@ -97,6 +106,14 @@ export function ProjectDetailPage() {
           <button className="secondary-button" onClick={() => generateOpenSpec.mutate()} disabled={generateOpenSpec.isPending || !project.idea}>
             <Bot size={18} />
             {generateOpenSpec.isPending ? "Generando" : "Generar OpenSpec IA"}
+          </button>
+          <button
+            className="secondary-button"
+            onClick={() => generateArtifactBundle.mutate()}
+            disabled={generateArtifactBundle.isPending || (project.specifications ?? []).length === 0}
+          >
+            <Package size={18} />
+            {generateArtifactBundle.isPending ? "Preparando" : "Generar kit"}
           </button>
         </div>
       </section>
@@ -172,6 +189,43 @@ export function ProjectDetailPage() {
                   </pre>
                 </article>
               ))
+            )}
+          </div>
+        </section>
+
+        <section className="min-w-0 rounded-md border border-white/10 bg-white/[0.04] p-5 xl:col-span-2">
+          <h2 className="text-lg font-semibold">Artifact bundles</h2>
+          <div className="mt-5 grid gap-3 md:grid-cols-2">
+            {(project.artifactBundles ?? []).length === 0 ? (
+              <p className="rounded-md border border-dashed border-white/15 p-5 text-sm text-zinc-400 md:col-span-2">
+                Todavia no hay kits generados. Crea uno desde una OpenSpec generada.
+              </p>
+            ) : (
+              project.artifactBundles?.map((bundle) => {
+                const files = Array.isArray(bundle.manifest.files) ? bundle.manifest.files : [];
+
+                return (
+                  <article key={bundle.id} className="min-w-0 rounded-md border border-white/10 bg-zinc-950/70 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-medium">Kit MVP</p>
+                      <span className="status-pill">{bundle.status}</span>
+                    </div>
+                    <p className="mt-2 text-xs text-zinc-500">Spec source: {bundle.specificationId}</p>
+                    <ul className="mt-4 grid gap-2 text-sm text-zinc-300">
+                      {files.map((file, index) => {
+                        const entry = file as { path?: string; description?: string };
+
+                        return (
+                          <li key={`${bundle.id}-${index}`} className="rounded-md bg-black/25 p-3">
+                            <span className="block font-mono text-xs text-emerald-200">{entry.path}</span>
+                            <span className="mt-1 block text-xs text-zinc-500">{entry.description}</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </article>
+                );
+              })
             )}
           </div>
         </section>

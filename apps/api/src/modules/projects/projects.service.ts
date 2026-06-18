@@ -36,7 +36,8 @@ export class ProjectsService {
       },
       include: {
         idea: true,
-        specifications: true
+        specifications: true,
+        artifactBundles: true
       },
       orderBy: { createdAt: "desc" }
     });
@@ -49,7 +50,8 @@ export class ProjectsService {
       where: { id: projectId },
       include: {
         idea: true,
-        specifications: true
+        specifications: true,
+        artifactBundles: true
       }
     });
   }

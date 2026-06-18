@@ -74,6 +74,9 @@ La primera base funcional del backend incluye:
 - `GET /api/ideas/project/:projectId`
 - `POST /api/specifications`
 - `GET /api/specifications/project/:projectId`
+- `POST /api/specifications/project/:projectId/generate-openspec`
+- `POST /api/artifacts/project/:projectId/generate`
+- `GET /api/artifacts/project/:projectId`
 
 ## OpenSpec
 
@@ -128,8 +131,6 @@ scripts/
 
 ## Próximas fases
 
-1. Implementar autenticación JWT, usuarios, workspaces y proyectos en `apps/api`.
-2. Construir las pantallas iniciales de login, registro, dashboard, proyectos y wizard en `apps/web`.
-3. Añadir agentes Product, Requirements, OpenSpec y Supervisor en `apps/ai-service`.
-4. Persistir especificaciones y artefactos generados.
-5. Exportar el kit de MVP generado.
+1. Exportar el kit de MVP generado.
+2. Ampliar los agentes para generar codigo y pruebas a partir del manifiesto.
+3. Preparar almacenamiento de artefactos en MinIO.

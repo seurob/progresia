@@ -44,6 +44,15 @@ export interface Specification {
   createdAt: string;
 }
 
+export interface ArtifactBundle {
+  id: string;
+  projectId: string;
+  specificationId: string;
+  status: "GENERATED" | "EXPORTED";
+  manifest: Record<string, unknown>;
+  createdAt: string;
+}
+
 export interface Project {
   id: string;
   workspaceId: string;
@@ -56,4 +65,5 @@ export interface Project {
   updatedAt: string;
   idea?: Idea | null;
   specifications?: Specification[];
+  artifactBundles?: ArtifactBundle[];
 }
