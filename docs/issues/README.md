@@ -20,6 +20,7 @@ Remote issues seeded:
 - #11 `[OpenSpec] Generate project artifacts`
 - #12 `[OpenSpec] Maintain Obsidian project knowledge base`
 - #13 `[OpenSpec] GitHub security and quality automation`
+- #14 `[Security] Remediate Dependabot alerts`
 
 Each issue should reference:
 
