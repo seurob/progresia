@@ -26,6 +26,8 @@ Resolve the current Dependabot alerts on the default branch without downgrading 
 
 - [ ] Review Dependabot PRs #1 to #7 and replacement PR #15.
 - [x] Merge Dependabot PR #1 (`actions/setup-python@6`).
+- [x] Split safe updates from Dependabot PR #6 (`lucide-react`, `zod`, `class-validator`).
+- [ ] Track Prisma 7 and React Router 8 as separate migrations instead of merging PR #6 wholesale.
 - [x] Prefer upstream package updates over manual lockfile edits.
 - [x] Avoid `npm audit fix --force` if it downgrades framework majors.
 - [x] Keep CI green on `main`.
