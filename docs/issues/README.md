@@ -12,6 +12,15 @@ node scripts/configure-github-security.mjs
 node scripts/create-github-issues.mjs
 ```
 
+Remote issues seeded:
+
+- #8 `[OpenSpec] Harden API foundation`
+- #9 `[OpenSpec] Polish web foundation`
+- #10 `[OpenSpec] Connect AI service to project workflow`
+- #11 `[OpenSpec] Generate project artifacts`
+- #12 `[OpenSpec] Maintain Obsidian project knowledge base`
+- #13 `[OpenSpec] GitHub security and quality automation`
+
 Each issue should reference:
 
 - OpenSpec change folder.

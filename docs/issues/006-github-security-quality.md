@@ -18,8 +18,16 @@ Manage the project through GitHub Issues and Actions with security and quality g
 - [x] Add Dependabot configuration.
 - [x] Add Security Policy.
 - [x] Add GitHub agent issue template.
-- [ ] Apply repository security settings through GitHub API.
-- [ ] Seed labels and issues remotely.
+- [x] Apply available repository security settings through GitHub API.
+- [x] Seed labels and issues remotely.
+
+## Remote Settings Notes
+
+- Enabled vulnerability alerts.
+- Enabled automated security fixes.
+- Restricted default Actions workflow permissions to read.
+- Advanced Security was rejected because it is not available for the current repository plan.
+- Branch protection was rejected because it requires GitHub Pro or a public repository.
 
 ## Validation
 

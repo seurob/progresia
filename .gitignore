@@ -7,6 +7,7 @@ coverage/
 *.tsbuildinfo
 .env
 .env.local
+gittokenprogresia.txt
 *.log
 apps/web/vite.config.js
 apps/web/vite.config.d.ts
