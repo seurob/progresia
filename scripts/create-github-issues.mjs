@@ -12,7 +12,11 @@ const labelDefinitions = [
   { name: "ai-service", color: "FBCA04", description: "FastAPI, agents, RAG and LLM integration work." },
   { name: "devops", color: "C2E0C6", description: "Docker, CI/CD, deployment and infra." },
   { name: "docs", color: "0075CA", description: "Documentation, Obsidian and project knowledge." },
-  { name: "task", color: "D4C5F9", description: "Implementation task." }
+  { name: "task", color: "D4C5F9", description: "Implementation task." },
+  { name: "security", color: "B60205", description: "Security hardening, scanning and vulnerability response." },
+  { name: "quality", color: "5319E7", description: "Test, maintainability and quality gate improvements." },
+  { name: "dependencies", color: "0366D6", description: "Dependency updates and dependency risk management." },
+  { name: "github-agent", color: "7057FF", description: "Issue scoped for GitHub or Copilot coding agents." }
 ];
 
 if (!token) {

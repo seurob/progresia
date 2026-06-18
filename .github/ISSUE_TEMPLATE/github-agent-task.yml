@@ -1,0 +1,43 @@
+name: GitHub agent task
+description: Small, bounded task suitable for a GitHub/Copilot coding agent.
+title: "[Agent] "
+labels:
+  - github-agent
+  - task
+body:
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: One concrete outcome the agent should deliver.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Link relevant OpenSpec changes, files and decisions.
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints
+      value: |
+        - Keep changes scoped to this issue.
+        - Update OpenSpec if behavior changes.
+        - Do not alter unrelated files.
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation
+      value: |
+        - [ ] npm run openspec:check
+        - [ ] npm run lint
+        - [ ] npm run typecheck
+        - [ ] npm run test
+        - [ ] npm run build
+    validations:
+      required: true

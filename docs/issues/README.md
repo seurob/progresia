@@ -8,6 +8,7 @@ This folder keeps the issue backlog in Markdown, mapped to OpenSpec changes. Whe
 $env:GH_TOKEN="..."
 node scripts/create-github-repo.mjs
 git push -u origin main
+node scripts/configure-github-security.mjs
 node scripts/create-github-issues.mjs
 ```
 

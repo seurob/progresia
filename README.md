@@ -94,10 +94,21 @@ El backlog inicial vive en `docs/issues/` y esta preparado para GitHub Issues. C
 $env:GH_TOKEN="..."
 node scripts/create-github-repo.mjs
 git push -u origin main
+node scripts/configure-github-security.mjs
 node scripts/create-github-issues.mjs
 ```
 
 Tambien hay una plantilla de issue en `.github/ISSUE_TEMPLATE/openspec-task.yml` para que cada tarea quede conectada a su cambio OpenSpec.
+
+Para configurar Security and quality en GitHub hace falta un token con permisos de administracion del repositorio, issues, actions y security events:
+
+```powershell
+$env:GH_TOKEN="ghp_..."
+node scripts/configure-github-security.mjs
+node scripts/create-github-issues.mjs
+```
+
+La automatizacion de seguridad versionada incluye CodeQL, Dependency Review, OpenSSF Scorecard, Dependabot y `SECURITY.md`.
 
 ## Obsidian
 
