@@ -4,24 +4,20 @@ Tags: #roadmap
 
 ## Sprint actual
 
-- Base backend funcional.
-- Base frontend funcional.
-- OpenSpec como contrato.
-- Backlog GitHub Issues preparado.
-- Vault Obsidian preparado.
+- Seguimiento de alertas `multer` y `js-yaml` bloqueadas por upstream.
+- Migraciones separadas: Prisma 7, React Router 8, TypeScript 6 y ESLint 10.
+- Preparar siguiente bloque funcional de IA avanzada.
 
 ## Siguiente sprint
 
-- Crear cambio OpenSpec para integracion AI service.
-- Conectar API NestJS con FastAPI.
-- Generar requirements desde proyecto persistido.
-- Guardar specification generada.
-- Mostrar resultado en frontend.
+- RAG con Qdrant.
+- Integrar ProductAgent en pipeline supervisor.
+- Roles Collaborator/Reviewer en UI.
+- Tests E2E Playwright.
 
 ## Despues
 
-- Jobs con BullMQ.
-- Artifacts manifest.
-- ZIP export.
-- GitHub repository generation.
-- Security/testing agents.
+- Dockerfiles de produccion.
+- Seed data idempotente.
+- Knowledge base Obsidian mas completa.
+- Security/testing agents avanzados.

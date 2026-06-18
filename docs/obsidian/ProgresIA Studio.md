@@ -9,6 +9,7 @@ ProgresIA Studio es un monorepo con runtime modular:
 - [[OpenSpec Workflow]]
 - [[Roadmap]]
 - [[Backlog]]
+- [[Estado actual]]
 - [[Architecture Decisions]]
 
 ## Enlaces clave
@@ -27,4 +28,4 @@ ProgresIA Studio es un monorepo con runtime modular:
 
 ## Proxima prioridad
 
-Conectar el servicio IA al flujo de proyecto persistido para generar requisitos y OpenSpec desde la interfaz.
+Resolver deuda controlada de dependencias mayores y continuar con RAG Qdrant, ProductAgent y colaboracion.

@@ -12,7 +12,8 @@ Tags: #backlog #issues
 
 ## Estado actual
 
-- `0005-generated-artifacts`: manifiesto de kit MVP persistido desde la ultima OpenSpec generada.
+- `0007-delivery-flow-consolidation`: flujo H-J implementado con status transitions, requirements UI, jobs async, SSE, MinIO y refresh token.
+- Dependabot Actions resuelto; migraciones mayores separadas en #16, #17, #18 y #19.
 
 ## Politica
 

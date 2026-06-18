@@ -25,6 +25,7 @@ Remote issues seeded:
 Current local consolidation:
 
 - `openspec/changes/0007-delivery-flow-consolidation` tracks the implemented Sprint H-J delivery flow.
+- `docs/estado-progresia.md` summarizes what has been built, what remains, and the current validation state.
 
 Each issue should reference:
 
