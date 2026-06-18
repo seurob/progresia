@@ -3,6 +3,7 @@ import { ConfigModule } from "@nestjs/config";
 import { PrismaModule } from "../database/prisma.module";
 import { AuthModule } from "./auth/auth.module";
 import { HealthModule } from "./health/health.module";
+import { AiServiceModule } from "./ai-service/ai-service.module";
 import { IdeasModule } from "./ideas/ideas.module";
 import { ProjectsModule } from "./projects/projects.module";
 import { SpecificationsModule } from "./specifications/specifications.module";
@@ -14,6 +15,7 @@ import { WorkspacesModule } from "./workspaces/workspaces.module";
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     HealthModule,
+    AiServiceModule,
     AuthModule,
     UsersModule,
     WorkspacesModule,

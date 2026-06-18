@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, FileText, Save } from "lucide-react";
+import { ArrowLeft, Bot, Save } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useParams } from "react-router";
@@ -63,21 +63,9 @@ export function ProjectDetailPage() {
     },
     onError: (error) => setServerError(getErrorMessage(error))
   });
-  const createSpec = useMutation({
-    mutationFn: async () => {
-      const project = projectQuery.data;
-      return api.post<Specification>("/specifications", {
-        projectId,
-        type: "OPENSPEC",
-        status: "GENERATED",
-        content: {
-          project: project?.name,
-          sector: project?.sector,
-          idea: project?.idea,
-          generatedBy: "web-foundation"
-        }
-      });
-    },
+  const generateOpenSpec = useMutation({
+    mutationFn: async () =>
+      (await api.post<Specification>(`/specifications/project/${projectId}/generate-openspec`)).data,
     onSuccess: async () => queryClient.invalidateQueries({ queryKey: ["project", projectId] }),
     onError: (error) => setServerError(getErrorMessage(error))
   });
@@ -106,9 +94,9 @@ export function ProjectDetailPage() {
             <h1 className="mt-2 text-3xl font-semibold md:text-4xl">{project.name}</h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-400">{project.description}</p>
           </div>
-          <button className="secondary-button" onClick={() => createSpec.mutate()} disabled={createSpec.isPending}>
-            <FileText size={18} />
-            {createSpec.isPending ? "Creando" : "Crear OpenSpec base"}
+          <button className="secondary-button" onClick={() => generateOpenSpec.mutate()} disabled={generateOpenSpec.isPending || !project.idea}>
+            <Bot size={18} />
+            {generateOpenSpec.isPending ? "Generando" : "Generar OpenSpec IA"}
           </button>
         </div>
       </section>
@@ -116,6 +104,9 @@ export function ProjectDetailPage() {
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <section className="min-w-0 rounded-md border border-white/10 bg-white/[0.04] p-5">
           <h2 className="text-lg font-semibold">Idea wizard</h2>
+          {!project.idea ? (
+            <p className="mt-2 text-sm text-zinc-400">Guarda la idea antes de generar OpenSpec con el servicio IA.</p>
+          ) : null}
           <form className="mt-5 grid gap-4" onSubmit={form.handleSubmit((values) => saveIdea.mutate(values))}>
             <FormField label="Problema" error={form.formState.errors.problem?.message}>
               <textarea className="input min-h-24" {...form.register("problem")} />
