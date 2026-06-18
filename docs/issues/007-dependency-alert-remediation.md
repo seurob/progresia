@@ -24,7 +24,8 @@ Resolve the current Dependabot alerts on the default branch without downgrading 
 
 ## Tasks
 
-- [ ] Review Dependabot PRs #1 to #7.
+- [ ] Review Dependabot PRs #1 to #7 and replacement PR #15.
+- [x] Merge Dependabot PR #1 (`actions/setup-python@6`).
 - [x] Prefer upstream package updates over manual lockfile edits.
 - [x] Avoid `npm audit fix --force` if it downgrades framework majors.
 - [x] Keep CI green on `main`.
