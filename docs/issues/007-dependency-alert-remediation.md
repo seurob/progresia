@@ -26,6 +26,7 @@ Resolve the current Dependabot alerts on the default branch without downgrading 
 
 - [ ] Review Dependabot PRs #1 to #7 and replacement PR #15.
 - [x] Merge Dependabot PR #1 (`actions/setup-python@6`).
+- [x] Merge Dependabot PR #2 (`ossf/scorecard-action@2.4.3`).
 - [x] Merge Dependabot PR #3 (`actions/setup-node@6`).
 - [x] Merge Dependabot PR #4 (`actions/checkout@6`).
 - [x] Merge Dependabot PR #5 (`actions/dependency-review-action@5`).
