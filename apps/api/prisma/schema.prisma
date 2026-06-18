@@ -43,15 +43,25 @@ enum ArtifactBundleStatus {
 }
 
 model User {
-  id             String            @id @default(uuid())
-  email          String            @unique
-  name           String
-  passwordHash   String
-  role           Role              @default(OWNER)
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  memberships    WorkspaceMember[]
+  id              String            @id @default(uuid())
+  email           String            @unique
+  name            String
+  passwordHash    String
+  role            Role              @default(OWNER)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  memberships     WorkspaceMember[]
   ownedWorkspaces Workspace[]       @relation("WorkspaceOwner")
+  refreshTokens   RefreshToken[]
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Workspace {
@@ -122,13 +132,14 @@ model Specification {
 }
 
 model ArtifactBundle {
-  id              String               @id @default(uuid())
-  projectId       String
-  specificationId String
-  status          ArtifactBundleStatus @default(GENERATED)
-  manifest        Json
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
-  project         Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  specification   Specification        @relation(fields: [specificationId], references: [id], onDelete: Cascade)
+  id               String               @id @default(uuid())
+  projectId        String
+  specificationId  String
+  status           ArtifactBundleStatus @default(GENERATED)
+  manifest         Json
+  generatedContent Json?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  project          Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  specification    Specification        @relation(fields: [specificationId], references: [id], onDelete: Cascade)
 }

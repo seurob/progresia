@@ -47,6 +47,7 @@ export function AppLayout() {
               <button
                 className="icon-button"
                 title="Cerrar sesion"
+                aria-label="Cerrar sesion"
                 onClick={() => {
                   auth.logout();
                   navigate("/login");

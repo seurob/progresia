@@ -6,7 +6,7 @@ export interface AuthContextValue {
   isLoading: boolean;
   user?: User;
   token: string | null;
-  setSession: (token: string, user: User) => void;
+  setSession: (accessToken: string, user: User, refreshToken?: string) => void;
   logout: () => void;
 }
 

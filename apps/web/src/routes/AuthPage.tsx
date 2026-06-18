@@ -42,7 +42,7 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
 
     try {
       const response = await api.post<AuthResponse>(endpoint, payload);
-      auth.setSession(response.data.accessToken, response.data.user);
+      auth.setSession(response.data.accessToken, response.data.user, response.data.refreshToken);
       navigate("/");
     } catch (error) {
       setServerError(getErrorMessage(error));

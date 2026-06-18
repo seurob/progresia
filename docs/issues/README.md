@@ -22,6 +22,10 @@ Remote issues seeded:
 - #13 `[OpenSpec] GitHub security and quality automation`
 - #14 `[Security] Remediate Dependabot alerts`
 
+Current local consolidation:
+
+- `openspec/changes/0007-delivery-flow-consolidation` tracks the implemented Sprint H-J delivery flow.
+
 Each issue should reference:
 
 - OpenSpec change folder.

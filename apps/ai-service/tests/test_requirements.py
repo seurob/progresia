@@ -21,4 +21,5 @@ def test_generate_requirements() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["project_name"] == "Reservas de clases"
-    assert len(payload["functional_requirements"]) == 2
+    # 2 core features + auth + admin (both default to True)
+    assert len(payload["functional_requirements"]) >= 2

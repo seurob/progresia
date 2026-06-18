@@ -1,11 +1,11 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ReactNode, useMemo, useState } from "react";
-import { clearAccessToken, getAccessToken, setAccessToken } from "../../lib/auth-token";
-import { api } from "../../lib/api";
+import { ReactNode, useEffect, useMemo, useState } from "react";
+import { clearAllTokens, getAccessToken, setAccessToken, setRefreshToken } from "../../lib/auth-token";
+import { api, registerLogout } from "../../lib/api";
 import { User } from "../../types/api";
 import { AuthContext, AuthContextValue } from "./auth-context";
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: { readonly children: ReactNode }) {
   const queryClient = useQueryClient();
   const [token, setToken] = useState<string | null>(() => getAccessToken());
 
@@ -25,19 +25,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading: meQuery.isLoading,
       user: meQuery.data,
       token,
-      setSession: (newToken, user) => {
-        setAccessToken(newToken);
-        setToken(newToken);
+      setSession: (accessToken, user, refreshToken) => {
+        setAccessToken(accessToken);
+        if (refreshToken) setRefreshToken(refreshToken);
+        setToken(accessToken);
         queryClient.setQueryData(["me"], user);
       },
       logout: () => {
-        clearAccessToken();
+        clearAllTokens();
         setToken(null);
         queryClient.clear();
       }
     }),
     [meQuery.data, meQuery.isLoading, queryClient, token]
   );
+
+  useEffect(() => {
+    registerLogout(value.logout);
+  }, [value.logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

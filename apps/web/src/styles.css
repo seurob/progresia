@@ -154,3 +154,13 @@ textarea {
   padding: 0.65rem 0.75rem;
   color: rgb(228 228 231);
 }
+
+.primary-button:focus-visible,
+.secondary-button:focus-visible,
+.icon-button:focus-visible,
+.nav-link:focus-visible,
+.subtle-link:focus-visible,
+.row-link:focus-visible {
+  outline: 2px solid rgb(110 231 183 / 0.8);
+  outline-offset: 2px;
+}

@@ -25,6 +25,12 @@ export class SpecificationsController {
     return this.specificationsService.listByProject(user.sub, projectId);
   }
 
+  @Post("project/:projectId/generate-requirements")
+  @ApiCreatedResponse({ description: "Generates and stores a Requirements specification through the AI service." })
+  generateRequirements(@CurrentUser() user: JwtUser, @Param("projectId") projectId: string) {
+    return this.specificationsService.generateRequirements(user.sub, projectId);
+  }
+
   @Post("project/:projectId/generate-openspec")
   @ApiCreatedResponse({ description: "Generates and stores an OpenSpec specification through the AI service." })
   generateOpenSpec(@CurrentUser() user: JwtUser, @Param("projectId") projectId: string) {

@@ -11,6 +11,7 @@ export interface User {
 
 export interface AuthResponse {
   accessToken: string;
+  refreshToken: string;
   user: User;
 }
 
@@ -35,6 +36,26 @@ export interface Idea {
   constraints?: string | null;
 }
 
+export interface RequirementItem {
+  id: string;
+  title: string;
+  description: string;
+}
+
+export interface UserStory {
+  id: string;
+  actor: string;
+  goal: string;
+  benefit: string;
+}
+
+export interface RequirementsContent {
+  project_name: string;
+  functional_requirements: RequirementItem[];
+  non_functional_requirements: RequirementItem[];
+  user_stories: UserStory[];
+}
+
 export interface Specification {
   id: string;
   projectId: string;
@@ -44,13 +65,35 @@ export interface Specification {
   createdAt: string;
 }
 
+export interface GeneratedFile {
+  path: string;
+  language: string;
+  content: string;
+}
+
+export interface PushToGithubResult {
+  repoUrl: string;
+  cloneUrl: string;
+  commitSha: string;
+}
+
 export interface ArtifactBundle {
   id: string;
   projectId: string;
   specificationId: string;
   status: "GENERATED" | "EXPORTED";
   manifest: Record<string, unknown>;
+  generatedContent?: { project_name: string; files: GeneratedFile[] } | null;
   createdAt: string;
+}
+
+export interface JobStatus {
+  id: string | undefined;
+  name: string;
+  status: "waiting" | "active" | "completed" | "failed" | "delayed" | "paused";
+  progress: unknown;
+  result?: unknown;
+  failReason?: string;
 }
 
 export interface Project {

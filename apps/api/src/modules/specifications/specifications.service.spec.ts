@@ -1,5 +1,5 @@
 import { ConflictException } from "@nestjs/common";
-import { SpecificationStatus, SpecificationType } from "@prisma/client";
+import { ProjectStatus, SpecificationStatus, SpecificationType } from "@prisma/client";
 import { SpecificationsService } from "./specifications.service";
 
 describe("SpecificationsService", () => {
@@ -24,7 +24,11 @@ describe("SpecificationsService", () => {
       },
       specification: {
         create: jest.fn().mockResolvedValue({ id: "spec-1" })
-      }
+      },
+      project: {
+        update: jest.fn().mockResolvedValue({ id: "project-1", status: ProjectStatus.SPEC_READY })
+      },
+      $transaction: jest.fn((operations: Array<Promise<unknown>>) => Promise.all(operations))
     };
     const projectsService = {
       ensureProjectAccess: jest.fn().mockResolvedValue(project)
@@ -64,6 +68,10 @@ describe("SpecificationsService", () => {
           projectName: "Reservas"
         }
       }
+    });
+    expect(prisma.project.update).toHaveBeenCalledWith({
+      where: { id: "project-1" },
+      data: { status: ProjectStatus.SPEC_READY }
     });
   });
 
