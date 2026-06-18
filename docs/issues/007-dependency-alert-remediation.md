@@ -26,7 +26,9 @@ Resolve the current Dependabot alerts on the default branch without downgrading 
 
 - [ ] Review Dependabot PRs #1 to #7 and replacement PR #15.
 - [x] Merge Dependabot PR #1 (`actions/setup-python@6`).
+- [x] Merge Dependabot PR #3 (`actions/setup-node@6`).
 - [x] Merge Dependabot PR #4 (`actions/checkout@6`).
+- [x] Merge Dependabot PR #5 (`actions/dependency-review-action@5`).
 - [x] Split safe updates from Dependabot PR #6 (`lucide-react`, `zod`, `class-validator`).
 - [x] Track Prisma 7 and React Router 8 as separate migrations instead of merging PR #6 wholesale (#16, #17).
 - [x] Close grouped Dependabot PR #15 and split TypeScript 6 / ESLint 10 migrations (#18, #19).
