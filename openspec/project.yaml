@@ -1,0 +1,69 @@
+name: progresia-studio
+title: ProgresIA Studio
+version: 0.1.0
+status: active-development
+language: es
+source_documents:
+  - info-progresia.md
+  - progresia-studio-start.md
+mission: >
+  Transformar ideas de negocio de usuarios no tecnicos en MVPs software
+  funcionales, documentados y desplegables mediante especificacion guiada,
+  agentes IA, generacion fullstack, testing, seguridad y DevOps.
+stack:
+  frontend:
+    - React 19
+    - Vite 8
+    - TypeScript
+    - Tailwind CSS 4
+    - React Router
+    - TanStack Query
+    - React Hook Form
+    - Zod
+    - Axios
+  backend:
+    - NestJS
+    - TypeScript
+    - PostgreSQL
+    - Prisma
+    - JWT
+    - RBAC
+    - Swagger/OpenAPI
+    - Redis
+    - BullMQ
+    - Sentry
+  ai_service:
+    - FastAPI
+    - Python
+    - LangChain
+    - LangGraph
+    - Qdrant
+    - configurable LLM provider
+  infrastructure:
+    - Docker
+    - Docker Compose
+    - GitHub Actions
+    - MinIO
+bounded_contexts:
+  - Auth
+  - Users
+  - Workspaces
+  - Projects
+  - Ideas
+  - Specifications
+  - Agents
+  - Artifacts
+  - GeneratedCode
+  - Deployments
+  - Documents
+roles:
+  - Admin
+  - Owner
+  - Collaborator
+  - Reviewer
+quality_gates:
+  - npm run openspec:check
+  - npm run lint
+  - npm run typecheck
+  - npm run test
+  - npm run build

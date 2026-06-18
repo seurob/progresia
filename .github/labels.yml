@@ -1,0 +1,21 @@
+- name: openspec
+  color: "0E8A16"
+  description: Work tied to an OpenSpec change.
+- name: backend
+  color: "1D76DB"
+  description: NestJS API, Prisma and backend domain work.
+- name: frontend
+  color: "5319E7"
+  description: React web application work.
+- name: ai-service
+  color: "FBCA04"
+  description: FastAPI, agents, RAG and LLM integration work.
+- name: devops
+  color: "C2E0C6"
+  description: Docker, CI/CD, deployment and infra.
+- name: docs
+  color: "0075CA"
+  description: Documentation, Obsidian and project knowledge.
+- name: task
+  color: "D4C5F9"
+  description: Implementation task.

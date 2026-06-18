@@ -1,0 +1,52 @@
+name: OpenSpec task
+description: Track implementation work from an OpenSpec change.
+title: "[OpenSpec] "
+labels:
+  - openspec
+  - task
+body:
+  - type: input
+    id: change
+    attributes:
+      label: OpenSpec change
+      description: Folder under openspec/changes.
+      placeholder: 0003-web-foundation
+    validations:
+      required: true
+  - type: input
+    id: spec
+    attributes:
+      label: Spec path
+      placeholder: openspec/changes/0003-web-foundation/specs/progresia-studio/spec.md
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Expected outcome
+      description: Describe the capability or verification target.
+    validations:
+      required: true
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Tasks
+      value: |
+        - [ ] Update OpenSpec if needed
+        - [ ] Implement
+        - [ ] Add or update tests
+        - [ ] Run validation
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation
+      value: |
+        - [ ] npm run openspec:check
+        - [ ] npm run lint
+        - [ ] npm run typecheck
+        - [ ] npm run test
+        - [ ] npm run build
+    validations:
+      required: true

@@ -1,0 +1,29 @@
+[project]
+name = "progresia-ai-service"
+version = "0.1.0"
+description = "Servicio IA de ProgresIA Studio para agentes, RAG y especificaciones."
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115.14",
+  "uvicorn[standard]>=0.35.0",
+  "pydantic>=2.11.7",
+  "pydantic-settings>=2.10.1",
+  "langchain>=0.3.26",
+  "langgraph>=0.5.1",
+  "qdrant-client>=1.14.3"
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx>=0.28.1",
+  "pytest>=8.4.1",
+  "ruff>=0.12.2"
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

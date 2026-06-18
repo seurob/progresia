@@ -1,0 +1,115 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  OWNER
+  COLLABORATOR
+  REVIEWER
+}
+
+enum ProjectStatus {
+  DRAFT
+  SPEC_READY
+  GENERATING
+  GENERATED
+  REVIEW
+  DEPLOYED
+}
+
+enum SpecificationType {
+  REQUIREMENTS
+  OPENSPEC
+  ARCHITECTURE
+  DATA_MODEL
+}
+
+enum SpecificationStatus {
+  DRAFT
+  GENERATED
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id             String            @id @default(uuid())
+  email          String            @unique
+  name           String
+  passwordHash   String
+  role           Role              @default(OWNER)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  memberships    WorkspaceMember[]
+  ownedWorkspaces Workspace[]       @relation("WorkspaceOwner")
+}
+
+model Workspace {
+  id        String            @id @default(uuid())
+  name      String
+  ownerId   String
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  owner     User              @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members   WorkspaceMember[]
+  projects  Project[]
+}
+
+model WorkspaceMember {
+  id          String    @id @default(uuid())
+  workspaceId String
+  userId      String
+  role        Role      @default(OWNER)
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+}
+
+model Project {
+  id           String          @id @default(uuid())
+  workspaceId  String
+  name         String
+  sector       String
+  productType  String
+  description  String
+  status       ProjectStatus   @default(DRAFT)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  workspace    Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  idea         Idea?
+  specifications Specification[]
+}
+
+model Idea {
+  id              String   @id @default(uuid())
+  projectId       String   @unique
+  problem         String
+  targetUsers     String
+  coreFeatures    String[]
+  complexity      String   @default("standard")
+  needsAi         Boolean  @default(false)
+  needsAuth       Boolean  @default(true)
+  needsAdminPanel Boolean  @default(true)
+  constraints     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Specification {
+  id        String              @id @default(uuid())
+  projectId String
+  type      SpecificationType
+  status    SpecificationStatus @default(DRAFT)
+  content   Json
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+  project   Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
