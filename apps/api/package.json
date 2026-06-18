@@ -7,7 +7,7 @@
     "start:dev": "nest start --watch",
     "build": "prisma generate && nest build",
     "lint": "eslint .",
-    "test": "jest --passWithNoTests",
+    "test": "prisma generate && jest --passWithNoTests",
     "typecheck": "prisma generate && tsc --noEmit",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"

@@ -28,6 +28,7 @@ Manage the project through GitHub Issues and Actions with security and quality g
 - Restricted default Actions workflow permissions to read.
 - Advanced Security was rejected because it is not available for the current repository plan.
 - Branch protection was rejected because it requires GitHub Pro or a public repository.
+- Dependency Review and Scorecard are configured as non-blocking when GitHub plan support is unavailable.
 
 ## Validation
 
