@@ -55,9 +55,9 @@ describe("ArtifactsService", () => {
           sourceSpecificationId: "spec-1",
           files: expect.arrayContaining([
             expect.objectContaining({ path: "reservas-clinica/README.md" }),
-            expect.objectContaining({ path: "reservas-clinica/docs/requirements.md" }),
-            expect.objectContaining({ path: "reservas-clinica/docs/architecture.md" }),
-            expect.objectContaining({ path: "reservas-clinica/openspec/spec.md" })
+            expect.objectContaining({ path: "reservas-clinica/docs/requisitos.md" }),
+            expect.objectContaining({ path: "reservas-clinica/docs/sdd.md" }),
+            expect.objectContaining({ path: "reservas-clinica/openspec/spec.json" })
           ])
         })
       })

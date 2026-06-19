@@ -16,6 +16,7 @@ enum Role {
 
 enum ProjectStatus {
   DRAFT
+  REQUIREMENTS_READY
   SPEC_READY
   GENERATING
   GENERATED
@@ -27,7 +28,9 @@ enum SpecificationType {
   REQUIREMENTS
   OPENSPEC
   ARCHITECTURE
-  DATA_MODEL
+  DATA_MODEL   // legacy — used for issues until ISSUES type was added
+  ISSUES
+  TUTORIAL
 }
 
 enum SpecificationStatus {

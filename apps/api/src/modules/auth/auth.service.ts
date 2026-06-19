@@ -3,7 +3,7 @@ import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import { Role, User } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { PrismaService } from "../../database/prisma.service";
 import { toSafeUser } from "../../common/users/safe-user";
 import { LoginDto } from "./dto/login.dto";
@@ -11,6 +11,10 @@ import { RegisterDto } from "./dto/register.dto";
 
 const REFRESH_TOKEN_TTL_DAYS = 7;
 const REFRESH_TOKEN_BYTES = 48;
+
+function hashToken(raw: string): string {
+  return createHash("sha256").update(raw).digest("hex");
+}
 
 @Injectable()
 export class AuthService {
@@ -75,50 +79,35 @@ export class AuthService {
   }
 
   async refresh(rawToken: string) {
-    // bcrypt.compare scans all stored hashes — O(n) but acceptable for refresh rate
-    const stored = await this.prisma.refreshToken.findMany({
-      where: { userId: { not: undefined } },
-      select: { id: true, userId: true, tokenHash: true, expiresAt: true }
-    });
+    const tokenHash = hashToken(rawToken);
+    const stored = await this.prisma.refreshToken.findUnique({ where: { tokenHash } });
 
-    const match = await Promise.all(
-      stored.map(async (t) => {
-        const ok = await bcrypt.compare(rawToken, t.tokenHash);
-        return ok ? t : null;
-      })
-    ).then((results) => results.find((r) => r !== null) ?? null);
-
-    if (!match) {
+    if (!stored) {
       throw new UnauthorizedException("Invalid refresh token");
     }
 
-    if (match.expiresAt < new Date()) {
-      await this.prisma.refreshToken.delete({ where: { id: match.id } });
+    if (stored.expiresAt < new Date()) {
+      await this.prisma.refreshToken.delete({ where: { id: stored.id } });
       throw new UnauthorizedException("Refresh token has expired — please log in again");
     }
 
-    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: match.userId } });
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: stored.userId } });
 
     // Rotate: delete old, issue new
-    await this.prisma.refreshToken.delete({ where: { id: match.id } });
+    await this.prisma.refreshToken.delete({ where: { id: stored.id } });
 
     return this.createAuthResponse(user);
   }
 
   async logout(rawToken: string): Promise<void> {
-    const stored = await this.prisma.refreshToken.findMany({
-      select: { id: true, tokenHash: true }
+    const tokenHash = hashToken(rawToken);
+    const stored = await this.prisma.refreshToken.findUnique({
+      where: { tokenHash },
+      select: { id: true }
     });
 
-    const match = await Promise.all(
-      stored.map(async (t) => {
-        const ok = await bcrypt.compare(rawToken, t.tokenHash);
-        return ok ? t.id : null;
-      })
-    ).then((results) => results.find((r) => r !== null) ?? null);
-
-    if (match) {
-      await this.prisma.refreshToken.delete({ where: { id: match } });
+    if (stored) {
+      await this.prisma.refreshToken.delete({ where: { id: stored.id } });
     }
   }
 
@@ -129,7 +118,7 @@ export class AuthService {
     );
 
     const rawRefreshToken = randomBytes(REFRESH_TOKEN_BYTES).toString("hex");
-    const tokenHash = await bcrypt.hash(rawRefreshToken, 8);
+    const tokenHash = hashToken(rawRefreshToken);
     const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_DAYS * 86_400_000);
 
     await this.prisma.refreshToken.create({

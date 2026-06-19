@@ -5,6 +5,7 @@ import { Queue } from "bullmq";
 import { CurrentUser } from "../../common/auth/current-user.decorator";
 import { JwtAuthGuard } from "../../common/auth/jwt-auth.guard";
 import { JwtUser } from "../../common/auth/types";
+import { AiServiceClient } from "../ai-service/ai-service.client";
 import { EnqueueJobDto } from "./dto/enqueue-job.dto";
 import { JobsService } from "./jobs.service";
 import { AI_QUEUE, AiJobName } from "./jobs.types";
@@ -16,7 +17,8 @@ import { AI_QUEUE, AiJobName } from "./jobs.types";
 export class JobsController {
   constructor(
     @InjectQueue(AI_QUEUE) private readonly aiQueue: Queue,
-    private readonly jobsService: JobsService
+    private readonly jobsService: JobsService,
+    private readonly aiClient: AiServiceClient
   ) {}
 
   private async enqueue(user: JwtUser, dto: EnqueueJobDto, name: AiJobName) {
@@ -43,6 +45,39 @@ export class JobsController {
   @ApiAcceptedResponse({ description: "Code generation job queued." })
   generateCode(@CurrentUser() user: JwtUser, @Body() dto: EnqueueJobDto) {
     return this.enqueue(user, dto, "generate-code");
+  }
+
+  @Post("recommend-architecture")
+  @HttpCode(202)
+  @ApiAcceptedResponse({ description: "Architecture recommendation job queued." })
+  recommendArchitecture(@CurrentUser() user: JwtUser, @Body() dto: EnqueueJobDto) {
+    return this.enqueue(user, dto, "recommend-architecture");
+  }
+
+  @Post("generate-issues")
+  @HttpCode(202)
+  @ApiAcceptedResponse({ description: "GitHub Issues generation job queued." })
+  generateIssues(@CurrentUser() user: JwtUser, @Body() dto: EnqueueJobDto) {
+    return this.enqueue(user, dto, "generate-issues");
+  }
+
+  @Post("generate-tutorial")
+  @HttpCode(202)
+  @ApiAcceptedResponse({ description: "Tutorial generation job queued." })
+  generateTutorial(@CurrentUser() user: JwtUser, @Body() dto: EnqueueJobDto) {
+    return this.enqueue(user, dto, "generate-tutorial");
+  }
+
+  @Post("suggest-features")
+  @ApiOkResponse({ description: "AI-generated feature suggestions for a project idea." })
+  suggestFeatures(
+    @Body() body: { sector: string; problem: string; targetUsers: string }
+  ) {
+    return this.aiClient.suggestFeatures({
+      sector: body.sector,
+      problem: body.problem,
+      target_users: body.targetUsers
+    });
   }
 
   @Get(":jobId")

@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Param, Post, Put, UseGuards } from "@nestjs/common";
-import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put, UseGuards } from "@nestjs/common";
+import { ApiBearerAuth, ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { CurrentUser } from "../../common/auth/current-user.decorator";
 import { JwtAuthGuard } from "../../common/auth/jwt-auth.guard";
 import { JwtUser } from "../../common/auth/types";
@@ -36,5 +36,12 @@ export class ProjectsController {
   @ApiOkResponse({ description: "Updates a project by id if accessible." })
   update(@CurrentUser() user: JwtUser, @Param("id") id: string, @Body() dto: UpdateProjectDto) {
     return this.projectsService.update(user.sub, id, dto);
+  }
+
+  @Delete(":id")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse({ description: "Deletes a project and all its associated data." })
+  remove(@CurrentUser() user: JwtUser, @Param("id") id: string) {
+    return this.projectsService.remove(user.sub, id);
   }
 }

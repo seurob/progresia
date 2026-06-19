@@ -1,4 +1,4 @@
-export type AiJobName = "generate-requirements" | "generate-openspec" | "generate-code";
+export type AiJobName = "generate-requirements" | "generate-openspec" | "generate-code" | "recommend-architecture" | "generate-issues" | "generate-tutorial";
 
 export interface AiJobData {
   userId: string;

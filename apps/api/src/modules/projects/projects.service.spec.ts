@@ -32,7 +32,8 @@ function buildMocks(projectOverride?: Partial<typeof project> | null) {
       findUnique: jest.fn().mockResolvedValue(resolvedProject),
       create: jest.fn().mockResolvedValue({ ...project, workspace: undefined }),
       findMany: jest.fn().mockResolvedValue([{ ...project, workspace: undefined }]),
-      update: jest.fn().mockResolvedValue({ ...project, workspace: undefined })
+      update: jest.fn().mockResolvedValue({ ...project, workspace: undefined }),
+      delete: jest.fn().mockResolvedValue({ id: PROJECT_ID })
     }
   };
 
@@ -125,6 +126,34 @@ describe("ProjectsService — ownership", () => {
       await expect(
         service.update(OWNER_ID, "non-existent", { name: "x" })
       ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe("remove", () => {
+    it("deletes the project for the owner", async () => {
+      const { prisma, workspacesService } = buildMocks();
+      const service = new ProjectsService(prisma as never, workspacesService as never);
+
+      await expect(service.remove(OWNER_ID, PROJECT_ID)).resolves.toBeUndefined();
+      expect(prisma.project.delete).toHaveBeenCalledWith({ where: { id: PROJECT_ID } });
+    });
+
+    it("throws ForbiddenException when a non-member tries to delete", async () => {
+      const { prisma, workspacesService } = buildMocks({
+        workspace: { id: WORKSPACE_ID, members: [] }
+      });
+      const service = new ProjectsService(prisma as never, workspacesService as never);
+
+      await expect(service.remove(OTHER_ID, PROJECT_ID)).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prisma.project.delete).not.toHaveBeenCalled();
+    });
+
+    it("throws NotFoundException when project does not exist", async () => {
+      const { prisma, workspacesService } = buildMocks(null);
+      const service = new ProjectsService(prisma as never, workspacesService as never);
+
+      await expect(service.remove(OWNER_ID, "non-existent")).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.project.delete).not.toHaveBeenCalled();
     });
   });
 

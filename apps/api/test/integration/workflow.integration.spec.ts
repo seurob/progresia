@@ -3,6 +3,7 @@ import { Test } from "@nestjs/testing";
 import * as request from "supertest";
 import { Role } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
+import { createHash } from "node:crypto";
 import { AppModule } from "../../src/modules/app.module";
 import { PrismaService } from "../../src/database/prisma.service";
 import { AiServiceClient } from "../../src/modules/ai-service/ai-service.client";
@@ -75,7 +76,7 @@ const dbSpec = {
 };
 
 function buildPrismaMock(overrides: Record<string, unknown> = {}) {
-  const refreshTokenHash = bcrypt.hashSync("refresh-token", 4);
+  const refreshTokenHash = createHash("sha256").update("refresh-token").digest("hex");
 
   return {
     user: {
@@ -115,14 +116,12 @@ function buildPrismaMock(overrides: Record<string, unknown> = {}) {
     },
     refreshToken: {
       create: jest.fn().mockResolvedValue({ id: "refresh-1" }),
-      findMany: jest.fn().mockResolvedValue([
-        {
-          id: "refresh-1",
-          userId: USER_ID,
-          tokenHash: refreshTokenHash,
-          expiresAt: new Date("2099-01-01T00:00:00Z")
-        }
-      ]),
+      findUnique: jest.fn().mockResolvedValue({
+        id: "refresh-1",
+        userId: USER_ID,
+        tokenHash: refreshTokenHash,
+        expiresAt: new Date("2099-01-01T00:00:00Z")
+      }),
       delete: jest.fn().mockResolvedValue({ id: "refresh-1" })
     },
     $transaction: jest.fn().mockImplementation((input: unknown) => {

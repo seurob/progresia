@@ -70,6 +70,11 @@ export class ProjectsService {
     });
   }
 
+  async remove(userId: string, projectId: string) {
+    await this.ensureProjectAccess(projectId, userId);
+    await this.prisma.project.delete({ where: { id: projectId } });
+  }
+
   async ensureProjectAccess(projectId: string, userId: string) {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },

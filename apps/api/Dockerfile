@@ -1,14 +1,27 @@
 FROM node:22-alpine AS build
 WORKDIR /app
+# Copy all workspace package.json files for npm ci to resolve the monorepo graph
 COPY package*.json ./
 COPY apps/api/package*.json apps/api/
-RUN npm install
+COPY apps/web/package*.json apps/web/
+COPY packages/config/package*.json packages/config/
+COPY packages/contracts/package*.json packages/contracts/
+COPY packages/shared/package*.json packages/shared/
+RUN npm ci
+# Copy only api source and shared packages (web is not needed at build time)
 COPY apps/api apps/api
+COPY packages packages
 RUN npm run build -w apps/api
 
 FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production
+RUN addgroup -S progresia && adduser -S progresia -G progresia
 COPY --from=build /app/node_modules node_modules
 COPY --from=build /app/apps/api/dist dist
-CMD ["node", "dist/main.js"]
+COPY --from=build /app/apps/api/prisma prisma
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD wget -qO- http://localhost:3000/api/health || exit 1
+USER progresia
+CMD ["sh", "-c", "node node_modules/.bin/prisma migrate deploy --schema ./prisma/schema.prisma && node dist/main.js"]
