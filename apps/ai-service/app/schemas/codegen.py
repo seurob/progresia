@@ -18,6 +18,9 @@ class CodeGenerationRequest(BaseModel):
     stack: list[str] = Field(
         default_factory=lambda: ["React", "NestJS", "PostgreSQL", "FastAPI", "Docker"]
     )
+    # Optional: explicit architecture type from the architecture recommender.
+    # When set, codegen bypasses LLM and picks the matching template directly.
+    architecture_type: str | None = None
 
 
 class CodeGenerationResponse(BaseModel):

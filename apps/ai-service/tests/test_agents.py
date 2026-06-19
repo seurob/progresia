@@ -3,14 +3,20 @@ from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
+from app.agents.architecture_agent import ArchitectureAgent
 from app.agents.codegen_agent import CodeGenerationAgent
+from app.agents.issue_generator_agent import IssueGeneratorAgent
 from app.agents.openspec_agent import OpenSpecAgent, _OpenSpecLLMOutput
 from app.agents.requirements_agent import RequirementsAgent
 from app.agents.supervisor_agent import SupervisorAgent
+from app.agents.tutorial_agent import TutorialAgent
 from app.main import app
+from app.schemas.architecture import ArchitectureRequest
 from app.schemas.codegen import CodeGenerationRequest, CodeGenerationResponse, GeneratedFile
 from app.schemas.idea import IdeaRequest
+from app.schemas.issues import IssueGenerationRequest
 from app.schemas.requirements import RequirementItem, RequirementsResponse, UserStory
+from app.schemas.tutorial import TutorialRequest
 
 client = TestClient(app)
 
@@ -48,10 +54,19 @@ MOCK_REQUIREMENTS = RequirementsResponse(
 )
 
 MOCK_OPENSPEC_OUTPUT = _OpenSpecLLMOutput(
-    project={"name": "Reservas de clases", "sector": "Educación", "targetUsers": "Academias"},
-    requirements=[{"id": "RF-001", "title": "CRUD de profesores", "description": "Gestionar."}],
-    constraints={"stack": ["React", "NestJS"], "delivery": "Docker"},
+    project_description="Sistema de reservas de clases para academias y profesores particulares.",
+    requirements=[{"id": "RF-001", "title": "CRUD de profesores", "description": "Gestionar profesores.", "acceptance_criteria": ["El endpoint /profesores funciona."]}],
+    user_stories=[{"id": "US-001", "actor": "Profesor", "goal": "gestionar su agenda", "benefit": "ahorrar tiempo"}],
     modules=["Auth", "Profesores", "Reservas"],
+    milestones=[
+        "Milestone 1: Setup y arquitectura",
+        "Milestone 2: Modelos y base de datos",
+        "Milestone 3: API y lógica de negocio",
+        "Milestone 4: Frontend y UX",
+        "Milestone 5: Testing y despliegue",
+    ],
+    delivery="MVP dockerizado",
+    environments=["desarrollo", "producción"],
 )
 
 
@@ -150,6 +165,8 @@ class TestSupervisorAgent:
         result = SupervisorAgent().run(IDEA, llm=self._mock_llm())
 
         assert result["decision"] == "generate_requirements"
+        assert result["product_analysis"] is not None
+        assert "summary" in result["product_analysis"]
         assert result["requirements"] is not None
         assert result["openspec"] is not None
         assert result["openspec"].project_name == IDEA.name
@@ -158,6 +175,7 @@ class TestSupervisorAgent:
         result = SupervisorAgent().run(IDEA_FEW_FEATURES, llm=MagicMock())
 
         assert result["decision"] == "ask_more_questions"
+        assert result["product_analysis"] is None
         assert result["openspec"] is None
 
     def test_pipeline_without_llm_uses_deterministic(self) -> None:
@@ -166,6 +184,7 @@ class TestSupervisorAgent:
             result = SupervisorAgent().run(IDEA, llm=None)
 
         assert result["decision"] == "generate_requirements"
+        assert result["product_analysis"] is not None
         assert result["openspec"] is not None
 
 
@@ -214,6 +233,9 @@ CODEGEN_REQUEST = CodeGenerationRequest(
     stack=["React", "NestJS", "PostgreSQL", "Docker"],
 )
 
+# Neutral sector that doesn't trigger any sector template (uses generic DDD scaffold)
+CODEGEN_REQUEST_NEUTRAL = CODEGEN_REQUEST.model_copy(update={"sector": "Gestión de proyectos"})
+
 MOCK_CODEGEN_RESPONSE = CodeGenerationResponse(
     project_name="Reservas de clases",
     files=[
@@ -222,6 +244,120 @@ MOCK_CODEGEN_RESPONSE = CodeGenerationResponse(
         GeneratedFile(path="apps/api/src/app.module.ts", language="typescript", content="// app"),
     ],
 )
+
+
+# ── IssueGeneratorAgent ───────────────────────────────────────────────────────
+
+ISSUE_REQUEST_NESTJS = IssueGenerationRequest(
+    project_name="Reservas de clases",
+    sector="Educación",
+    openspec={
+        "requirements": [
+            {"id": "RF-001", "title": "CRUD de profesores", "description": "Gestionar profesores.", "acceptance_criteria": ["Endpoint /profesores funciona"]},
+            {"id": "RF-002", "title": "Reserva de clases", "description": "Gestionar reservas.", "acceptance_criteria": ["El alumno puede reservar"]},
+        ],
+        "user_stories": [
+            {"id": "US-001", "actor": "Profesor", "goal": "gestionar su agenda", "benefit": "ahorrar tiempo"},
+        ],
+        "modules": ["Auth", "Profesores", "Reservas", "Calendario"],
+        "milestones": [
+            "Milestone 1: Setup y arquitectura",
+            "Milestone 2: Modelos y base de datos",
+            "Milestone 3: API y lógica de negocio",
+            "Milestone 4: Frontend y UX",
+            "Milestone 5: Testing y despliegue",
+        ],
+        "architecture": {"type": "NESTJS_REACT"},
+    },
+)
+
+ISSUE_REQUEST_DJANGO = ISSUE_REQUEST_NESTJS.model_copy(
+    update={"openspec": {**ISSUE_REQUEST_NESTJS.openspec, "architecture": {"type": "DJANGO_REST"}}}
+)
+
+ISSUE_REQUEST_LARAVEL = ISSUE_REQUEST_NESTJS.model_copy(
+    update={"openspec": {**ISSUE_REQUEST_NESTJS.openspec, "architecture": {"type": "LARAVEL_MONOLITH"}}}
+)
+
+
+class TestIssueGeneratorAgent:
+    def test_deterministic_returns_issues(self) -> None:
+        with patch("app.agents.issue_generator_agent.get_llm", return_value=None):
+            result = IssueGeneratorAgent().generate(ISSUE_REQUEST_NESTJS)
+
+        assert result.project_name == "Reservas de clases"
+        assert result.total == len(result.issues)
+        assert result.total >= 5
+
+    def test_issues_have_required_fields(self) -> None:
+        with patch("app.agents.issue_generator_agent.get_llm", return_value=None):
+            result = IssueGeneratorAgent().generate(ISSUE_REQUEST_NESTJS)
+
+        for issue in result.issues:
+            assert issue.title, "Issue title must not be empty"
+            assert issue.body, "Issue body must not be empty"
+            assert issue.priority in {"high", "medium", "low"}, f"Invalid priority: {issue.priority}"
+            assert isinstance(issue.labels, list)
+
+    def test_requirements_become_issues(self) -> None:
+        with patch("app.agents.issue_generator_agent.get_llm", return_value=None):
+            result = IssueGeneratorAgent().generate(ISSUE_REQUEST_NESTJS)
+
+        titles = [i.title for i in result.issues]
+        assert any("RF-001" in t or "CRUD de profesores" in t for t in titles)
+
+    def test_milestones_are_propagated(self) -> None:
+        with patch("app.agents.issue_generator_agent.get_llm", return_value=None):
+            result = IssueGeneratorAgent().generate(ISSUE_REQUEST_NESTJS)
+
+        assert len(result.milestones) >= 3
+        assert any("Setup" in m or "arquitectura" in m for m in result.milestones)
+
+    def test_nestjs_setup_issue_is_generated(self) -> None:
+        with patch("app.agents.issue_generator_agent.get_llm", return_value=None):
+            result = IssueGeneratorAgent().generate(ISSUE_REQUEST_NESTJS)
+
+        titles = [i.title for i in result.issues]
+        assert any("NestJS" in t or "Prisma" in t or "módulo" in t.lower() for t in titles)
+
+    def test_django_setup_issue_is_generated(self) -> None:
+        with patch("app.agents.issue_generator_agent.get_llm", return_value=None):
+            result = IssueGeneratorAgent().generate(ISSUE_REQUEST_DJANGO)
+
+        titles = [i.title for i in result.issues]
+        assert any("Django" in t or "migración" in t.lower() or "migrate" in t.lower() for t in titles)
+
+    def test_laravel_setup_issue_is_generated(self) -> None:
+        with patch("app.agents.issue_generator_agent.get_llm", return_value=None):
+            result = IssueGeneratorAgent().generate(ISSUE_REQUEST_LARAVEL)
+
+        titles = [i.title for i in result.issues]
+        assert any("Laravel" in t or "Eloquent" in t or "Sanctum" in t for t in titles)
+
+    def test_testing_and_deployment_issues_always_present(self) -> None:
+        with patch("app.agents.issue_generator_agent.get_llm", return_value=None):
+            result = IssueGeneratorAgent().generate(ISSUE_REQUEST_NESTJS)
+
+        titles = " ".join(i.title.lower() for i in result.issues)
+        assert "test" in titles or "testing" in titles
+        assert "docker" in titles or "despliegue" in titles or "deploy" in titles
+
+    def test_endpoint_returns_issues(self) -> None:
+        with patch("app.agents.issue_generator_agent.get_llm", return_value=None):
+            response = client.post("/generate-issues", json=ISSUE_REQUEST_NESTJS.model_dump())
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["project_name"] == "Reservas de clases"
+        assert body["total"] >= 5
+        assert len(body["issues"]) == body["total"]
+        assert all(i["title"] for i in body["issues"])
+
+    def test_total_matches_issues_length(self) -> None:
+        with patch("app.agents.issue_generator_agent.get_llm", return_value=None):
+            result = IssueGeneratorAgent().generate(ISSUE_REQUEST_NESTJS)
+
+        assert result.total == len(result.issues)
 
 
 # ── CodeGenerationAgent ───────────────────────────────────────────────────────
@@ -233,7 +369,8 @@ class TestCodeGenerationAgent:
         mock_llm.with_structured_output.return_value = mock_structured
         mock_structured.invoke.return_value = MOCK_CODEGEN_RESPONSE
 
-        result = CodeGenerationAgent().generate(CODEGEN_REQUEST, llm=mock_llm)
+        # Use neutral sector so LLM is not bypassed by a sector template
+        result = CodeGenerationAgent().generate(CODEGEN_REQUEST_NEUTRAL, llm=mock_llm)
 
         mock_llm.with_structured_output.assert_called_once_with(CodeGenerationResponse)
         assert result.project_name == "Reservas de clases"
@@ -252,14 +389,15 @@ class TestCodeGenerationAgent:
         assert any(f.path == "README.md" for f in result.files)
 
     def test_falls_back_when_no_llm(self) -> None:
+        # Neutral sector → generic DDD scaffold (tRPC + Prisma)
         with patch("app.agents.codegen_agent.get_llm", return_value=None):
-            result = CodeGenerationAgent().generate(CODEGEN_REQUEST)
+            result = CodeGenerationAgent().generate(CODEGEN_REQUEST_NEUTRAL)
 
-        assert result.project_name == CODEGEN_REQUEST.project_name
+        assert result.project_name == CODEGEN_REQUEST_NEUTRAL.project_name
         paths = [f.path for f in result.files]
         assert "docker-compose.yml" in paths
-        assert "README.md" in paths
-        assert "apps/api/src/app.module.ts" in paths
+        assert "apps/api/package.json" in paths
+        assert "apps/api/src/modules/auth/auth.entity.ts" in paths
         assert "apps/api/prisma/schema.prisma" in paths
 
     def test_fallback_includes_auth_model_when_needed(self) -> None:
@@ -270,7 +408,7 @@ class TestCodeGenerationAgent:
         assert "model User" in schema_file.content
 
     def test_fallback_skips_auth_model_when_not_needed(self) -> None:
-        req_no_auth = CODEGEN_REQUEST.model_copy(update={"needs_auth": False})
+        req_no_auth = CODEGEN_REQUEST_NEUTRAL.model_copy(update={"needs_auth": False})
         with patch("app.agents.codegen_agent.get_llm", return_value=None):
             result = CodeGenerationAgent().generate(req_no_auth)
 
@@ -283,8 +421,9 @@ class TestCodeGenerationAgent:
         mock_llm.with_structured_output.return_value = mock_structured
         mock_structured.invoke.return_value = MOCK_CODEGEN_RESPONSE
 
+        # Neutral sector ensures the LLM path is taken (no template bypass)
         with patch("app.agents.codegen_agent.get_llm", return_value=mock_llm):
-            response = client.post("/generate-code", json=CODEGEN_REQUEST.model_dump())
+            response = client.post("/generate-code", json=CODEGEN_REQUEST_NEUTRAL.model_dump())
 
         assert response.status_code == 200
         body = response.json()
@@ -299,3 +438,934 @@ class TestCodeGenerationAgent:
         assert response.status_code == 200
         body = response.json()
         assert len(body["files"]) >= 5
+
+
+# ── TutorialAgent ─────────────────────────────────────────────────────────────
+
+TUTORIAL_REQUEST_DJANGO = TutorialRequest(
+    project_name="Reservas de clases",
+    sector="Educación",
+    architecture_type="DJANGO_REST",
+    stack=["Python", "Django", "PostgreSQL", "Docker"],
+    modules=["Auth", "Profesores", "Reservas"],
+    requirements=[{"id": "RF-001", "title": "CRUD de profesores", "description": "Gestionar profesores."}],
+    needs_auth=True,
+    needs_admin_panel=True,
+)
+
+TUTORIAL_REQUEST_NEXTJS = TUTORIAL_REQUEST_DJANGO.model_copy(
+    update={"architecture_type": "NEXTJS_APP", "stack": ["Next.js", "TypeScript", "Prisma", "PostgreSQL"]}
+)
+
+TUTORIAL_REQUEST_LARAVEL = TUTORIAL_REQUEST_DJANGO.model_copy(
+    update={"architecture_type": "LARAVEL_MONOLITH", "stack": ["PHP", "Laravel", "PostgreSQL"]}
+)
+
+TUTORIAL_REQUEST_UNKNOWN = TUTORIAL_REQUEST_DJANGO.model_copy(
+    update={"architecture_type": "UNKNOWN_ARCH", "stack": []}
+)
+
+
+class TestTutorialAgent:
+    def test_django_deterministic_returns_phases(self) -> None:
+        result = TutorialAgent().generate(TUTORIAL_REQUEST_DJANGO)
+
+        assert result.project_name == "Reservas de clases"
+        assert result.architecture_type == "DJANGO_REST"
+        assert len(result.phases) >= 5
+        assert result.total_steps == sum(len(p.steps) for p in result.phases)
+
+    def test_django_has_migrate_command(self) -> None:
+        result = TutorialAgent().generate(TUTORIAL_REQUEST_DJANGO)
+
+        all_commands = [s.command for p in result.phases for s in p.steps if s.command]
+        assert any("migrate" in cmd for cmd in all_commands)
+
+    def test_django_has_admin_phase(self) -> None:
+        result = TutorialAgent().generate(TUTORIAL_REQUEST_DJANGO)
+
+        titles = [p.title for p in result.phases]
+        assert any("Admin" in t for t in titles)
+
+    def test_nextjs_has_prisma_command(self) -> None:
+        result = TutorialAgent().generate(TUTORIAL_REQUEST_NEXTJS)
+
+        all_commands = [s.command for p in result.phases for s in p.steps if s.command]
+        assert any("prisma" in cmd for cmd in all_commands)
+
+    def test_laravel_has_artisan_command(self) -> None:
+        result = TutorialAgent().generate(TUTORIAL_REQUEST_LARAVEL)
+
+        all_commands = [s.command for p in result.phases for s in p.steps if s.command]
+        assert any("artisan" in cmd for cmd in all_commands)
+
+    def test_unknown_arch_llm_fallback_then_generic(self) -> None:
+        with patch("app.agents.tutorial_agent.get_llm", return_value=None):
+            result = TutorialAgent().generate(TUTORIAL_REQUEST_UNKNOWN)
+
+        assert result.project_name == "Reservas de clases"
+        assert len(result.phases) >= 3
+
+    def test_total_steps_matches_sum(self) -> None:
+        for req in [TUTORIAL_REQUEST_DJANGO, TUTORIAL_REQUEST_NEXTJS, TUTORIAL_REQUEST_LARAVEL]:
+            result = TutorialAgent().generate(req)
+            assert result.total_steps == sum(len(p.steps) for p in result.phases)
+
+    def test_endpoint_returns_tutorial(self) -> None:
+        response = client.post("/generate-tutorial", json=TUTORIAL_REQUEST_DJANGO.model_dump())
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["project_name"] == "Reservas de clases"
+        assert body["architecture_type"] == "DJANGO_REST"
+        assert len(body["phases"]) >= 5
+        assert body["total_steps"] > 0
+
+    def test_endpoint_unknown_arch_uses_generic_fallback(self) -> None:
+        with patch("app.agents.tutorial_agent.get_llm", return_value=None):
+            response = client.post("/generate-tutorial", json=TUTORIAL_REQUEST_UNKNOWN.model_dump())
+
+        assert response.status_code == 200
+        body = response.json()
+        assert len(body["phases"]) >= 3
+
+
+# ── ArchitectureAgent ─────────────────────────────────────────────────────────
+
+ARCH_REQUEST = ArchitectureRequest(
+    project_name="Reservas de clases",
+    sector="Educación",
+    problem="Gestionar reservas de clases particulares de forma manual",
+    target_users="Academias y profesores particulares",
+    key_features=["CRUD de profesores", "Reserva de clases", "Panel admin", "Calendario", "Notificaciones", "Pagos", "Reportes"],
+    needs_auth=True,
+    needs_admin_panel=True,
+    needs_ai=False,
+    preferred_stack="",
+)
+
+ARCH_REQUEST_LARAVEL = ARCH_REQUEST.model_copy(update={"preferred_stack": "laravel"})
+ARCH_REQUEST_NEXTJS  = ARCH_REQUEST.model_copy(update={"preferred_stack": "nextjs"})
+ARCH_REQUEST_DJANGO  = ARCH_REQUEST.model_copy(update={"preferred_stack": "django"})
+ARCH_REQUEST_AI      = ARCH_REQUEST.model_copy(update={"needs_ai": True, "preferred_stack": ""})
+
+
+class TestArchitectureAgent:
+    def test_rule_based_returns_learning_path(self) -> None:
+        with patch("app.agents.architecture_agent.get_llm", return_value=None):
+            result = ArchitectureAgent().recommend(ARCH_REQUEST)
+
+        assert len(result.learning_path) > 0
+        assert all(r.title and r.url and r.type and r.level for r in result.learning_path)
+
+    def test_rule_based_returns_when_to_upgrade(self) -> None:
+        with patch("app.agents.architecture_agent.get_llm", return_value=None):
+            result = ArchitectureAgent().recommend(ARCH_REQUEST)
+
+        assert len(result.when_to_upgrade) > 0
+        assert all(s.signal and s.reason and s.next_step for s in result.when_to_upgrade)
+
+    def test_laravel_has_bootcamp_resource(self) -> None:
+        with patch("app.agents.architecture_agent.get_llm", return_value=None):
+            result = ArchitectureAgent().recommend(ARCH_REQUEST_LARAVEL)
+
+        assert result.architecture_type == "LARAVEL_MONOLITH"
+        urls = [r.url for r in result.learning_path]
+        assert any("bootcamp.laravel.com" in u for u in urls)
+
+    def test_nextjs_has_learn_resource(self) -> None:
+        with patch("app.agents.architecture_agent.get_llm", return_value=None):
+            result = ArchitectureAgent().recommend(ARCH_REQUEST_NEXTJS)
+
+        assert result.architecture_type == "NEXTJS_APP"
+        urls = [r.url for r in result.learning_path]
+        assert any("nextjs.org/learn" in u for u in urls)
+
+    def test_django_has_djangogirls_resource(self) -> None:
+        with patch("app.agents.architecture_agent.get_llm", return_value=None):
+            result = ArchitectureAgent().recommend(ARCH_REQUEST_DJANGO)
+
+        assert result.architecture_type == "DJANGO_REST"
+        urls = [r.url for r in result.learning_path]
+        assert any("djangogirls" in u for u in urls)
+
+    def test_fastapi_ai_recommended_for_ai_projects(self) -> None:
+        with patch("app.agents.architecture_agent.get_llm", return_value=None):
+            result = ArchitectureAgent().recommend(ARCH_REQUEST_AI)
+
+        assert result.architecture_type == "FASTAPI_AI"
+        assert len(result.learning_path) > 0
+        assert len(result.when_to_upgrade) > 0
+
+    def test_learning_path_levels_are_valid(self) -> None:
+        valid_levels = {"BEGINNER", "INTERMEDIATE", "ADVANCED"}
+        with patch("app.agents.architecture_agent.get_llm", return_value=None):
+            result = ArchitectureAgent().recommend(ARCH_REQUEST)
+
+        assert all(r.level in valid_levels for r in result.learning_path)
+
+    def test_upgrade_signals_have_all_fields(self) -> None:
+        with patch("app.agents.architecture_agent.get_llm", return_value=None):
+            for req in [ARCH_REQUEST_LARAVEL, ARCH_REQUEST_NEXTJS, ARCH_REQUEST_DJANGO, ARCH_REQUEST_AI]:
+                result = ArchitectureAgent().recommend(req)
+                for sig in result.when_to_upgrade:
+                    assert sig.signal, f"Missing signal in {result.architecture_type}"
+                    assert sig.reason, f"Missing reason in {result.architecture_type}"
+                    assert sig.next_step, f"Missing next_step in {result.architecture_type}"
+
+    def test_endpoint_includes_new_fields(self) -> None:
+        with patch("app.agents.architecture_agent.get_llm", return_value=None):
+            response = client.post("/recommend-architecture", json=ARCH_REQUEST.model_dump())
+
+        assert response.status_code == 200
+        body = response.json()
+        assert "learning_path" in body
+        assert "when_to_upgrade" in body
+        assert len(body["learning_path"]) > 0
+        assert len(body["when_to_upgrade"]) > 0
+        assert all(k in body["learning_path"][0] for k in ("title", "url", "type", "level"))
+        assert all(k in body["when_to_upgrade"][0] for k in ("signal", "reason", "next_step"))
+
+    def test_inertia_react_rule_based(self) -> None:
+        req = ARCH_REQUEST.model_copy(update={"preferred_stack": "inertia react"})
+        with patch("app.agents.architecture_agent.get_llm", return_value=None):
+            result = ArchitectureAgent().recommend(req)
+
+        assert result.architecture_type == "LARAVEL_INERTIA_REACT"
+        assert result.name  # name is populated
+        assert len(result.first_steps) > 0
+        assert len(result.learning_path) > 0
+
+    def test_inertia_vue_rule_based(self) -> None:
+        req = ARCH_REQUEST.model_copy(update={"preferred_stack": "inertia vue"})
+        with patch("app.agents.architecture_agent.get_llm", return_value=None):
+            result = ArchitectureAgent().recommend(req)
+
+        assert result.architecture_type == "LARAVEL_INERTIA_VUE"
+        assert len(result.first_steps) > 0
+
+    def test_react_express_rule_based(self) -> None:
+        req = ARCH_REQUEST.model_copy(update={"preferred_stack": "express"})
+        with patch("app.agents.architecture_agent.get_llm", return_value=None):
+            result = ArchitectureAgent().recommend(req)
+
+        assert result.architecture_type == "REACT_EXPRESS"
+        assert any("express" in step.lower() for step in result.first_steps)
+
+    def test_laravel_inertia_react_first_steps_contain_composer(self) -> None:
+        req = ARCH_REQUEST.model_copy(update={"preferred_stack": "laravel react"})
+        with patch("app.agents.architecture_agent.get_llm", return_value=None):
+            result = ArchitectureAgent().recommend(req)
+
+        assert result.architecture_type == "LARAVEL_INERTIA_REACT"
+        assert any("composer" in step.lower() for step in result.first_steps)
+
+    def test_react_express_first_steps_contain_npm(self) -> None:
+        req = ARCH_REQUEST.model_copy(update={"preferred_stack": "react express"})
+        with patch("app.agents.architecture_agent.get_llm", return_value=None):
+            result = ArchitectureAgent().recommend(req)
+
+        assert result.architecture_type == "REACT_EXPRESS"
+        assert any("npm" in step.lower() for step in result.first_steps)
+
+
+# ── CodeGenerationAgent — sector templates (Sprint 0009) ────────────────────
+
+CODEGEN_RRHH = CodeGenerationRequest(
+    project_name="Portal RRHH",
+    sector="RRHH y empresas",
+    modules=["Empleados", "Departamentos", "Ausencias"],
+    requirements=[{"id": "RF-001", "title": "Gestión de empleados", "description": "CRUD empleados."}],
+    needs_auth=True,
+    needs_admin_panel=True,
+    needs_ai=False,
+    stack=["Next.js", "tRPC", "Prisma", "PostgreSQL"],
+)
+
+CODEGEN_SALUD = CodeGenerationRequest(
+    project_name="Clinica Digital",
+    sector="Salud y bienestar",
+    modules=["Pacientes", "Doctores", "Citas"],
+    requirements=[{"id": "RF-001", "title": "Gestión de pacientes", "description": "CRUD pacientes."}],
+    needs_auth=True,
+    needs_admin_panel=False,
+    needs_ai=False,
+    stack=["Next.js", "tRPC", "Prisma", "PostgreSQL"],
+)
+
+CODEGEN_HORECA = CodeGenerationRequest(
+    project_name="El Rincón",
+    sector="Restaurante y hostelería",
+    modules=["Carta", "Mesas", "Reservas", "Comandas"],
+    requirements=[{"id": "RF-001", "title": "Gestión de comandas", "description": "CRUD comandas."}],
+    needs_auth=True,
+    needs_admin_panel=True,
+    needs_ai=False,
+    stack=["Next.js", "tRPC", "Prisma", "PostgreSQL"],
+)
+
+CODEGEN_INMO = CodeGenerationRequest(
+    project_name="Pisos ya",
+    sector="Agencia inmobiliaria",
+    modules=["Propiedades", "Clientes", "Visitas", "Contratos"],
+    requirements=[{"id": "RF-001", "title": "Gestión de propiedades", "description": "CRUD propiedades."}],
+    needs_auth=True,
+    needs_admin_panel=True,
+    needs_ai=False,
+    stack=["Next.js", "tRPC", "Prisma", "PostgreSQL"],
+)
+
+CODEGEN_ECOMMERCE = CodeGenerationRequest(
+    project_name="MiTienda",
+    sector="Ecommerce y venta online",
+    modules=["Productos", "Carrito", "Pedidos"],
+    requirements=[{"id": "RF-001", "title": "Catálogo de productos", "description": "Listar productos."}],
+    needs_auth=True,
+    needs_admin_panel=True,
+    needs_ai=False,
+    stack=["Next.js", "tRPC", "Prisma", "PostgreSQL"],
+)
+
+CODEGEN_LOGISTICA = CodeGenerationRequest(
+    project_name="TransExpress",
+    sector="Logística y transporte",
+    modules=["Envíos", "Rutas", "Flota"],
+    requirements=[{"id": "RF-001", "title": "Gestión de envíos", "description": "CRUD envíos."}],
+    needs_auth=True,
+    needs_admin_panel=True,
+    needs_ai=False,
+    stack=["Next.js", "tRPC", "Prisma", "PostgreSQL"],
+)
+
+
+class TestSectorTemplates:
+    def test_rrhh_template_generates_files(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_RRHH, llm=None)
+
+        assert result.project_name == "Portal RRHH"
+        paths = [f.path for f in result.files]
+        assert "apps/api/prisma/schema.prisma" in paths
+        assert "docker-compose.yml" in paths
+
+    def test_rrhh_schema_has_employee_model(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_RRHH, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model Employee" in schema.content
+        assert "model Department" in schema.content
+        assert "model LeaveRequest" in schema.content
+
+    def test_rrhh_schema_has_leave_request_model(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_RRHH, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "LeaveType" in schema.content
+        assert "LeaveStatus" in schema.content
+
+    def test_salud_template_generates_files(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_SALUD, llm=None)
+
+        assert result.project_name == "Clinica Digital"
+        paths = [f.path for f in result.files]
+        assert "apps/api/prisma/schema.prisma" in paths
+        assert "apps/web/src/app/citas/page.tsx" in paths
+
+    def test_salud_schema_has_medical_models(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_SALUD, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model Patient" in schema.content
+        assert "model Doctor" in schema.content
+        assert "model Appointment" in schema.content
+        assert "model MedicalRecord" in schema.content
+
+    def test_salud_has_appointments_page(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_SALUD, llm=None)
+
+        paths = [f.path for f in result.files]
+        assert "apps/web/src/app/citas/page.tsx" in paths
+        assert "apps/web/src/app/pacientes/page.tsx" in paths
+
+    def test_rrhh_triggered_by_keyword_in_sector(self) -> None:
+        req = CODEGEN_RRHH.model_copy(update={"sector": "recursos humanos"})
+        result = CodeGenerationAgent().generate(req, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model Employee" in schema.content
+
+    def test_salud_triggered_by_clinica_keyword(self) -> None:
+        req = CODEGEN_SALUD.model_copy(update={"sector": "clinica medica"})
+        result = CodeGenerationAgent().generate(req, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model Patient" in schema.content
+
+    def test_rrhh_no_duplicate_paths(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_RRHH, llm=None)
+
+        paths = [f.path for f in result.files]
+        assert len(paths) == len(set(paths)), "Duplicate file paths in RRHH template"
+
+    def test_salud_no_duplicate_paths(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_SALUD, llm=None)
+
+        paths = [f.path for f in result.files]
+        assert len(paths) == len(set(paths)), "Duplicate file paths in SALUD template"
+
+    # ── HORECA ──────────────────────────────────────────────────────────────
+
+    def test_horeca_template_generates_files(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_HORECA, llm=None)
+
+        assert result.project_name == "El Rincón"
+        paths = [f.path for f in result.files]
+        assert "apps/api/prisma/schema.prisma" in paths
+        assert "docker-compose.yml" in paths
+
+    def test_horeca_schema_has_restaurant_models(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_HORECA, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model MenuItem" in schema.content
+        assert "model Table" in schema.content
+        assert "model Reservation" in schema.content
+        assert "model Order" in schema.content
+
+    def test_horeca_schema_has_order_line(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_HORECA, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model OrderLine" in schema.content
+        assert "enum MenuCategory" in schema.content
+        assert "enum OrderStatus" in schema.content
+
+    def test_horeca_has_comanda_and_reservas_pages(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_HORECA, llm=None)
+
+        paths = [f.path for f in result.files]
+        assert "apps/web/src/app/reservas/page.tsx" in paths
+        assert "apps/web/src/app/comandas/page.tsx" in paths
+        assert "apps/web/src/app/carta/page.tsx" in paths
+
+    def test_horeca_triggered_by_restaurante_keyword(self) -> None:
+        req = CODEGEN_HORECA.model_copy(update={"sector": "gestión de restaurante"})
+        result = CodeGenerationAgent().generate(req, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model MenuItem" in schema.content
+
+    def test_horeca_no_duplicate_paths(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_HORECA, llm=None)
+
+        paths = [f.path for f in result.files]
+        assert len(paths) == len(set(paths)), "Duplicate file paths in HORECA template"
+
+    # ── INMOBILIARIA ─────────────────────────────────────────────────────────
+
+    def test_inmobiliaria_template_generates_files(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_INMO, llm=None)
+
+        assert result.project_name == "Pisos ya"
+        paths = [f.path for f in result.files]
+        assert "apps/api/prisma/schema.prisma" in paths
+        assert "docker-compose.yml" in paths
+
+    def test_inmobiliaria_schema_has_real_estate_models(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_INMO, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model Property" in schema.content
+        assert "model Client" in schema.content
+        assert "model Visit" in schema.content
+        assert "model Contract" in schema.content
+
+    def test_inmobiliaria_schema_has_lead_pipeline(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_INMO, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "enum LeadStatus" in schema.content
+        assert "enum PropertyType" in schema.content
+        assert "enum ContractType" in schema.content
+
+    def test_inmobiliaria_has_propiedades_and_visitas_pages(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_INMO, llm=None)
+
+        paths = [f.path for f in result.files]
+        assert "apps/web/src/app/propiedades/page.tsx" in paths
+        assert "apps/web/src/app/clientes/page.tsx" in paths
+        assert "apps/web/src/app/visitas/page.tsx" in paths
+
+    def test_inmobiliaria_triggered_by_inmobiliaria_keyword(self) -> None:
+        req = CODEGEN_INMO.model_copy(update={"sector": "agencia inmobiliaria"})
+        result = CodeGenerationAgent().generate(req, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model Property" in schema.content
+
+    def test_inmobiliaria_no_duplicate_paths(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_INMO, llm=None)
+
+        paths = [f.path for f in result.files]
+        assert len(paths) == len(set(paths)), "Duplicate file paths in INMOBILIARIA template"
+
+    # ── ECOMMERCE ────────────────────────────────────────────────────────────
+
+    def test_ecommerce_template_generates_files(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_ECOMMERCE, llm=None)
+
+        assert result.project_name == "MiTienda"
+        paths = [f.path for f in result.files]
+        assert "apps/api/prisma/schema.prisma" in paths
+        assert "docker-compose.yml" in paths
+
+    def test_ecommerce_schema_has_shop_models(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_ECOMMERCE, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model Product" in schema.content
+        assert "model Cart" in schema.content
+        assert "model CartItem" in schema.content
+        assert "model Order" in schema.content
+        assert "model OrderItem" in schema.content
+
+    def test_ecommerce_schema_has_category_and_address(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_ECOMMERCE, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model Category" in schema.content
+        assert "model Address" in schema.content
+        assert "enum OrderStatus" in schema.content
+
+    def test_ecommerce_has_shop_pages(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_ECOMMERCE, llm=None)
+
+        paths = [f.path for f in result.files]
+        assert "apps/web/src/app/productos/page.tsx" in paths
+        assert "apps/web/src/app/carrito/page.tsx" in paths
+        assert "apps/web/src/app/pedidos/page.tsx" in paths
+
+    def test_ecommerce_triggered_by_tienda_online_keyword(self) -> None:
+        req = CODEGEN_ECOMMERCE.model_copy(update={"sector": "tienda online de ropa"})
+        result = CodeGenerationAgent().generate(req, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model Product" in schema.content
+
+    def test_ecommerce_no_duplicate_paths(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_ECOMMERCE, llm=None)
+
+        paths = [f.path for f in result.files]
+        assert len(paths) == len(set(paths)), "Duplicate file paths in ECOMMERCE template"
+
+    # ── LOGISTICA ────────────────────────────────────────────────────────────
+
+    def test_logistica_template_generates_files(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_LOGISTICA, llm=None)
+
+        assert result.project_name == "TransExpress"
+        paths = [f.path for f in result.files]
+        assert "apps/api/prisma/schema.prisma" in paths
+        assert "docker-compose.yml" in paths
+
+    def test_logistica_schema_has_logistics_models(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_LOGISTICA, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model Shipment" in schema.content
+        assert "model Vehicle" in schema.content
+        assert "model Driver" in schema.content
+        assert "model Route" in schema.content
+
+    def test_logistica_schema_has_tracking_events(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_LOGISTICA, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model TrackingEvent" in schema.content
+        assert "model RouteItem" in schema.content
+        assert "enum ShipmentStatus" in schema.content
+
+    def test_logistica_has_tracking_and_fleet_pages(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_LOGISTICA, llm=None)
+
+        paths = [f.path for f in result.files]
+        assert "apps/web/src/app/tracking/page.tsx" in paths
+        assert "apps/web/src/app/envios/page.tsx" in paths
+        assert "apps/web/src/app/flota/page.tsx" in paths
+
+    def test_logistica_triggered_by_envio_keyword(self) -> None:
+        req = CODEGEN_LOGISTICA.model_copy(update={"sector": "empresa de envíos y mensajería"})
+        result = CodeGenerationAgent().generate(req, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model Shipment" in schema.content
+
+    def test_logistica_no_duplicate_paths(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_LOGISTICA, llm=None)
+
+        paths = [f.path for f in result.files]
+        assert len(paths) == len(set(paths)), "Duplicate file paths in LOGISTICA template"
+
+
+CODEGEN_FINTECH = CodeGenerationRequest(
+    project_name="MiFinanzas",
+    sector="Fintech y gestión financiera",
+    modules=["Cuentas", "Transacciones", "Presupuesto", "Metas"],
+    requirements=[{"id": "RF-001", "title": "Control de gastos", "description": "Registrar ingresos y gastos."}],
+    needs_auth=True,
+    needs_admin_panel=False,
+    needs_ai=False,
+    stack=["Next.js", "tRPC", "Prisma", "PostgreSQL"],
+)
+
+CODEGEN_EVENTOS = CodeGenerationRequest(
+    project_name="EventPass",
+    sector="Eventos y venta de entradas",
+    modules=["Eventos", "Entradas", "Check-in"],
+    requirements=[{"id": "RF-001", "title": "Compra de entradas", "description": "Reservar entradas."}],
+    needs_auth=True,
+    needs_admin_panel=True,
+    needs_ai=False,
+    stack=["Next.js", "tRPC", "Prisma", "PostgreSQL"],
+)
+
+
+class TestFintechTemplate:
+    def test_fintech_template_generates_files(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_FINTECH, llm=None)
+
+        assert result.project_name == "MiFinanzas"
+        paths = [f.path for f in result.files]
+        assert "apps/api/prisma/schema.prisma" in paths
+        assert "docker-compose.yml" in paths
+
+    def test_fintech_schema_has_financial_models(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_FINTECH, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model Account" in schema.content
+        assert "model Transaction" in schema.content
+        assert "model Budget" in schema.content
+        assert "model Goal" in schema.content
+
+    def test_fintech_schema_has_account_types_and_enums(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_FINTECH, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "enum AccountType" in schema.content
+        assert "enum TransactionType" in schema.content
+        assert "CHECKING" in schema.content
+        assert "SAVINGS" in schema.content
+
+    def test_fintech_has_finance_pages(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_FINTECH, llm=None)
+
+        paths = [f.path for f in result.files]
+        assert "apps/web/src/app/transacciones/page.tsx" in paths
+        assert "apps/web/src/app/presupuesto/page.tsx" in paths
+        assert "apps/web/src/app/metas/page.tsx" in paths
+
+    def test_fintech_triggered_by_finanzas_keyword(self) -> None:
+        req = CODEGEN_FINTECH.model_copy(update={"sector": "control de finanzas personales"})
+        result = CodeGenerationAgent().generate(req, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model Account" in schema.content
+
+    def test_fintech_no_duplicate_paths(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_FINTECH, llm=None)
+
+        paths = [f.path for f in result.files]
+        assert len(paths) == len(set(paths)), "Duplicate file paths in FINTECH template"
+
+
+class TestEventosTemplate:
+    def test_eventos_template_generates_files(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_EVENTOS, llm=None)
+
+        assert result.project_name == "EventPass"
+        paths = [f.path for f in result.files]
+        assert "apps/api/prisma/schema.prisma" in paths
+        assert "docker-compose.yml" in paths
+
+    def test_eventos_schema_has_event_models(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_EVENTOS, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model Event" in schema.content
+        assert "model TicketType" in schema.content
+        assert "model Order" in schema.content
+        assert "model Attendee" in schema.content
+
+    def test_eventos_schema_has_venue_and_checkin(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_EVENTOS, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model Venue" in schema.content
+        assert "model OrderItem" in schema.content
+        assert "checkedIn" in schema.content
+
+    def test_eventos_has_event_and_checkin_pages(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_EVENTOS, llm=None)
+
+        paths = [f.path for f in result.files]
+        assert "apps/web/src/app/eventos/page.tsx" in paths
+        assert "apps/web/src/app/mis-entradas/page.tsx" in paths
+        assert "apps/web/src/app/checkin/page.tsx" in paths
+
+    def test_eventos_triggered_by_concierto_keyword(self) -> None:
+        req = CODEGEN_EVENTOS.model_copy(update={"sector": "plataforma de conciertos y festivales"})
+        result = CodeGenerationAgent().generate(req, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model Event" in schema.content
+
+    def test_eventos_no_duplicate_paths(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_EVENTOS, llm=None)
+
+        paths = [f.path for f in result.files]
+        assert len(paths) == len(set(paths)), "Duplicate file paths in EVENTOS template"
+
+
+CODEGEN_VETERINARIA = CodeGenerationRequest(
+    project_name="VetClinica",
+    sector="Clínica veterinaria",
+    modules=["Mascotas", "Citas", "Historia clínica"],
+    requirements=[{"id": "RF-001", "title": "Registro de mascotas", "description": "CRUD mascotas y propietarios."}],
+    needs_auth=True,
+    needs_admin_panel=False,
+    needs_ai=False,
+    stack=["Next.js", "tRPC", "Prisma", "PostgreSQL"],
+)
+
+CODEGEN_GYM = CodeGenerationRequest(
+    project_name="FitZone",
+    sector="Gimnasio y fitness",
+    modules=["Membresías", "Clases", "Reservas"],
+    requirements=[{"id": "RF-001", "title": "Gestión de membresías", "description": "Planes y suscripciones."}],
+    needs_auth=True,
+    needs_admin_panel=True,
+    needs_ai=False,
+    stack=["Next.js", "tRPC", "Prisma", "PostgreSQL"],
+)
+
+
+class TestVeterinariaTemplate:
+    def test_veterinaria_template_generates_files(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_VETERINARIA, llm=None)
+
+        assert result.project_name == "VetClinica"
+        paths = [f.path for f in result.files]
+        assert "apps/api/prisma/schema.prisma" in paths
+        assert "docker-compose.yml" in paths
+
+    def test_veterinaria_schema_has_clinic_models(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_VETERINARIA, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model Owner" in schema.content
+        assert "model Pet" in schema.content
+        assert "model Appointment" in schema.content
+        assert "model MedicalRecord" in schema.content
+
+    def test_veterinaria_schema_has_vaccine_and_enums(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_VETERINARIA, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model Vaccine" in schema.content
+        assert "enum Species" in schema.content
+        assert "enum AppointmentType" in schema.content
+        assert "enum VetRole" in schema.content
+
+    def test_veterinaria_has_clinic_pages(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_VETERINARIA, llm=None)
+
+        paths = [f.path for f in result.files]
+        assert "apps/web/src/app/mascotas/page.tsx" in paths
+        assert "apps/web/src/app/citas/page.tsx" in paths
+        assert "apps/web/src/app/historia/page.tsx" in paths
+
+    def test_veterinaria_triggered_by_mascota_keyword(self) -> None:
+        req = CODEGEN_VETERINARIA.model_copy(update={"sector": "clínica para mascotas y animales"})
+        result = CodeGenerationAgent().generate(req, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model Pet" in schema.content
+
+    def test_veterinaria_no_duplicate_paths(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_VETERINARIA, llm=None)
+
+        paths = [f.path for f in result.files]
+        assert len(paths) == len(set(paths)), "Duplicate file paths in VETERINARIA template"
+
+
+class TestGymTemplate:
+    def test_gym_template_generates_files(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_GYM, llm=None)
+
+        assert result.project_name == "FitZone"
+        paths = [f.path for f in result.files]
+        assert "apps/api/prisma/schema.prisma" in paths
+        assert "docker-compose.yml" in paths
+
+    def test_gym_schema_has_gym_models(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_GYM, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model MembershipPlan" in schema.content
+        assert "model Membership" in schema.content
+        assert "model GymClass" in schema.content
+        assert "model ClassSession" in schema.content
+        assert "model ClassBooking" in schema.content
+
+    def test_gym_schema_has_trainer_and_enums(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_GYM, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model Trainer" in schema.content
+        assert "enum ClassType" in schema.content
+        assert "enum DayOfWeek" in schema.content
+        assert "enum MembershipStatus" in schema.content
+
+    def test_gym_has_gym_pages(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_GYM, llm=None)
+
+        paths = [f.path for f in result.files]
+        assert "apps/web/src/app/clases/page.tsx" in paths
+        assert "apps/web/src/app/reservas/page.tsx" in paths
+        assert "apps/web/src/app/membresia/page.tsx" in paths
+
+    def test_gym_triggered_by_gimnasio_keyword(self) -> None:
+        req = CODEGEN_GYM.model_copy(update={"sector": "gestión de gimnasio y membresías"})
+        result = CodeGenerationAgent().generate(req, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model GymClass" in schema.content
+
+    def test_gym_no_duplicate_paths(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_GYM, llm=None)
+
+        paths = [f.path for f in result.files]
+        assert len(paths) == len(set(paths)), "Duplicate file paths in GYM template"
+
+
+CODEGEN_FARMACIA = CodeGenerationRequest(
+    project_name="FarmaPlus",
+    sector="Farmacia y dispensario",
+    modules=["Inventario", "Ventas", "Recetas"],
+    requirements=[{"id": "RF-001", "title": "Punto de venta", "description": "Dispensar medicamentos."}],
+    needs_auth=True,
+    needs_admin_panel=False,
+    needs_ai=False,
+    stack=["Next.js", "tRPC", "Prisma", "PostgreSQL"],
+)
+
+CODEGEN_ABOGADOS = CodeGenerationRequest(
+    project_name="LexDesk",
+    sector="Despacho de abogados y bufete jurídico",
+    modules=["Expedientes", "Clientes", "Facturación"],
+    requirements=[{"id": "RF-001", "title": "Gestión de expedientes", "description": "CRUD casos legales."}],
+    needs_auth=True,
+    needs_admin_panel=True,
+    needs_ai=False,
+    stack=["Next.js", "tRPC", "Prisma", "PostgreSQL"],
+)
+
+
+class TestFarmaciaTemplate:
+    def test_farmacia_template_generates_files(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_FARMACIA, llm=None)
+
+        assert result.project_name == "FarmaPlus"
+        paths = [f.path for f in result.files]
+        assert "apps/api/prisma/schema.prisma" in paths
+        assert "docker-compose.yml" in paths
+
+    def test_farmacia_schema_has_pharmacy_models(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_FARMACIA, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model Product" in schema.content
+        assert "model Sale" in schema.content
+        assert "model SaleItem" in schema.content
+        assert "model Prescription" in schema.content
+
+    def test_farmacia_schema_has_enums_and_fields(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_FARMACIA, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "enum PharmRole" in schema.content
+        assert "enum SaleStatus" in schema.content
+        assert "requiresPrescription" in schema.content
+        assert "minStock" in schema.content
+
+    def test_farmacia_has_pharmacy_pages(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_FARMACIA, llm=None)
+
+        paths = [f.path for f in result.files]
+        assert "apps/web/src/app/inventario/page.tsx" in paths
+        assert "apps/web/src/app/recetas/page.tsx" in paths
+        assert "apps/web/src/app/ventas/page.tsx" in paths
+
+    def test_farmacia_triggered_by_farmacia_keyword(self) -> None:
+        req = CODEGEN_FARMACIA.model_copy(update={"sector": "gestión de farmacia y botica"})
+        result = CodeGenerationAgent().generate(req, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model Prescription" in schema.content
+
+    def test_farmacia_no_duplicate_paths(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_FARMACIA, llm=None)
+
+        paths = [f.path for f in result.files]
+        assert len(paths) == len(set(paths)), "Duplicate file paths in FARMACIA template"
+
+
+class TestAbogadosTemplate:
+    def test_abogados_template_generates_files(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_ABOGADOS, llm=None)
+
+        assert result.project_name == "LexDesk"
+        paths = [f.path for f in result.files]
+        assert "apps/api/prisma/schema.prisma" in paths
+        assert "docker-compose.yml" in paths
+
+    def test_abogados_schema_has_legal_models(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_ABOGADOS, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model LegalClient" in schema.content
+        assert "model Matter" in schema.content
+        assert "model Hearing" in schema.content
+        assert "model TimeEntry" in schema.content
+        assert "model Invoice" in schema.content
+
+    def test_abogados_schema_has_legal_enums(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_ABOGADOS, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "enum LegalRole" in schema.content
+        assert "enum CaseType" in schema.content
+        assert "enum CaseStatus" in schema.content
+        assert "enum InvoiceStatus" in schema.content
+
+    def test_abogados_has_legal_pages(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_ABOGADOS, llm=None)
+
+        paths = [f.path for f in result.files]
+        assert "apps/web/src/app/expedientes/page.tsx" in paths
+        assert "apps/web/src/app/clientes/page.tsx" in paths
+        assert "apps/web/src/app/agenda/page.tsx" in paths
+        assert "apps/web/src/app/facturacion/page.tsx" in paths
+
+    def test_abogados_triggered_by_bufete_keyword(self) -> None:
+        req = CODEGEN_ABOGADOS.model_copy(update={"sector": "software para bufete de abogados"})
+        result = CodeGenerationAgent().generate(req, llm=None)
+
+        schema = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        assert "model Matter" in schema.content
+
+    def test_abogados_no_duplicate_paths(self) -> None:
+        result = CodeGenerationAgent().generate(CODEGEN_ABOGADOS, llm=None)
+
+        paths = [f.path for f in result.files]
+        assert len(paths) == len(set(paths)), "Duplicate file paths in ABOGADOS template"

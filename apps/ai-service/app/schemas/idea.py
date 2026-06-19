@@ -10,3 +10,6 @@ class IdeaRequest(BaseModel):
     needs_auth: bool = True
     needs_admin_panel: bool = True
     needs_ai: bool = False
+    # Injected by NestJS when a stored architecture recommendation exists.
+    # Allows OpenSpecAgent to embed the chosen architecture in the spec.
+    architecture_type: str | None = None

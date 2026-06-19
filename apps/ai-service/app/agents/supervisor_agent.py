@@ -13,6 +13,7 @@ class PipelineState(TypedDict):
     idea: IdeaRequest
     # Optional single-LLM override (used in tests; None = let each node pick its own)
     llm: BaseChatModel | None
+    product_analysis: Annotated[dict[str, object] | None, "product analysis result"]
     requirements: Annotated[RequirementsResponse | None, "generated requirements"]
     openspec: Annotated[OpenSpecResponse | None, "generated openspec"]
     decision: str
@@ -24,9 +25,14 @@ def _supervisor_node(state: PipelineState) -> PipelineState:
     return {**state, "decision": decision}
 
 
+def _product_node(state: PipelineState) -> PipelineState:
+    from app.agents.product_agent import ProductAgent
+    analysis = ProductAgent().analyze(state["idea"])
+    return {**state, "product_analysis": analysis}
+
+
 def _requirements_node(state: PipelineState) -> PipelineState:
     from app.agents.requirements_agent import RequirementsAgent
-    # Use test override if provided; otherwise resolve task-specific LLM
     llm_override = state["llm"]
     task_llm = llm_override if llm_override is not None else get_llm("reasoning")
     requirements = RequirementsAgent().generate(state["idea"], task_llm)
@@ -49,6 +55,7 @@ def _route_after_supervisor(state: PipelineState) -> str:
 def _build_graph() -> StateGraph:
     graph = StateGraph(PipelineState)
     graph.add_node("supervisor", _supervisor_node)
+    graph.add_node("analyze_product", _product_node)
     graph.add_node("generate_requirements", _requirements_node)
     graph.add_node("generate_openspec", _openspec_node)
     graph.set_entry_point("supervisor")
@@ -56,10 +63,11 @@ def _build_graph() -> StateGraph:
         "supervisor",
         _route_after_supervisor,
         {
-            "generate_requirements": "generate_requirements",
+            "generate_requirements": "analyze_product",
             "ask_more_questions": END,
         },
     )
+    graph.add_edge("analyze_product", "generate_requirements")
     graph.add_edge("generate_requirements", "generate_openspec")
     graph.add_edge("generate_openspec", END)
     return graph
@@ -70,14 +78,15 @@ _compiled_graph = _build_graph().compile()
 
 class SupervisorAgent:
     def run(self, idea: IdeaRequest, llm: BaseChatModel | None = None) -> PipelineState:
-        """Run the full pipeline.
+        """Run the full pipeline: supervisor → product_analysis → requirements → openspec.
 
         Pass llm= to inject a mock in tests. In production leave it None
         so each node resolves the best available model for its task.
         """
         initial_state: PipelineState = {
             "idea": idea,
-            "llm": llm,  # None = each node picks task-specific LLM
+            "llm": llm,
+            "product_analysis": None,
             "requirements": None,
             "openspec": None,
             "decision": "",
