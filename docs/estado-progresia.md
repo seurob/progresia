@@ -38,12 +38,14 @@ progresia-studio
 | 0005 Generated artifacts | Manifest y export de artefactos generados. |
 | 0006 GitHub security quality | CI, Dependabot, security policy, dependency review y Scorecard. |
 | 0007 Delivery flow consolidation | Project status transitions, requirements UI, jobs async, SSE, MinIO, refresh token y pruebas. |
+| 0008 Bug fixes post-analysis | BullMQ processor discovery, SHA-256 refresh tokens, idea fields en generateCode, errores UI pollers, timeout poller, REQUIREMENTS_READY enum. |
+| 0009 MVP completion | Dockerfiles produccion (nginx SPA, prisma migrate, non-root), ProductAgent en pipeline supervisor, gestion de miembros de workspace (API + UI). |
 
 ## Trabajo Implementado De Prioridad
 
 | Prioridad | Gap original | Estado |
 | --- | --- | --- |
-| Critico | Project status nunca cambia | Resuelto: DRAFT, SPEC_READY, REQUIREMENTS_READY y GENERATED se actualizan desde services. |
+| Critico | Project status nunca cambia | Resuelto: DRAFT, REQUIREMENTS_READY, SPEC_READY y GENERATED se actualizan desde services. REQUIREMENTS_READY añadido al enum. |
 | Critico | Frontend sin tests | Resuelto: Vitest con tests de flujos principales. |
 | Critico / Alta | Generacion sincrona | Resuelto: jobs async con BullMQ. |
 | Alta | Progress en tiempo real | Resuelto: SSE/polling de jobs desde API y frontend. |
@@ -110,11 +112,9 @@ GitHub Actions en `main`:
 | 3 | Evaluar React Router 8 sin mezclarlo con otras majors. | #17 |
 | 4 | Evaluar TypeScript 6 en todo el monorepo. | #18 |
 | 5 | Evaluar ESLint 10 y plugins asociados. | #19 |
-| 6 | RAG con Qdrant. | Pendiente |
-| 7 | Integrar ProductAgent en pipeline supervisor. | Pendiente |
-| 8 | Roles Collaborator/Reviewer en UI. | Pendiente |
-| 9 | E2E Playwright. | Pendiente |
-| 10 | Dockerfiles de produccion. | Pendiente |
+| 6 | RAG con Qdrant — embeddings de specs y busqueda semantica. | Pendiente |
+| 7 | E2E Playwright — smoke tests del flujo idea-to-GitHub. | Pendiente |
+| 8 | Sentry — observabilidad en API y frontend. | Pendiente |
 
 ## Regla Operativa
 

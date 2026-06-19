@@ -4,15 +4,15 @@ services:
     container_name: progresia-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: progresia
-      POSTGRES_PASSWORD: progresia
-      POSTGRES_DB: progresia_studio
+      POSTGRES_USER: ${POSTGRES_USER:-progresia}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-progresia_studio}
     ports:
       - "5432:5432"
     volumes:
       - progresia_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U progresia -d progresia_studio"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-progresia} -d ${POSTGRES_DB:-progresia_studio}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -45,13 +45,95 @@ services:
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: progresia
-      MINIO_ROOT_PASSWORD: progresia_secret
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-progresia}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?MINIO_SECRET_KEY must be set in .env}
     ports:
       - "9000:9000"
       - "9001:9001"
     volumes:
       - progresia_minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ai-service:
+    build:
+      context: ./apps/ai-service
+      dockerfile: Dockerfile
+    container_name: progresia-ai-service
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      AI_SERVICE_PORT: 8000
+    ports:
+      - "${AI_SERVICE_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: progresia-api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-progresia}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-progresia_studio}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MINIO_ENDPOINT: minio
+      AI_SERVICE_URL: http://ai-service:8000
+    ports:
+      - "${API_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: progresia-web
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: http://localhost:3000/api
+    ports:
+      - "5173:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:alpine
+    container_name: progresia-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./apps/web/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - api
+      - web
 
 volumes:
   progresia_postgres_data:
