@@ -40,20 +40,37 @@ function renderWithRouter(
 
 describe("ProtectedRoute", () => {
   it("redirects unauthenticated users to /login", () => {
-    renderWithRouter(makeAuthContext({ isAuthenticated: false }), "/");
+    renderWithRouter(makeAuthContext({ isAuthenticated: false, isLoading: false }), "/");
     expect(screen.getByText("Login page")).toBeInTheDocument();
   });
 
   it("renders children for authenticated users", () => {
     renderWithRouter(
-      makeAuthContext({ isAuthenticated: true, token: "tok" }),
+      makeAuthContext({ isAuthenticated: true, isLoading: false, token: "tok" }),
       "/"
     );
     expect(screen.getByText("Dashboard")).toBeInTheDocument();
   });
 
   it("does not render dashboard when unauthenticated", () => {
-    renderWithRouter(makeAuthContext({ isAuthenticated: false }), "/");
+    renderWithRouter(makeAuthContext({ isAuthenticated: false, isLoading: false }), "/");
     expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
+  });
+
+  it("renders a blank screen while auth is loading (no flash of content)", () => {
+    renderWithRouter(
+      makeAuthContext({ isAuthenticated: false, isLoading: true }),
+      "/"
+    );
+    expect(screen.queryByText("Login page")).not.toBeInTheDocument();
+    expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
+  });
+
+  it("does not redirect to login while auth is still loading", () => {
+    renderWithRouter(
+      makeAuthContext({ isAuthenticated: false, isLoading: true }),
+      "/"
+    );
+    expect(screen.queryByText("Login page")).not.toBeInTheDocument();
   });
 });

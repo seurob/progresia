@@ -15,6 +15,15 @@ export interface AuthResponse {
   user: User;
 }
 
+export interface WorkspaceMember {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  role: Role;
+  createdAt: string;
+  user: { id: string; name: string; email: string };
+}
+
 export interface Workspace {
   id: string;
   name: string;
@@ -59,7 +68,7 @@ export interface RequirementsContent {
 export interface Specification {
   id: string;
   projectId: string;
-  type: "REQUIREMENTS" | "OPENSPEC" | "ARCHITECTURE" | "DATA_MODEL";
+  type: "REQUIREMENTS" | "OPENSPEC" | "ARCHITECTURE" | "DATA_MODEL" | "ISSUES" | "TUTORIAL";
   status: "DRAFT" | "GENERATED" | "APPROVED" | "REJECTED";
   content: Record<string, unknown>;
   createdAt: string;
@@ -103,7 +112,7 @@ export interface Project {
   sector: string;
   productType: string;
   description: string;
-  status: "DRAFT" | "SPEC_READY" | "GENERATING" | "GENERATED" | "REVIEW" | "DEPLOYED";
+  status: "DRAFT" | "REQUIREMENTS_READY" | "SPEC_READY" | "GENERATING" | "GENERATED" | "REVIEW" | "DEPLOYED";
   createdAt: string;
   updatedAt: string;
   idea?: Idea | null;

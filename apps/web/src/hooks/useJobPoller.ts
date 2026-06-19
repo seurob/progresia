@@ -4,13 +4,17 @@ import { JobStatus } from "../types/api";
 
 type PollState = "idle" | "polling" | "completed" | "failed";
 
+const MAX_POLLS = 150; // 5 min at 2s intervals
+
 export function useJobPoller(onComplete: () => void) {
   const [jobId, setJobId] = useState<string | null>(null);
   const [state, setState] = useState<PollState>("idle");
   const [error, setError] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollCountRef = useRef(0);
 
   function startPolling(id: string) {
+    pollCountRef.current = 0;
     setJobId(id);
     setState("polling");
     setError(null);
@@ -20,6 +24,15 @@ export function useJobPoller(onComplete: () => void) {
     if (state !== "polling" || !jobId) return;
 
     intervalRef.current = setInterval(async () => {
+      pollCountRef.current += 1;
+
+      if (pollCountRef.current > MAX_POLLS) {
+        clearInterval(intervalRef.current!);
+        setState("failed");
+        setError("El job no completó en 5 minutos");
+        return;
+      }
+
       try {
         const res = await api.get<JobStatus>(`/jobs/${jobId}`);
         const { status } = res.data;

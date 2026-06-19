@@ -1,13 +1,108 @@
+@import url("https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Inter:wght@400;500;600&display=swap");
 @import "tailwindcss";
 
+/* ── Tailwind color tokens — dark (default) ─────────────────────────────── */
+@theme {
+  --color-zinc-950: #09090a;
+  --color-zinc-900: #111110;
+  --color-zinc-800: #1c1c19;
+  --color-zinc-700: #2a2a25;
+  --color-zinc-600: #3d3d36;
+  --color-zinc-500: #6b6555;
+  --color-zinc-400: #a89f8c;
+  --color-zinc-300: #c4b99e;
+  --color-zinc-200: #d8cdb2;
+  --color-zinc-100: #ede6d6;
+  --color-zinc-50:  #f5f0e8;
+
+  --color-emerald-500: #c49a2a;
+  --color-emerald-400: #d4a843;
+  --color-emerald-300: #e0b85c;
+  --color-emerald-200: #edd585;
+  --color-emerald-100: #f5eabc;
+}
+
+/* ── Design tokens — dark ───────────────────────────────────────────────── */
 :root {
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --c-bg:             #09090a;
+  --c-surface:        rgb(28 28 25 / 0.9);
+  --c-surface-2:      rgb(42 42 37 / 0.6);
+  --c-border-subtle:  rgb(212 168 67 / 0.13);
+  --c-border-med:     rgb(212 168 67 / 0.22);
+  --c-border-strong:  rgb(212 168 67 / 0.48);
+  --c-border-hover:   rgb(212 168 67 / 0.65);
+  --c-text:           #f5f0e8;
+  --c-text-muted:     #a89f8c;
+  --c-text-faint:     #6b6555;
+  --c-accent:         #d4a843;
+  --c-accent-hover:   #e0b85c;
+  --c-accent-on:      #09090a;
+  --c-active-bg:      #1e1e18;
+  --c-focus-ring:     rgb(212 168 67 / 0.75);
+  --c-shadow-accent:  rgb(212 168 67 / 0.10);
+  --c-status-bg:      #1a1a14;
+  --c-status-text:    #d4a843;
+  --c-status-border:  rgb(212 168 67 / 0.35);
+
+  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
   color-scheme: dark;
+}
+
+/* ── Design tokens — light ──────────────────────────────────────────────── */
+:root.light {
+  /* Override Tailwind color tokens — inverts the zinc scale */
+  --color-zinc-950: #faf8f3;
+  --color-zinc-900: #f0ebe0;
+  --color-zinc-800: #e0d9c8;
+  --color-zinc-700: #cdc4b0;
+  --color-zinc-600: #b0a58e;
+  --color-zinc-500: #8c8070;
+  --color-zinc-400: #6b6355;
+  --color-zinc-300: #4a4038;
+  --color-zinc-200: #302820;
+  --color-zinc-100: #1a1a14;
+  --color-zinc-50:  #0d0d0a;
+
+  --color-emerald-400: #a07218;
+  --color-emerald-300: #b8911f;
+  --color-emerald-500: #8a6415;
+  --color-emerald-200: #c49a2a;
+  --color-emerald-100: #d4a843;
+
+  /* Component tokens */
+  --c-bg:             #faf8f3;
+  --c-surface:        rgb(240 235 224 / 0.95);
+  --c-surface-2:      rgb(224 217 200 / 0.7);
+  --c-border-subtle:  rgb(140 110 30 / 0.14);
+  --c-border-med:     rgb(140 110 30 / 0.22);
+  --c-border-strong:  rgb(140 110 30 / 0.5);
+  --c-border-hover:   rgb(140 110 30 / 0.65);
+  --c-text:           #1a1a14;
+  --c-text-muted:     #6b6355;
+  --c-text-faint:     #9a8e78;
+  --c-accent:         #a07218;
+  --c-accent-hover:   #b8911f;
+  --c-accent-on:      #faf8f3;
+  --c-active-bg:      #ede8dd;
+  --c-focus-ring:     rgb(140 110 30 / 0.75);
+  --c-shadow-accent:  rgb(140 110 30 / 0.10);
+  --c-status-bg:      #e8e0cf;
+  --c-status-text:    #a07218;
+  --c-status-border:  rgb(140 110 30 / 0.35);
+  color-scheme: light;
+}
+
+/* ── Base ──────────────────────────────────────────────────────────────── */
+
+h1, h2, h3, h4 {
+  font-family: "Syne", ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.02em;
 }
 
 body {
   margin: 0;
+  background: var(--c-bg);
+  color: var(--c-text);
 }
 
 pre {
@@ -15,32 +110,33 @@ pre {
   overflow-wrap: anywhere;
 }
 
-button,
-input,
-select,
-textarea {
+button, input, select, textarea {
   font: inherit;
 }
+
+/* ── Inputs ────────────────────────────────────────────────────────────── */
 
 .input {
   min-height: 2.75rem;
   width: 100%;
   border-radius: 0.375rem;
-  border: 1px solid rgb(255 255 255 / 0.12);
-  background: rgb(24 24 27 / 0.9);
+  border: 1px solid var(--c-border-subtle);
+  background: var(--c-surface);
   padding: 0.7rem 0.8rem;
-  color: rgb(250 250 250);
+  color: var(--c-text);
   outline: none;
 }
 
 .input:focus {
-  border-color: rgb(110 231 183 / 0.8);
-  box-shadow: 0 0 0 3px rgb(16 185 129 / 0.16);
+  border-color: var(--c-border-strong);
+  box-shadow: 0 0 0 3px var(--c-shadow-accent);
 }
 
 .input::placeholder {
-  color: rgb(113 113 122);
+  color: var(--c-text-faint);
 }
+
+/* ── Buttons & interactive ─────────────────────────────────────────────── */
 
 .primary-button,
 .secondary-button,
@@ -62,38 +158,44 @@ textarea {
 
 .primary-button {
   min-height: 2.75rem;
-  border: 1px solid rgb(110 231 183 / 0.8);
-  background: rgb(52 211 153);
-  padding: 0.7rem 1rem;
+  border: 1px solid var(--c-accent);
+  background: var(--c-accent);
+  padding: 0.7rem 1.1rem;
   font-weight: 700;
-  color: rgb(9 9 11);
+  letter-spacing: 0.01em;
+  color: var(--c-accent-on);
 }
 
 .primary-button:hover {
-  background: rgb(110 231 183);
+  background: var(--c-accent-hover);
+  border-color: var(--c-accent-hover);
 }
 
 .primary-button:disabled,
 .secondary-button:disabled {
   cursor: not-allowed;
-  opacity: 0.6;
+  opacity: 0.45;
 }
 
 .secondary-button {
   min-height: 2.75rem;
-  border: 1px solid rgb(255 255 255 / 0.14);
-  background: rgb(255 255 255 / 0.04);
-  padding: 0.7rem 1rem;
+  border: 1px solid var(--c-border-med);
+  background: var(--c-surface-2);
+  padding: 0.7rem 1.1rem;
   font-weight: 600;
-  color: rgb(244 244 245);
+  color: var(--c-text);
 }
 
 .secondary-button:hover,
-.nav-link:hover,
 .icon-button:hover,
 .row-link:hover {
-  border-color: rgb(110 231 183 / 0.65);
-  color: rgb(167 243 208);
+  border-color: var(--c-border-hover);
+  color: var(--c-accent-hover);
+}
+
+.nav-link:hover {
+  border-color: var(--c-border-strong);
+  color: var(--c-accent);
 }
 
 .icon-button {
@@ -101,59 +203,67 @@ textarea {
   min-height: 2.5rem;
   min-width: 2.5rem;
   place-items: center;
-  border: 1px solid rgb(255 255 255 / 0.14);
-  background: rgb(255 255 255 / 0.04);
-  color: rgb(244 244 245);
+  border: 1px solid var(--c-border-med);
+  background: var(--c-surface-2);
+  color: var(--c-text);
 }
 
 .nav-link {
   border: 1px solid transparent;
   padding: 0.75rem;
-  color: rgb(212 212 216);
+  color: var(--c-text-muted);
   text-decoration: none;
 }
 
 .nav-link.active {
-  border-color: rgb(110 231 183 / 0.5);
-  background: rgb(16 185 129 / 0.12);
-  color: rgb(167 243 208);
+  border-color: var(--c-border-strong);
+  background: var(--c-active-bg);
+  color: var(--c-text);
 }
 
 .subtle-link {
-  color: rgb(161 161 170);
+  color: var(--c-text-muted);
   text-decoration: none;
 }
 
 .subtle-link:hover {
-  color: rgb(167 243 208);
+  color: var(--c-text);
 }
 
 .row-link {
   justify-content: space-between;
-  border: 1px solid rgb(255 255 255 / 0.1);
-  background: rgb(255 255 255 / 0.04);
+  border: 1px solid var(--c-border-subtle);
+  background: var(--c-surface-2);
   padding: 1rem;
   color: inherit;
   text-decoration: none;
 }
 
+/* ── Status pill ───────────────────────────────────────────────────────── */
+
 .status-pill {
   border-radius: 0.375rem;
-  border: 1px solid rgb(110 231 183 / 0.35);
-  background: rgb(16 185 129 / 0.12);
-  padding: 0.35rem 0.55rem;
-  font-size: 0.75rem;
+  border: 1px solid var(--c-status-border);
+  background: var(--c-status-bg);
+  padding: 0.35rem 0.6rem;
+  font-size: 0.7rem;
   font-weight: 700;
-  color: rgb(167 243 208);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--c-status-text);
 }
+
+/* ── Check row ─────────────────────────────────────────────────────────── */
 
 .check-row {
   min-height: 2.75rem;
-  border: 1px solid rgb(255 255 255 / 0.12);
-  background: rgb(24 24 27 / 0.85);
+  border: 1px solid var(--c-border-subtle);
+  background: var(--c-surface);
   padding: 0.65rem 0.75rem;
-  color: rgb(228 228 231);
+  color: var(--c-text);
 }
+
+/* ── Focus rings ───────────────────────────────────────────────────────── */
 
 .primary-button:focus-visible,
 .secondary-button:focus-visible,
@@ -161,6 +271,6 @@ textarea {
 .nav-link:focus-visible,
 .subtle-link:focus-visible,
 .row-link:focus-visible {
-  outline: 2px solid rgb(110 231 183 / 0.8);
+  outline: 2px solid var(--c-focus-ring);
   outline-offset: 2px;
 }
