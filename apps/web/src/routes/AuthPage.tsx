@@ -9,10 +9,18 @@ import { useAuth } from "../features/auth/auth-context";
 import { api, getErrorMessage } from "../lib/api";
 import { AuthResponse } from "../types/api";
 
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_=+{};:,<.>?])/;
+
 const authSchema = z.object({
-  name: z.string().min(2).optional(),
-  email: z.string().email(),
-  password: z.string().min(8)
+  name: z.string().min(2, "El nombre debe tener al menos 2 caracteres").optional(),
+  email: z.string().email("Introduce un email válido"),
+  password: z.string().min(8, "Mínimo 8 caracteres")
+});
+
+const registerSchema = authSchema.extend({
+  password: z.string()
+    .min(8, "Mínimo 8 caracteres")
+    .regex(PASSWORD_REGEX, "Debe incluir mayúscula, minúscula, número y carácter especial (!@#$%...)")
 });
 
 type AuthForm = z.infer<typeof authSchema>;
@@ -23,7 +31,7 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
   const [serverError, setServerError] = useState<string | null>(null);
   const isRegister = mode === "register";
   const form = useForm<AuthForm>({
-    resolver: zodResolver(authSchema),
+    resolver: zodResolver(isRegister ? registerSchema : authSchema),
     defaultValues: {
       name: "",
       email: "",
@@ -87,7 +95,11 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
             <FormField label="Email" error={form.formState.errors.email?.message}>
               <input className="input" type="email" {...form.register("email")} autoComplete="email" />
             </FormField>
-            <FormField label="Password" error={form.formState.errors.password?.message}>
+            <FormField
+              label="Contraseña"
+              error={form.formState.errors.password?.message}
+              hint={isRegister ? "Mín. 8 caracteres · mayúscula · minúscula · número · símbolo" : undefined}
+            >
               <input className="input" type="password" {...form.register("password")} autoComplete={isRegister ? "new-password" : "current-password"} />
             </FormField>
           </div>

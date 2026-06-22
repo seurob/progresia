@@ -146,7 +146,7 @@ export class SpecificationsService {
     return this.prisma.specification.create({
       data: {
         projectId,
-        type:    SpecificationType.DATA_MODEL,  // reusing DATA_MODEL as "ISSUES" until schema migration
+        type:    SpecificationType.ISSUES,
         status:  SpecificationStatus.GENERATED,
         content: result as unknown as Prisma.InputJsonValue
       }

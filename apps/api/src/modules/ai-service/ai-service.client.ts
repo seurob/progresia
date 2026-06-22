@@ -157,7 +157,7 @@ export class AiServiceClient {
   constructor(private readonly configService: ConfigService) {}
 
   private get baseUrl(): string {
-    return this.configService.get<string>("AI_SERVICE_URL", "http://127.0.0.1:8002");
+    return this.configService.get<string>("AI_SERVICE_URL", "http://127.0.0.1:8000");
   }
 
   private async post<T>(path: string, payload: unknown): Promise<T> {

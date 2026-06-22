@@ -667,8 +667,8 @@ export function NewProjectPage() {
         </div>
       </div>
 
-      {/* Input area */}
-      {(() => { const node = renderInput(); return node ? <div className="mt-3 rounded-xl border border-(--c-border-subtle) bg-(--c-surface) p-4">{node}</div> : null; })()}
+      {/* Input area — capped so chat area always stays visible */}
+      {(() => { const node = renderInput(); return node ? <div className="mt-3 max-h-[48vh] overflow-y-auto rounded-xl border border-(--c-border-subtle) bg-(--c-surface) p-4">{node}</div> : null; })()}
 
       <style>{`
         @keyframes bounce {
