@@ -65,6 +65,27 @@ const PRODUCT_TYPE_INSIGHTS: Record<string, string> = {
   "Aplicacion movil": "Apps móviles tienen costes de distribución altos (App Store review, instalación). Para el MVP considera primero una **PWA** — misma experiencia, más fácil de iterar y sin friction de descarga.",
 };
 
+const SENTENCE_WORDS = /\b(quiero|tengo|hacer|necesito|hay|como|para|una|que|mi|esto|eso|hola|ok|sí|si|no|ayuda|help|test|prueba|gracias|hago|crear|voy|idea|proyecto)\b/gi;
+const NOT_A_NAME_RESPONSES = [
+  `Eso suena a una idea, no a un nombre. 😄 Necesito algo como **"GestiónPro"**, **"EduFlow"** o **"ClinicaOnline"** — el nombre con el que reconocerías este proyecto. ¿Cuál es?`,
+  `Mmm, eso parece una descripción. El nombre es más corto: **"AppSalud"**, **"TallerGest"**, **"LegalDesk"**… ¿Cómo quieres llamar a tu proyecto?`,
+  `Necesito el **nombre del proyecto**, no una descripción. Algo breve que lo identifique, como lo llamarías en el repositorio o en el logo. ¿Cómo se llama?`
+];
+let _notNameIdx = 0;
+
+function looksLikeProjectName(val: string): boolean {
+  const words = val.trim().split(/\s+/);
+  if (words.length > 5) return false;
+  if (val.length > 60) return false;
+  const matches = val.match(SENTENCE_WORDS) ?? [];
+  if (matches.length >= 2) return false;
+  return true;
+}
+
+function notANameMsg(): string {
+  return NOT_A_NAME_RESPONSES[_notNameIdx++ % NOT_A_NAME_RESPONSES.length];
+}
+
 function nameReactionMsg(name: string): string {
   const len = name.length;
   if (len <= 5) return `**"${name}"** es corto y directo. Fácil de recordar, fácil de escribir. Buena señal para un producto.`;
@@ -370,7 +391,7 @@ export function NewProjectPage() {
     // pushAI is safe to call here: the useChat cleanup cancels any in-flight
     // timers on StrictMode's simulated unmount, so the second mount starts fresh.
     pushAI(
-      `¡Hola! Soy **ProgresIA**, tu co-fundador técnico virtual.\n\nVoy a convertir tu idea en un **MVP completo**: código real, documentación, Docker y guía de implementación — generado con IA.\n\nEmpecemos. ¿Cómo se llama tu proyecto?`,
+      `¡Hola! Soy **ProgresIA**, tu co-fundador técnico virtual.\n\nMi trabajo es convertir tu idea en un **MVP completo**: requisitos, arquitectura, código y documentación — todo adaptado a tu sector y generado con IA.\n\nCuéntame, ¿cómo se llama el proyecto que tienes en mente?`,
       () => setStep("name")
     );
   }, [pushAI]);
@@ -400,8 +421,12 @@ export function NewProjectPage() {
     const val = textInput.trim();
     if (val.length < 2) return;
     pushUser(val);
-    setData(d => ({ ...d, name: val }));
     setTextInput("");
+    if (!looksLikeProjectName(val)) {
+      pushAI(notANameMsg());
+      return;
+    }
+    setData(d => ({ ...d, name: val }));
     pushAI(nameReactionMsg(val));
     pushAI(sectorMsg(val), () => setStep("sector"));
   }
