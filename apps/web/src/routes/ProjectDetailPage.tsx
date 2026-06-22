@@ -947,6 +947,7 @@ export function ProjectDetailPage() {
   const deleteMutation = useMutation({
     mutationFn: () => api.delete(`/projects/${projectId}`),
     onSuccess: async () => {
+      queryClient.removeQueries({ queryKey: ["project", projectId] });
       await queryClient.invalidateQueries({ queryKey: ["projects"] });
       void navigate("/");
     }

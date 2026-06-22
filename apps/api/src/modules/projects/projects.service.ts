@@ -7,6 +7,7 @@ import { UpdateProjectDto } from "./dto/update-project.dto";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function slugify(text: string): string {
+  // ̀-ͯ = Unicode combining diacritics block
   return (
     text
       .normalize("NFD")
@@ -29,11 +30,12 @@ export class ProjectsService {
   private async generateUniqueSlug(name: string): Promise<string> {
     const base = slugify(name);
     let slug = base;
-    let counter = 1;
-    while (await this.prisma.project.findUnique({ where: { slug } })) {
-      slug = `${base}-${counter++}`;
+    for (let i = 1; i <= 99; i++) {
+      const exists = await this.prisma.project.findUnique({ where: { slug }, select: { id: true } });
+      if (!exists) return slug;
+      slug = `${base}-${i}`;
     }
-    return slug;
+    return `${base}-${Date.now()}`;
   }
 
   async create(userId: string, dto: CreateProjectDto) {
