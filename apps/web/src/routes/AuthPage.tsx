@@ -11,19 +11,25 @@ import { AuthResponse } from "../types/api";
 
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_=+{};:,<.>?])/;
 
-const authSchema = z.object({
-  name: z.string().min(2, "El nombre debe tener al menos 2 caracteres").optional(),
+const baseSchema = z.object({
+  name: z.string(),
   email: z.string().email("Introduce un email válido"),
   password: z.string().min(8, "Mínimo 8 caracteres")
 });
 
-const registerSchema = authSchema.extend({
-  password: z.string()
-    .min(8, "Mínimo 8 caracteres")
-    .regex(PASSWORD_REGEX, "Debe incluir mayúscula, minúscula, número y carácter especial (!@#$%...)")
-});
+function buildSchema(isRegister: boolean) {
+  if (!isRegister) return baseSchema;
+  return baseSchema.superRefine((data, ctx) => {
+    if (data.name.trim().length < 2) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El nombre debe tener al menos 2 caracteres", path: ["name"] });
+    }
+    if (!PASSWORD_REGEX.test(data.password)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Debe incluir mayúscula, minúscula, número y carácter especial (!@#$%...)", path: ["password"] });
+    }
+  });
+}
 
-type AuthForm = z.infer<typeof authSchema>;
+type AuthForm = z.infer<typeof baseSchema>;
 
 export function AuthPage({ mode }: { mode: "login" | "register" }) {
   const auth = useAuth();
@@ -31,7 +37,7 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
   const [serverError, setServerError] = useState<string | null>(null);
   const isRegister = mode === "register";
   const form = useForm<AuthForm>({
-    resolver: zodResolver(isRegister ? registerSchema : authSchema),
+    resolver: zodResolver(buildSchema(isRegister)),
     defaultValues: {
       name: "",
       email: "",
