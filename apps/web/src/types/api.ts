@@ -109,6 +109,7 @@ export interface Project {
   id: string;
   workspaceId: string;
   name: string;
+  slug: string;
   sector: string;
   productType: string;
   description: string;

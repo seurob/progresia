@@ -538,7 +538,7 @@ export function NewProjectPage() {
         needsAi: data.needsAi
       });
 
-      navigate(`/projects/${project.id}`);
+      navigate(`/projects/${project.slug}`);
     } catch (err) {
       setServerError(getErrorMessage(err));
       setSubmitting(false);

@@ -11,12 +11,12 @@ export class IdeasService {
   ) {}
 
   async upsert(userId: string, dto: CreateIdeaDto) {
-    await this.projectsService.ensureProjectAccess(dto.projectId, userId);
+    const project = await this.projectsService.ensureProjectAccess(dto.projectId, userId);
 
     return this.prisma.idea.upsert({
-      where: { projectId: dto.projectId },
+      where: { projectId: project.id },
       create: {
-        projectId: dto.projectId,
+        projectId: project.id,
         problem: dto.problem,
         targetUsers: dto.targetUsers,
         coreFeatures: dto.coreFeatures,
@@ -40,9 +40,9 @@ export class IdeasService {
   }
 
   async findByProject(userId: string, projectId: string) {
-    await this.projectsService.ensureProjectAccess(projectId, userId);
+    const project = await this.projectsService.ensureProjectAccess(projectId, userId);
 
-    const idea = await this.prisma.idea.findUnique({ where: { projectId } });
+    const idea = await this.prisma.idea.findUnique({ where: { projectId: project.id } });
 
     if (!idea) {
       throw new NotFoundException("Idea not found");

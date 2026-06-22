@@ -35,19 +35,20 @@ export class ArtifactsService {
   ) {}
 
   async listByProject(userId: string, projectId: string) {
-    await this.projectsService.ensureProjectAccess(projectId, userId);
+    const project = await this.projectsService.ensureProjectAccess(projectId, userId);
 
     return this.prisma.artifactBundle.findMany({
-      where: { projectId },
+      where: { projectId: project.id },
       orderBy: { createdAt: "desc" }
     });
   }
 
   async generateBundle(userId: string, projectId: string) {
     const project = await this.projectsService.ensureProjectAccess(projectId, userId);
+    const id = project.id;
     const specification = await this.prisma.specification.findFirst({
       where: {
-        projectId,
+        projectId: id,
         type: SpecificationType.OPENSPEC,
         status: SpecificationStatus.GENERATED
       },
@@ -66,7 +67,7 @@ export class ArtifactsService {
 
     return this.prisma.artifactBundle.create({
       data: {
-        projectId,
+        projectId: id,
         specificationId: specification.id,
         manifest: manifest as unknown as Prisma.InputJsonValue
       }
@@ -75,8 +76,9 @@ export class ArtifactsService {
 
   async generateCode(userId: string, projectId: string) {
     const project = await this.projectsService.ensureProjectAccess(projectId, userId);
+    const id = project.id;
     const specification = await this.prisma.specification.findFirst({
-      where: { projectId, type: SpecificationType.OPENSPEC, status: SpecificationStatus.GENERATED },
+      where: { projectId: id, type: SpecificationType.OPENSPEC, status: SpecificationStatus.GENERATED },
       orderBy: { createdAt: "desc" }
     });
 
@@ -92,12 +94,10 @@ export class ArtifactsService {
     const constraints = (spec.constraints ?? {}) as Record<string, unknown>;
     const stack = Array.isArray(constraints.stack) ? (constraints.stack as string[]) : [];
 
-    const idea = await this.prisma.idea.findUnique({ where: { projectId } });
+    const idea = await this.prisma.idea.findUnique({ where: { projectId: id } });
 
-    // Use the stored architecture recommendation to drive template dispatch,
-    // so the code generation matches what was recommended to the user.
     const archSpec = await this.prisma.specification.findFirst({
-      where: { projectId, type: SpecificationType.ARCHITECTURE, status: SpecificationStatus.GENERATED },
+      where: { projectId: id, type: SpecificationType.ARCHITECTURE, status: SpecificationStatus.GENERATED },
       orderBy: { createdAt: "desc" }
     });
     const architectureType = (archSpec?.content as Record<string, unknown>)?.architecture_type as string | undefined;
@@ -115,7 +115,7 @@ export class ArtifactsService {
     });
 
     const existingBundle = await this.prisma.artifactBundle.findFirst({
-      where: { projectId, specificationId: specification.id },
+      where: { projectId: id, specificationId: specification.id },
       orderBy: { createdAt: "desc" }
     });
 
@@ -129,7 +129,7 @@ export class ArtifactsService {
           }
         }),
         this.prisma.project.update({
-          where: { id: projectId },
+          where: { id },
           data: { status: ProjectStatus.GENERATED }
         })
       ]);
@@ -145,14 +145,14 @@ export class ArtifactsService {
     const [bundle] = await this.prisma.$transaction([
       this.prisma.artifactBundle.create({
         data: {
-          projectId,
+          projectId: id,
           specificationId: specification.id,
           manifest: manifest as unknown as Prisma.InputJsonValue,
           generatedContent: generated as unknown as Prisma.InputJsonValue
         }
       }),
       this.prisma.project.update({
-        where: { id: projectId },
+        where: { id },
         data: { status: ProjectStatus.GENERATED }
       })
     ]);

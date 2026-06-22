@@ -14,11 +14,11 @@ export class SpecificationsService {
   ) {}
 
   async create(userId: string, dto: CreateSpecificationDto) {
-    await this.projectsService.ensureProjectAccess(dto.projectId, userId);
+    const project = await this.projectsService.ensureProjectAccess(dto.projectId, userId);
 
     return this.prisma.specification.create({
       data: {
-        projectId: dto.projectId,
+        projectId: project.id,
         type: dto.type,
         status: dto.status,
         content: dto.content as Prisma.InputJsonValue
@@ -27,23 +27,24 @@ export class SpecificationsService {
   }
 
   async listByProject(userId: string, projectId: string) {
-    await this.projectsService.ensureProjectAccess(projectId, userId);
+    const project = await this.projectsService.ensureProjectAccess(projectId, userId);
 
     return this.prisma.specification.findMany({
-      where: { projectId },
+      where: { projectId: project.id },
       orderBy: { createdAt: "desc" }
     });
   }
 
   async generateRequirements(userId: string, projectId: string) {
     const project = await this.projectsService.ensureProjectAccess(projectId, userId);
-    const idea = await this.prisma.idea.findUnique({ where: { projectId } });
+    const id = project.id;
+    const idea = await this.prisma.idea.findUnique({ where: { projectId: id } });
 
     if (!idea) {
       throw new ConflictException("Idea intake is required before generating requirements");
     }
 
-    const aiPayload = {
+    const generated = await this.aiServiceClient.generateRequirements({
       name: project.name,
       sector: project.sector,
       problem: idea.problem,
@@ -52,21 +53,19 @@ export class SpecificationsService {
       needs_auth: idea.needsAuth,
       needs_admin_panel: idea.needsAdminPanel,
       needs_ai: idea.needsAi
-    };
-
-    const generated = await this.aiServiceClient.generateRequirements(aiPayload);
+    });
 
     const [specification] = await this.prisma.$transaction([
       this.prisma.specification.create({
         data: {
-          projectId,
+          projectId: id,
           type: SpecificationType.REQUIREMENTS,
           status: SpecificationStatus.GENERATED,
           content: generated as unknown as Prisma.InputJsonValue
         }
       }),
       this.prisma.project.update({
-        where: { id: projectId },
+        where: { id },
         data: { status: ProjectStatus.REQUIREMENTS_READY }
       })
     ]);
@@ -76,16 +75,15 @@ export class SpecificationsService {
 
   async generateOpenSpec(userId: string, projectId: string) {
     const project = await this.projectsService.ensureProjectAccess(projectId, userId);
-    const idea = await this.prisma.idea.findUnique({ where: { projectId } });
+    const id = project.id;
+    const idea = await this.prisma.idea.findUnique({ where: { projectId: id } });
 
     if (!idea) {
       throw new ConflictException("Idea intake is required before generating OpenSpec");
     }
 
-    // If an architecture recommendation was already generated, embed it in the OpenSpec
-    // so the specification document reflects the chosen technology stack.
     const archSpec = await this.prisma.specification.findFirst({
-      where: { projectId, type: SpecificationType.ARCHITECTURE, status: SpecificationStatus.GENERATED },
+      where: { projectId: id, type: SpecificationType.ARCHITECTURE, status: SpecificationStatus.GENERATED },
       orderBy: { createdAt: "desc" }
     });
     const architectureType = (archSpec?.content as Record<string, unknown>)?.architecture_type as string | undefined;
@@ -102,11 +100,10 @@ export class SpecificationsService {
       architecture_type: architectureType
     });
 
-    // Atomic: create spec + advance project to SPEC_READY
     const [specification] = await this.prisma.$transaction([
       this.prisma.specification.create({
         data: {
-          projectId,
+          projectId: id,
           type: SpecificationType.OPENSPEC,
           status: SpecificationStatus.GENERATED,
           content: {
@@ -117,7 +114,7 @@ export class SpecificationsService {
         }
       }),
       this.prisma.project.update({
-        where: { id: projectId },
+        where: { id },
         data: { status: ProjectStatus.SPEC_READY }
       })
     ]);
@@ -127,9 +124,10 @@ export class SpecificationsService {
 
   async generateIssues(userId: string, projectId: string) {
     const project = await this.projectsService.ensureProjectAccess(projectId, userId);
+    const id = project.id;
 
     const openspecSpec = await this.prisma.specification.findFirst({
-      where: { projectId, type: SpecificationType.OPENSPEC, status: SpecificationStatus.GENERATED },
+      where: { projectId: id, type: SpecificationType.OPENSPEC, status: SpecificationStatus.GENERATED },
       orderBy: { createdAt: "desc" }
     });
 
@@ -145,7 +143,7 @@ export class SpecificationsService {
 
     return this.prisma.specification.create({
       data: {
-        projectId,
+        projectId: id,
         type:    SpecificationType.ISSUES,
         status:  SpecificationStatus.GENERATED,
         content: result as unknown as Prisma.InputJsonValue
@@ -155,10 +153,11 @@ export class SpecificationsService {
 
   async generateTutorial(userId: string, projectId: string) {
     const project = await this.projectsService.ensureProjectAccess(projectId, userId);
-    const idea    = await this.prisma.idea.findUnique({ where: { projectId } });
+    const id = project.id;
+    const idea = await this.prisma.idea.findUnique({ where: { projectId: id } });
 
     const openspecSpec = await this.prisma.specification.findFirst({
-      where: { projectId, type: SpecificationType.OPENSPEC, status: SpecificationStatus.GENERATED },
+      where: { projectId: id, type: SpecificationType.OPENSPEC, status: SpecificationStatus.GENERATED },
       orderBy: { createdAt: "desc" }
     });
 
@@ -171,25 +170,25 @@ export class SpecificationsService {
       ? (spec.architecture as Record<string, unknown>)
       : {};
 
-    const modules      = Array.isArray(spec.modules)      ? (spec.modules      as string[])                                                        : [];
-    const requirements = Array.isArray(spec.requirements) ? (spec.requirements as Array<{ id: string; title: string; description: string }>)        : [];
-    const stack        = Array.isArray(archSection.stack)  ? (archSection.stack  as string[])                                                        : [];
+    const modules      = Array.isArray(spec.modules)      ? (spec.modules      as string[])                                                  : [];
+    const requirements = Array.isArray(spec.requirements) ? (spec.requirements as Array<{ id: string; title: string; description: string }>) : [];
+    const stack        = Array.isArray(archSection.stack)  ? (archSection.stack  as string[])                                                  : [];
     const archType     = (archSection.type as string | undefined) ?? "";
 
     const tutorial = await this.aiServiceClient.generateTutorial({
-      project_name:     project.name,
-      sector:           project.sector,
+      project_name:      project.name,
+      sector:            project.sector,
       architecture_type: archType,
       stack,
       modules,
       requirements,
-      needs_auth:       idea?.needsAuth       ?? true,
+      needs_auth:        idea?.needsAuth       ?? true,
       needs_admin_panel: idea?.needsAdminPanel ?? true,
     });
 
     return this.prisma.specification.create({
       data: {
-        projectId,
+        projectId: id,
         type:    SpecificationType.TUTORIAL,
         status:  SpecificationStatus.GENERATED,
         content: tutorial as unknown as Prisma.InputJsonValue
@@ -199,27 +198,28 @@ export class SpecificationsService {
 
   async generateArchitecture(userId: string, projectId: string) {
     const project = await this.projectsService.ensureProjectAccess(projectId, userId);
-    const idea = await this.prisma.idea.findUnique({ where: { projectId } });
+    const id = project.id;
+    const idea = await this.prisma.idea.findUnique({ where: { projectId: id } });
 
     if (!idea) {
       throw new ConflictException("Idea intake is required before generating architecture recommendation");
     }
 
     const recommendation = await this.aiServiceClient.recommendArchitecture({
-      project_name:   project.name,
-      sector:         project.sector,
-      problem:        idea.problem,
-      target_users:   idea.targetUsers,
-      key_features:   idea.coreFeatures,
-      needs_auth:     idea.needsAuth,
+      project_name:      project.name,
+      sector:            project.sector,
+      problem:           idea.problem,
+      target_users:      idea.targetUsers,
+      key_features:      idea.coreFeatures,
+      needs_auth:        idea.needsAuth,
       needs_admin_panel: idea.needsAdminPanel,
-      needs_ai:       idea.needsAi,
-      preferred_stack: ""
+      needs_ai:          idea.needsAi,
+      preferred_stack:   ""
     });
 
     return this.prisma.specification.create({
       data: {
-        projectId,
+        projectId: id,
         type:    SpecificationType.ARCHITECTURE,
         status:  SpecificationStatus.GENERATED,
         content: recommendation as unknown as Prisma.InputJsonValue

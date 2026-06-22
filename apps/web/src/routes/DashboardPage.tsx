@@ -154,7 +154,7 @@ function ProjectCard({ project }: { readonly project: Project }) {
 
   return (
     <Link
-      to={`/projects/${project.id}`}
+      to={`/projects/${project.slug}`}
       className="group flex flex-col gap-3 rounded-lg border border-white/10 bg-white/4 p-4 transition-colors hover:border-white/20 hover:bg-white/6"
       aria-label={`Proyecto: ${project.name}`}
     >

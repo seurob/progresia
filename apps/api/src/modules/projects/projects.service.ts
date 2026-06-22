@@ -4,6 +4,21 @@ import { WorkspacesService } from "../workspaces/workspaces.service";
 import { CreateProjectDto } from "./dto/create-project.dto";
 import { UpdateProjectDto } from "./dto/update-project.dto";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function slugify(text: string): string {
+  return (
+    text
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "")
+      .substring(0, 50) || "proyecto"
+  );
+}
+
 @Injectable()
 export class ProjectsService {
   constructor(
@@ -11,13 +26,25 @@ export class ProjectsService {
     private readonly workspacesService: WorkspacesService
   ) {}
 
+  private async generateUniqueSlug(name: string): Promise<string> {
+    const base = slugify(name);
+    let slug = base;
+    let counter = 1;
+    while (await this.prisma.project.findUnique({ where: { slug } })) {
+      slug = `${base}-${counter++}`;
+    }
+    return slug;
+  }
+
   async create(userId: string, dto: CreateProjectDto) {
     await this.workspacesService.ensureMember(dto.workspaceId, userId);
+    const slug = await this.generateUniqueSlug(dto.name);
 
     return this.prisma.project.create({
       data: {
         workspaceId: dto.workspaceId,
         name: dto.name,
+        slug,
         sector: dto.sector,
         productType: dto.productType,
         description: dto.description
@@ -43,11 +70,15 @@ export class ProjectsService {
     });
   }
 
-  async findOne(userId: string, projectId: string) {
-    await this.ensureProjectAccess(projectId, userId);
+  async findOne(userId: string, projectIdOrSlug: string) {
+    await this.ensureProjectAccess(projectIdOrSlug, userId);
+
+    const where = UUID_RE.test(projectIdOrSlug)
+      ? { id: projectIdOrSlug }
+      : { slug: projectIdOrSlug };
 
     return this.prisma.project.findUnique({
-      where: { id: projectId },
+      where,
       include: {
         idea: true,
         specifications: true,
@@ -56,11 +87,11 @@ export class ProjectsService {
     });
   }
 
-  async update(userId: string, projectId: string, dto: UpdateProjectDto) {
-    await this.ensureProjectAccess(projectId, userId);
+  async update(userId: string, projectIdOrSlug: string, dto: UpdateProjectDto) {
+    const project = await this.ensureProjectAccess(projectIdOrSlug, userId);
 
     return this.prisma.project.update({
-      where: { id: projectId },
+      where: { id: project.id },
       data: {
         name: dto.name,
         sector: dto.sector,
@@ -70,14 +101,18 @@ export class ProjectsService {
     });
   }
 
-  async remove(userId: string, projectId: string) {
-    await this.ensureProjectAccess(projectId, userId);
-    await this.prisma.project.delete({ where: { id: projectId } });
+  async remove(userId: string, projectIdOrSlug: string) {
+    const project = await this.ensureProjectAccess(projectIdOrSlug, userId);
+    await this.prisma.project.delete({ where: { id: project.id } });
   }
 
-  async ensureProjectAccess(projectId: string, userId: string) {
+  async ensureProjectAccess(projectIdOrSlug: string, userId: string) {
+    const where = UUID_RE.test(projectIdOrSlug)
+      ? { id: projectIdOrSlug }
+      : { slug: projectIdOrSlug };
+
     const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
+      where,
       include: {
         workspace: {
           include: {

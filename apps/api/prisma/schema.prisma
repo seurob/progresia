@@ -94,6 +94,7 @@ model Project {
   id           String          @id @default(uuid())
   workspaceId  String
   name         String
+  slug         String          @unique
   sector       String
   productType  String
   description  String
