@@ -271,9 +271,7 @@ export class ArtifactsService {
     } | null;
     const manifest = bundle.manifest as unknown as Manifest;
 
-    const files: Array<{ path: string }> = generated?.files?.length
-      ? generated.files
-      : (manifest.files ?? []);
+    const files = this.mergeBundleFiles(manifest.files ?? [], generated?.files ?? []);
 
     const issues: string[] = [];
     const paths = files.map(f => f.path);
@@ -304,6 +302,22 @@ export class ArtifactsService {
       hasReadme,
       issues,
     };
+  }
+
+  private mergeBundleFiles(
+    manifestFiles: Array<{ path: string }>,
+    generatedFiles: Array<{ path: string }>
+  ): Array<{ path: string }> {
+    const seen = new Set<string>();
+    const files: Array<{ path: string }> = [];
+
+    for (const file of [...manifestFiles, ...generatedFiles]) {
+      if (!file.path || seen.has(file.path)) continue;
+      seen.add(file.path);
+      files.push(file);
+    }
+
+    return files;
   }
 
   async exportZipUrl(userId: string, bundleId: string): Promise<{ url: string; expiresIn: number }> {

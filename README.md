@@ -196,7 +196,15 @@ El `OpenSpecDoc` es la fuente de verdad para todos los agentes downstream:
 | `CAPTCHA_PROVIDER` | api | `turnstile`, `hcaptcha` o `recaptcha` |
 | `CAPTCHA_SECRET_KEY` | api | Secreto del proveedor CAPTCHA |
 | `SMTP_HOST` | api | Servidor SMTP para enviar codigos de verificacion |
+| `SMTP_PORT` | api | Puerto SMTP (`587` STARTTLS, `465` TLS) |
+| `SMTP_SECURE` | api | `true` para TLS directo, normalmente puerto `465` |
+| `SMTP_USER` / `SMTP_PASSWORD` | api | Credenciales SMTP si el proveedor requiere autenticacion |
+| `SMTP_REQUIRE_AUTH` | api | Hace fallar el envio si faltan credenciales SMTP |
+| `SMTP_VERIFY_ON_SEND` | api | Verifica conexion SMTP antes de enviar |
+| `SMTP_TLS_REJECT_UNAUTHORIZED` | api | Mantener `true` en produccion |
 | `EMAIL_FROM` | api | Remitente de los correos de verificacion |
+| `EMAIL_REPLY_TO` | api | Respuesta opcional para correos transaccionales |
+| `VITE_CAPTCHA_PROVIDER` | web | Proveedor del widget: `turnstile`, `hcaptcha` o `recaptcha` |
 | `VITE_CAPTCHA_SITE_KEY` | web | Clave publica del widget CAPTCHA |
 | `AI_SERVICE_URL` | api | URL del ai-service (default: `http://127.0.0.1:8001`) |
 | `GROQ_API_KEY` | ai-service | Clave Groq (LLM primario) |
@@ -208,7 +216,25 @@ El `OpenSpecDoc` es la fuente de verdad para todos los agentes downstream:
 
 ## Registro seguro
 
-El registro crea cuentas en estado pendiente. El usuario debe verificar un codigo de 6 digitos enviado por correo antes de iniciar sesion. En local, CAPTCHA queda desactivado si `CAPTCHA_ENABLED=false`; en produccion debe configurarse un proveedor como Cloudflare Turnstile y un SMTP real.
+El registro crea cuentas en estado pendiente. El usuario debe verificar un codigo de 6 digitos enviado por correo antes de iniciar sesion. En local, CAPTCHA queda desactivado si `CAPTCHA_ENABLED=false`; en produccion debe configurarse un proveedor CAPTCHA real y SMTP transaccional.
+
+Configuracion minima de produccion:
+
+```env
+CAPTCHA_ENABLED=true
+CAPTCHA_PROVIDER=turnstile
+CAPTCHA_SECRET_KEY=...
+VITE_CAPTCHA_PROVIDER=turnstile
+VITE_CAPTCHA_SITE_KEY=...
+
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=...
+SMTP_PASSWORD=...
+SMTP_REQUIRE_AUTH=true
+EMAIL_FROM="ProgresIA Studio <no-reply@example.com>"
+```
 
 Endpoints principales:
 

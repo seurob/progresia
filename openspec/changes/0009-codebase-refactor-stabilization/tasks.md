@@ -5,6 +5,8 @@
 - [x] Keep Prisma seed compatible with verified-account auth.
 - [x] Separate theme context from provider to remove Fast Refresh warning.
 - [x] Remove generated Python cache artifacts from the workspace.
+- [x] Preserve SDD files when validating bundles after code generation.
+- [x] Add Windows-safe Prisma generate wrapper for typecheck/build scripts.
 - [x] Run OpenSpec validation.
 - [x] Run Node lint and tests.
 - [x] Run focused web/API type and build checks.

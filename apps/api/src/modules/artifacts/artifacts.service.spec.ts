@@ -87,4 +87,46 @@ describe("ArtifactsService", () => {
       ConflictException
     );
   });
+
+  it("validates generated code without losing SDD files from the manifest", async () => {
+    const prisma = {
+      artifactBundle: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "bundle-1",
+          projectId: "project-1",
+          manifest: {
+            files: [
+              { path: "reservas-clinica/README.md" },
+              { path: "reservas-clinica/sdd/constitution.md" }
+            ]
+          },
+          generatedContent: {
+            files: [
+              { path: "apps/web/src/main.tsx", content: "export {}" },
+              { path: "package.json", content: "{}" }
+            ]
+          }
+        })
+      }
+    };
+    const projectsService = {
+      ensureProjectAccess: jest.fn().mockResolvedValue(project)
+    };
+    const service = new ArtifactsService(
+      prisma as never,
+      projectsService as never,
+      aiServiceClientMock,
+      githubServiceMock,
+      storageServiceMock
+    );
+
+    await expect(service.validateBundle("user-1", "bundle-1")).resolves.toMatchObject({
+      valid: true,
+      fileCount: 4,
+      hasCode: true,
+      hasSdd: true,
+      hasReadme: true,
+      issues: []
+    });
+  });
 });

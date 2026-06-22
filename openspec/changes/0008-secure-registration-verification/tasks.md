@@ -7,6 +7,8 @@
 - [x] Block login for pending accounts.
 - [x] Add frontend verification screen.
 - [x] Update env examples and docs.
+- [x] Support production CAPTCHA widgets for Turnstile, hCaptcha and reCAPTCHA.
+- [x] Add SMTP transport timeouts, TLS options and auth validation.
 - [ ] Add Redis-backed rate limiting.
 - [ ] Add production email provider adapter beyond SMTP.
 
