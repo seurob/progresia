@@ -4,10 +4,11 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, Navigate, useNavigate } from "react-router";
 import { z } from "zod";
+import { CaptchaBox } from "../components/CaptchaBox";
 import { FormField } from "../components/FormField";
 import { useAuth } from "../features/auth/auth-context";
 import { api, getErrorMessage } from "../lib/api";
-import { AuthResponse } from "../types/api";
+import { AuthResponse, RegisterPendingResponse } from "../types/api";
 
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_=+{};:,<.>?])/;
 
@@ -35,6 +36,7 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
   const auth = useAuth();
   const navigate = useNavigate();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState("");
   const isRegister = mode === "register";
   const form = useForm<AuthForm>({
     resolver: zodResolver(buildSchema(isRegister)),
@@ -52,10 +54,16 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
   async function onSubmit(values: AuthForm) {
     setServerError(null);
     const endpoint = isRegister ? "/auth/register" : "/auth/login";
-    const payload = isRegister ? values : { email: values.email, password: values.password };
+    const payload = isRegister
+      ? { ...values, captchaToken }
+      : { email: values.email, password: values.password, captchaToken };
 
     try {
-      const response = await api.post<AuthResponse>(endpoint, payload);
+      const response = await api.post<AuthResponse | RegisterPendingResponse>(endpoint, payload);
+      if ("requiresEmailVerification" in response.data) {
+        navigate(`/verify-email?email=${encodeURIComponent(response.data.email)}`, { replace: true });
+        return;
+      }
       auth.setSession(response.data.accessToken, response.data.user, response.data.refreshToken);
       navigate("/");
     } catch (error) {
@@ -108,6 +116,7 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
             >
               <input className="input" type="password" {...form.register("password")} autoComplete={isRegister ? "new-password" : "current-password"} />
             </FormField>
+            <CaptchaBox onToken={setCaptchaToken} />
           </div>
 
           {serverError ? <p className="mt-4 rounded-md border border-rose-400/30 bg-rose-400/10 p-3 text-sm text-rose-200">{serverError}</p> : null}

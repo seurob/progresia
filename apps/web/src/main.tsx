@@ -10,6 +10,7 @@ import { AuthPage } from "./routes/AuthPage";
 import { DashboardPage } from "./routes/DashboardPage";
 import { NewProjectPage } from "./routes/NewProjectPage";
 import { ProjectDetailPage } from "./routes/ProjectDetailPage";
+import { VerifyEmailPage } from "./routes/VerifyEmailPage";
 import "./styles.css";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,10 @@ const router = createBrowserRouter([
   {
     path: "/register",
     element: <AuthPage mode="register" />
+  },
+  {
+    path: "/verify-email",
+    element: <VerifyEmailPage />
   },
   {
     path: "/",

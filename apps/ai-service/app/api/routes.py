@@ -10,6 +10,7 @@ from app.agents.codegen_agent import CodeGenerationAgent
 from app.agents.product_agent import ProductAgent
 from app.agents.requirements_agent import RequirementsAgent
 from app.agents.supervisor_agent import SupervisorAgent
+from app.agents.tech_proposal_agent import TechProposalAgent
 from app.agents.tutorial_agent import TutorialAgent
 from app.core.llm import get_llm
 from app.schemas.architecture import ArchitectureRecommendation, ArchitectureRequest
@@ -19,6 +20,7 @@ from app.schemas.idea import IdeaRequest
 from app.schemas.openspec import OpenSpecResponse
 from app.schemas.requirements import RequirementsResponse
 from app.schemas.suggestion import FeatureSuggestionRequest, FeatureSuggestionResponse
+from app.schemas.tech_proposal import TechProposalRequest, TechProposalResponse
 from app.schemas.tutorial import TutorialRequest, TutorialResponse
 
 logger = logging.getLogger(__name__)
@@ -71,6 +73,15 @@ def generate_openspec(payload: IdeaRequest) -> OpenSpecResponse:
         )
 
     return result["openspec"]
+
+
+@router.post("/propose-tech")
+def propose_tech(payload: TechProposalRequest) -> TechProposalResponse:
+    """Return 3 tech stack proposals for the given project context.
+
+    Synchronous — no job queue needed; fast catalog fallback guarantees <200ms.
+    """
+    return TechProposalAgent().propose(payload)
 
 
 @router.post("/generate-code")

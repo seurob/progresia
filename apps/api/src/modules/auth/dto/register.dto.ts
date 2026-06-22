@@ -1,5 +1,5 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { IsEmail, IsString, Matches, MinLength } from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { IsEmail, IsOptional, IsString, Matches, MinLength } from "class-validator";
 
 export class RegisterDto {
   @ApiProperty({ example: "Ada Lovelace" })
@@ -22,4 +22,9 @@ export class RegisterDto {
     message: "La contraseña debe incluir al menos una mayúscula, una minúscula, un número y un carácter especial (!@#$%...)"
   })
   password!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  captchaToken?: string;
 }

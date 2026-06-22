@@ -1,7 +1,7 @@
 import { Braces, FolderKanban, LogOut, Moon, Plus, Sun, UserRound } from "lucide-react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router";
 import { useAuth } from "../features/auth/auth-context";
-import { useTheme } from "../features/theme/ThemeProvider";
+import { useTheme } from "../features/theme/theme-context";
 
 export function AppLayout() {
   const auth = useAuth();

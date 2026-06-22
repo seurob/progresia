@@ -14,6 +14,13 @@ enum Role {
   REVIEWER
 }
 
+enum AccountStatus {
+  PENDING_VERIFICATION
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
 enum ProjectStatus {
   DRAFT
   REQUIREMENTS_READY
@@ -28,9 +35,10 @@ enum SpecificationType {
   REQUIREMENTS
   OPENSPEC
   ARCHITECTURE
-  DATA_MODEL   // legacy — used for issues until ISSUES type was added
   ISSUES
   TUTORIAL
+  CODE
+  TECH_PROPOSAL
 }
 
 enum SpecificationStatus {
@@ -46,16 +54,39 @@ enum ArtifactBundleStatus {
 }
 
 model User {
-  id              String            @id @default(uuid())
-  email           String            @unique
-  name            String
-  passwordHash    String
-  role            Role              @default(OWNER)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  memberships     WorkspaceMember[]
-  ownedWorkspaces Workspace[]       @relation("WorkspaceOwner")
-  refreshTokens   RefreshToken[]
+  id                  String                  @id @default(uuid())
+  email               String                  @unique
+  name                String
+  passwordHash        String
+  role                Role                    @default(OWNER)
+  emailVerified       Boolean                 @default(false)
+  emailVerifiedAt     DateTime?
+  accountStatus       AccountStatus           @default(PENDING_VERIFICATION)
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  memberships         WorkspaceMember[]
+  ownedWorkspaces     Workspace[]             @relation("WorkspaceOwner")
+  refreshTokens       RefreshToken[]
+  verificationCodes   EmailVerificationCode[]
+}
+
+model EmailVerificationCode {
+  id            String    @id @default(uuid())
+  userId        String
+  codeHash      String
+  expiresAt     DateTime
+  attempts      Int       @default(0)
+  maxAttempts   Int       @default(5)
+  sentAt        DateTime  @default(now())
+  verifiedAt    DateTime?
+  invalidatedAt DateTime?
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model RefreshToken {
@@ -118,6 +149,15 @@ model Idea {
   needsAuth       Boolean  @default(true)
   needsAdminPanel Boolean  @default(true)
   constraints     String?
+  // Structured wizard fields (Sprint 0015)
+  mainObjective        String?  // learn | class_project | mvp | validate | portfolio | internal | startup
+  techPreference       String?  // none | ai_recommends | compare | mandatory
+  mandatoryTechs       String?  // free text for mandatory tech requirements
+  architectureStyle    String?  // single | modular | frontend_api | ai_service | mobile_api | desktop_api
+  dataNeeds            String[] // relational | document | cache | vector | none
+  aiNeeds              String?  // none | online | local | hybrid | chat_docs | rag | agents | recommendation
+  deploymentTarget     String?  // local | docker_local | vps | cloud | recommendation
+  expectedResults      String[] // specs_pdf | zip | docker | github | learning | ai_instructions
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)

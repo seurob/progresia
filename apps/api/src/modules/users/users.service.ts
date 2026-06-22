@@ -15,4 +15,9 @@ export class UsersService {
 
     return toSafeUser(user);
   }
+
+  async findAll() {
+    const users = await this.prisma.user.findMany({ orderBy: { createdAt: "asc" } });
+    return users.map(toSafeUser);
+  }
 }

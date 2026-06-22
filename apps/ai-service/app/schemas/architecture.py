@@ -18,6 +18,8 @@ class ArchitectureRequest(BaseModel):
     needs_admin_panel: bool = True
     needs_ai: bool = False
     preferred_stack: str = Field(default="")
+    # BEGINNER | INTERMEDIATE | ADVANCED — constrains which architectures to recommend
+    technical_level: str = Field(default="INTERMEDIATE")
 
 
 class LearningResource(BaseModel):

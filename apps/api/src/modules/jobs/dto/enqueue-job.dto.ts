@@ -1,9 +1,9 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsString, IsUUID } from "class-validator";
+import { IsString, MinLength } from "class-validator";
 
 export class EnqueueJobDto {
-  @ApiProperty()
+  @ApiProperty({ description: "UUID or slug of the project" })
   @IsString()
-  @IsUUID()
+  @MinLength(1)
   projectId!: string;
 }

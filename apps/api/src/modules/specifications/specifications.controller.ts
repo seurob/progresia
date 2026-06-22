@@ -36,4 +36,10 @@ export class SpecificationsController {
   generateOpenSpec(@CurrentUser() user: JwtUser, @Param("projectId") projectId: string) {
     return this.specificationsService.generateOpenSpec(user.sub, projectId);
   }
+
+  @Post("project/:projectId/propose-tech")
+  @ApiCreatedResponse({ description: "Returns 3 tech stack proposals for the project. Synchronous — fast catalog fallback guarantees sub-200ms response." })
+  proposeTech(@CurrentUser() user: JwtUser, @Param("projectId") projectId: string) {
+    return this.specificationsService.proposeTech(user.sub, projectId);
+  }
 }

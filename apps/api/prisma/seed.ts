@@ -1,4 +1,11 @@
-import { PrismaClient, Role, ProjectStatus, SpecificationType, SpecificationStatus } from "@prisma/client";
+import {
+  AccountStatus,
+  PrismaClient,
+  Role,
+  ProjectStatus,
+  SpecificationType,
+  SpecificationStatus
+} from "@prisma/client";
 import * as bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -8,12 +15,19 @@ async function main() {
 
   const user = await prisma.user.upsert({
     where: { email: "demo@progresia.local" },
-    update: {},
+    update: {
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
+      accountStatus: AccountStatus.ACTIVE
+    },
     create: {
       email: "demo@progresia.local",
       name: "Demo User",
       passwordHash,
-      role: Role.OWNER
+      role: Role.OWNER,
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
+      accountStatus: AccountStatus.ACTIVE
     }
   });
 
@@ -32,11 +46,14 @@ async function main() {
 
   const project = await prisma.project.upsert({
     where: { id: "10000000-0000-0000-0000-000000000002" },
-    update: {},
+    update: {
+      slug: "sistema-de-reservas"
+    },
     create: {
       id: "10000000-0000-0000-0000-000000000002",
       workspaceId: workspace.id,
       name: "Sistema de Reservas",
+      slug: "sistema-de-reservas",
       sector: "Educación",
       productType: "Web App",
       description: "Plataforma para gestionar reservas de aulas y recursos del centro.",
@@ -62,7 +79,14 @@ async function main() {
       needsAi: false,
       needsAuth: true,
       needsAdminPanel: true,
-      constraints: "Debe integrarse con el sistema de calendario existente del centro."
+      constraints: "Debe integrarse con el sistema de calendario existente del centro.",
+      mainObjective: "mvp",
+      techPreference: "ai_recommends",
+      architectureStyle: "frontend_api",
+      dataNeeds: ["relational"],
+      aiNeeds: "none",
+      deploymentTarget: "docker_local",
+      expectedResults: ["zip", "docker", "github"]
     }
   });
 

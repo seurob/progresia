@@ -1,10 +1,11 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { SpecificationStatus, SpecificationType } from "@prisma/client";
-import { IsEnum, IsObject, IsOptional, IsUUID } from "class-validator";
+import { IsEnum, IsObject, IsOptional, IsString, MinLength } from "class-validator";
 
 export class CreateSpecificationDto {
-  @ApiProperty()
-  @IsUUID()
+  @ApiProperty({ description: "UUID or slug of the project" })
+  @IsString()
+  @MinLength(1)
   projectId!: string;
 
   @ApiProperty({ enum: SpecificationType })

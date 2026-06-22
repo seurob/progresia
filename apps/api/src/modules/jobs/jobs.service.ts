@@ -7,8 +7,7 @@ export interface JobStatus {
   id: string | undefined;
   name: string;
   status: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  progress: any;
+  progress: unknown;
   result?: unknown;
   failReason?: string;
 }

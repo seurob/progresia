@@ -68,8 +68,8 @@ def _django_rest(req: TutorialRequest) -> list[TutorialPhase]:
             f"Implementa el CRUD completo para el recurso {module} con DRF.",
             [
                 _s(f"Completar serializers.py de {module}", f"code apps/{mod_lower}s/serializers.py"),
-                _s(f"Implementar ModelViewSet en views.py", f"code apps/{mod_lower}s/views.py"),
-                _s(f"Registrar rutas con DefaultRouter en urls.py", f"code apps/{mod_lower}s/urls.py"),
+                _s("Implementar ModelViewSet en views.py", f"code apps/{mod_lower}s/views.py"),
+                _s("Registrar rutas con DefaultRouter en urls.py", f"code apps/{mod_lower}s/urls.py"),
                 _s("Probar el endpoint CRUD", f"curl http://localhost:8000/api/{mod_lower}s/"),
                 _s(f"Registrar {module} en Django Admin", f"code apps/{mod_lower}s/admin.py"),
             ]
@@ -136,11 +136,11 @@ def _nextjs_app(req: TutorialRequest) -> list[TutorialPhase]:
             f"Fase {len(phases)}: API de {module}",
             f"Crea los API Routes para el recurso {module}.",
             [
-                _s(f"Crear route handler GET/POST", f"code src/app/api/{mod_lower}s/route.ts"),
-                _s(f"Crear route handler con parámetro [id]", f"code src/app/api/{mod_lower}s/[id]/route.ts"),
+                _s("Crear route handler GET/POST", f"code src/app/api/{mod_lower}s/route.ts"),
+                _s("Crear route handler con parámetro [id]", f"code src/app/api/{mod_lower}s/[id]/route.ts"),
                 _s("Añadir validación de entrada con Zod"),
                 _s("Proteger endpoint con session check"),
-                _s(f"Probar con curl o Postman", f"curl http://localhost:3000/api/{mod_lower}s"),
+                _s("Probar con curl o Postman", f"curl http://localhost:3000/api/{mod_lower}s"),
             ]
         ))
 
@@ -210,12 +210,12 @@ def _laravel(req: TutorialRequest, has_frontend: bool = False) -> list[TutorialP
             f"Fase {len(phases)}: Módulo {module}",
             f"Implementa el API Resource controller para {module}.",
             [
-                _s(f"Crear controller API", f"php artisan make:controller {module}Controller --api"),
-                _s(f"Crear Form Request para validación", f"php artisan make:request {module}Request"),
-                _s(f"Crear API Resource para la respuesta", f"php artisan make:resource {module}Resource"),
-                _s(f"Registrar rutas en routes/api.php", None, f"Route::apiResource('{module.lower()}s', {module}Controller::class);"),
-                _s(f"Implementar los métodos CRUD en el controller"),
-                _s(f"Probar el CRUD", f"curl http://localhost:8000/api/{module.lower()}s"),
+                _s("Crear controller API", f"php artisan make:controller {module}Controller --api"),
+                _s("Crear Form Request para validación", f"php artisan make:request {module}Request"),
+                _s("Crear API Resource para la respuesta", f"php artisan make:resource {module}Resource"),
+                _s("Registrar rutas en routes/api.php", None, f"Route::apiResource('{module.lower()}s', {module}Controller::class);"),
+                _s("Implementar los métodos CRUD en el controller"),
+                _s("Probar el CRUD", f"curl http://localhost:8000/api/{module.lower()}s"),
             ]
         ))
 
@@ -276,8 +276,8 @@ def _nestjs_react(req: TutorialRequest) -> list[TutorialPhase]:
             [
                 _s(f"Implementar {module}Service con métodos findAll, findOne, create, update, remove"),
                 _s(f"Implementar {module}Controller con endpoints REST"),
-                _s(f"Crear DTOs de validación con class-validator"),
-                _s(f"Probar el endpoint", f"curl http://localhost:3000/{mod_lower}s"),
+                _s("Crear DTOs de validación con class-validator"),
+                _s("Probar el endpoint", f"curl http://localhost:3000/{mod_lower}s"),
                 _s("Ver documentación Swagger", None, "Abre http://localhost:3000/api para ver todos los endpoints"),
             ]
         ))
@@ -293,15 +293,13 @@ def _nestjs_react(req: TutorialRequest) -> list[TutorialPhase]:
         _s("Ejecutar tests unitarios del backend", "npm run test"),
         _s("Ejecutar tests e2e", "npm run test:e2e"),
         _s("Construir para producción", "npm run build"),
-        _s("Desplegar con Docker", f"docker compose -f docker-compose.prod.yml up -d"),
+        _s("Desplegar con Docker", "docker compose -f docker-compose.prod.yml up -d"),
     ]))
 
     return phases
 
 
 def _fastapi_ai(req: TutorialRequest) -> list[TutorialPhase]:
-    modules = req.modules or ["Core"]
-
     phases: list[TutorialPhase] = [
         _p("Fase 0: Configuración del entorno", "Crea el entorno Python y arranca los servicios.", [
             _s("Crear entorno virtual", "python -m venv .venv && source .venv/bin/activate", "En Windows: .venv\\Scripts\\activate"),
@@ -375,9 +373,9 @@ def _generic(req: TutorialRequest) -> list[TutorialPhase]:
                 f"Implementa el CRUD para el recurso {m}.",
                 [
                     _s(f"Crear el modelo/entidad {m}"),
-                    _s(f"Implementar los endpoints CRUD"),
-                    _s(f"Añadir validaciones de entrada"),
-                    _s(f"Escribir tests unitarios"),
+                    _s("Implementar los endpoints CRUD"),
+                    _s("Añadir validaciones de entrada"),
+                    _s("Escribir tests unitarios"),
                 ]
             )
             for i, m in enumerate(modules[:4])

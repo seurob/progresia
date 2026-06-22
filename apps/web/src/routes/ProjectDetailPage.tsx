@@ -1,14 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle, ArrowLeft, BookOpen, Check, ChevronDown, ChevronUp,
-  Code2, Download, ExternalLink, FileText, GitBranch, Layers,
+  Code2, Cpu, Database, Download, ExternalLink, FileText, GitBranch, Layers,
   Loader2, PackageCheck, RefreshCw, Rocket, Terminal, Trash2, Upload, X, Zap
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { api, getErrorMessage } from "../lib/api";
 import { getAccessToken } from "../lib/auth-token";
-import { ArtifactBundle, JobStatus, Project, PushToGithubResult, Specification } from "../types/api";
+import { ArtifactBundle, JobStatus, Project, PushToGithubResult, Specification, TechProposal, TechProposalContent } from "../types/api";
 
 /* ─── Pipeline ─────────────────────────────────────────────────────────── */
 
@@ -713,6 +713,254 @@ function TutorialCard({ spec }: { readonly spec: Specification }) {
   );
 }
 
+/* ─── Data Model card ────────────────────────────────────────────────────── */
+
+interface DataModelContent {
+  data_model?: {
+    storage_type?: string;
+    technology?: string;
+    justification?: string;
+    orm?: string;
+    orm_rationale?: string;
+    relationships?: { from_entity: string; to_entity: string; type: string; label?: string; cascade_delete?: boolean; optional?: boolean }[];
+    indexes?: string[];
+    mermaid_diagram?: string;
+    seed_needed?: boolean;
+    seed_instructions?: string[];
+    security_notes?: string[];
+    mvp_scope?: string[];
+    future_scope?: string[];
+  };
+  data_entities?: { name: string; description?: string; fields?: string[]; relations?: string[] }[];
+}
+
+const REL_TYPE_LABEL: Record<string, string> = {
+  one_to_one: "1:1", one_to_many: "1:N", many_to_many: "N:M"
+};
+
+function DataModelCard({ spec }: { readonly spec: Specification }) {
+  const [open, setOpen]         = useState(false);
+  const [entityOpen, setEntityOpen] = useState<number | null>(null);
+  const doc = spec.content as DataModelContent;
+  const dm  = doc.data_model ?? {};
+  const entities     = doc.data_entities ?? [];
+  const relationships = dm.relationships ?? [];
+  const indexes       = dm.indexes ?? [];
+  const security      = dm.security_notes ?? [];
+  const seedInstr     = dm.seed_instructions ?? [];
+  const mvpScope      = dm.mvp_scope ?? [];
+  const futureScope   = dm.future_scope ?? [];
+
+  const summary = [
+    dm.technology ?? "PostgreSQL",
+    dm.orm ? `· ${dm.orm}` : "",
+    entities.length > 0 ? `· ${entities.length} entidades` : "",
+  ].filter(Boolean).join(" ");
+
+  return (
+    <SpecAccordion
+      icon={<Database size={16} />}
+      label="Modelo de datos y base de datos"
+      summary={summary}
+      open={open}
+      onToggle={() => setOpen(v => !v)}
+    >
+      {/* Technology + ORM pills */}
+      <div className="flex flex-wrap gap-2">
+        {dm.technology && (
+          <span className="rounded-full border border-[var(--c-border-med)] px-3 py-1 font-mono text-xs text-[var(--c-text-muted)]">
+            {dm.storage_type === "relational" ? "🗄️" : dm.storage_type === "document" ? "📄" : "🔮"} {dm.technology}
+          </span>
+        )}
+        {dm.orm && (
+          <span className="rounded-full border border-[var(--c-border-med)] px-3 py-1 font-mono text-xs text-[var(--c-text-muted)]">
+            ORM: {dm.orm}
+          </span>
+        )}
+      </div>
+
+      {/* Justification */}
+      {dm.justification && (
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-[var(--c-text-faint)]">Por qué esta base de datos</p>
+          <p className="text-sm text-[var(--c-text-muted)] leading-relaxed">{dm.justification}</p>
+        </div>
+      )}
+      {dm.orm_rationale && (
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-[var(--c-text-faint)]">Por qué este ORM</p>
+          <p className="text-sm text-[var(--c-text-muted)] leading-relaxed">{dm.orm_rationale}</p>
+        </div>
+      )}
+
+      {/* Entities */}
+      {entities.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--c-text-faint)]">
+            Entidades principales ({entities.length})
+          </p>
+          <div className="grid gap-2">
+            {entities.map((entity, i) => (
+              <div key={i} className="rounded-lg border border-[var(--c-border-subtle)] bg-[var(--c-surface-2)]">
+                <button
+                  className="flex w-full items-center justify-between gap-2 p-3 text-left"
+                  onClick={() => setEntityOpen(entityOpen === i ? null : i)}
+                >
+                  <span className="font-mono text-sm font-semibold text-[var(--c-text)]">{entity.name}</span>
+                  <div className="flex items-center gap-2">
+                    {entity.fields && (
+                      <span className="text-xs text-[var(--c-text-faint)]">{entity.fields.length} campos</span>
+                    )}
+                    {entityOpen === i
+                      ? <ChevronUp size={13} className="shrink-0 text-[var(--c-text-faint)]" />
+                      : <ChevronDown size={13} className="shrink-0 text-[var(--c-text-faint)]" />}
+                  </div>
+                </button>
+                {entityOpen === i && (
+                  <div className="border-t border-[var(--c-border-subtle)] p-3 grid gap-2">
+                    {entity.description && (
+                      <p className="text-xs text-[var(--c-text-muted)]">{entity.description}</p>
+                    )}
+                    {(entity.fields ?? []).length > 0 && (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="text-left text-[var(--c-text-faint)]">
+                              <th className="pb-1 pr-4 font-semibold">Campo</th>
+                              <th className="pb-1 font-semibold">Definición</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {entity.fields!.map((field, j) => {
+                              const [name, ...rest] = field.split(":");
+                              return (
+                                <tr key={j} className="border-t border-[var(--c-border-subtle)]">
+                                  <td className="py-1 pr-4 font-mono text-[var(--c-accent)]">{name.trim()}</td>
+                                  <td className="py-1 text-[var(--c-text-faint)]">{rest.join(":").trim()}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                    {(entity.relations ?? []).filter(Boolean).length > 0 && (
+                      <p className="text-xs text-[var(--c-text-faint)]">
+                        <span className="font-semibold">Relaciones:</span>{" "}
+                        {entity.relations!.filter(Boolean).join(" · ")}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Relationships */}
+      {relationships.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--c-text-faint)]">Relaciones</p>
+          <div className="grid gap-1.5">
+            {relationships.map((r, i) => (
+              <div key={i} className="flex items-center gap-2 rounded-md bg-[var(--c-surface-2)] px-3 py-2 text-xs">
+                <span className="font-mono font-semibold text-[var(--c-accent)]">{r.from_entity}</span>
+                <span className="rounded border border-[var(--c-border-med)] px-1.5 py-0.5 text-[var(--c-text-faint)]">
+                  {REL_TYPE_LABEL[r.type] ?? r.type}
+                </span>
+                <span className="font-mono font-semibold text-[var(--c-accent)]">{r.to_entity}</span>
+                {r.label && <span className="text-[var(--c-text-faint)]">"{r.label}"</span>}
+                {r.cascade_delete && <span className="ml-auto text-amber-400">CASCADE</span>}
+                {r.optional && <span className="ml-auto text-zinc-500">opcional</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Mermaid diagram */}
+      {dm.mermaid_diagram && (
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--c-text-faint)]">Diagrama ER</p>
+          <pre className="overflow-x-auto rounded-lg bg-zinc-900 p-4 font-mono text-xs text-emerald-300 leading-relaxed whitespace-pre">
+            {dm.mermaid_diagram}
+          </pre>
+          <p className="mt-1 text-[10px] text-[var(--c-text-faint)]">
+            Copia este bloque en{" "}
+            <a href="https://mermaid.live" target="_blank" rel="noopener noreferrer" className="underline">
+              mermaid.live
+            </a>{" "}
+            para visualizarlo.
+          </p>
+        </div>
+      )}
+
+      {/* Indexes */}
+      {indexes.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--c-text-faint)]">Índices recomendados</p>
+          <pre className="overflow-x-auto rounded-lg bg-zinc-900 p-3 font-mono text-xs text-sky-300">
+            {indexes.join("\n")}
+          </pre>
+        </div>
+      )}
+
+      {/* MVP scope */}
+      {(mvpScope.length > 0 || futureScope.length > 0) && (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {mvpScope.length > 0 && (
+            <div>
+              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-400">MVP</p>
+              <div className="flex flex-wrap gap-1">
+                {mvpScope.map((e, i) => (
+                  <span key={i} className="rounded border border-emerald-800 px-2 py-0.5 font-mono text-xs text-emerald-400">{e}</span>
+                ))}
+              </div>
+            </div>
+          )}
+          {futureScope.length > 0 && (
+            <div>
+              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-500">Fase futura</p>
+              <div className="flex flex-wrap gap-1">
+                {futureScope.map((e, i) => (
+                  <span key={i} className="rounded border border-zinc-700 px-2 py-0.5 font-mono text-xs text-zinc-500">{e}</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Seed instructions */}
+      {seedInstr.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--c-text-faint)]">Seeds y migraciones</p>
+          <ul className="grid gap-1">
+            {seedInstr.map((s, i) => (
+              <li key={i} className="rounded-md bg-[var(--c-surface-2)] px-3 py-2 font-mono text-xs text-[var(--c-text-muted)]">
+                {s}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Security notes */}
+      {security.length > 0 && (
+        <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+          <p className="mb-2 text-xs font-semibold text-amber-400">🔒 Seguridad y privacidad</p>
+          <ul className="grid gap-1">
+            {security.map((n, i) => (
+              <li key={i} className="text-xs text-[var(--c-text-muted)]">· {n}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </SpecAccordion>
+  );
+}
+
 /* ─── SpecAccordion wrapper ──────────────────────────────────────────────── */
 
 function SpecAccordion({
@@ -800,12 +1048,20 @@ function BundleCard({ bundle }: { readonly bundle: ArtifactBundle }) {
   const [pushResult, setPushResult] = useState<PushToGithubResult | null>(null);
   const [pushError, setPushError]   = useState<string | null>(null);
   const [showFiles, setShowFiles]   = useState(false);
+  const [validation, setValidation] = useState<{
+    valid: boolean; fileCount: number; hasCode: boolean; hasSdd: boolean; hasReadme: boolean; issues: string[];
+  } | null>(null);
 
   const pushMutation = useMutation({
     mutationFn: () =>
       api.post<PushToGithubResult>(`/artifacts/${bundle.id}/push-to-github`, { githubToken, repoName, isPrivate }).then(r => r.data),
     onSuccess: (data) => { setPushResult(data); setPushError(null); },
     onError:   (err)  => setPushError(getErrorMessage(err)),
+  });
+
+  const validateMutation = useMutation({
+    mutationFn: () => api.get<typeof validation>(`/artifacts/${bundle.id}/validate`).then(r => r.data),
+    onSuccess: (data) => setValidation(data),
   });
 
   function downloadZip() {
@@ -838,10 +1094,49 @@ function BundleCard({ bundle }: { readonly bundle: ArtifactBundle }) {
         </div>
       </div>
 
-      <button className="primary-button justify-center py-4 text-base" onClick={downloadZip}>
-        <Download size={20} />
-        Descargar ZIP del proyecto
-      </button>
+      {/* Validation result */}
+      {validation && (
+        <div className={`rounded-xl border p-4 text-sm ${
+          validation.valid
+            ? "border-emerald-500/30 bg-emerald-500/10"
+            : "border-amber-500/30 bg-amber-500/10"
+        }`}>
+          <div className="flex items-center gap-2 font-semibold">
+            {validation.valid
+              ? <><Check size={15} className="text-emerald-400" /> <span className="text-emerald-300">Bundle válido — {validation.fileCount} archivos</span></>
+              : <><AlertTriangle size={15} className="text-amber-400" /> <span className="text-amber-300">Se encontraron advertencias</span></>}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2 text-xs">
+            {validation.hasCode    && <span className="rounded border border-emerald-700 px-2 py-0.5 text-emerald-400">✓ Código</span>}
+            {validation.hasSdd     && <span className="rounded border border-emerald-700 px-2 py-0.5 text-emerald-400">✓ SDD</span>}
+            {validation.hasReadme  && <span className="rounded border border-emerald-700 px-2 py-0.5 text-emerald-400">✓ README</span>}
+          </div>
+          {validation.issues.length > 0 && (
+            <ul className="mt-2 grid gap-1">
+              {validation.issues.map((issue, i) => (
+                <li key={i} className="flex items-start gap-1.5 text-xs text-amber-300">
+                  <AlertTriangle size={11} className="mt-0.5 shrink-0" />{issue}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <button className="primary-button flex-1 justify-center py-4 text-base" onClick={downloadZip}>
+          <Download size={20} />
+          Descargar ZIP
+        </button>
+        <button
+          className="secondary-button px-4"
+          onClick={() => validateMutation.mutate()}
+          disabled={validateMutation.isPending}
+          title="Validar coherencia del bundle antes de descargar"
+        >
+          {validateMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+        </button>
+      </div>
 
       {hasCode && !pushResult && (
         <button className="secondary-button justify-center" onClick={() => setShowGitHub(v => !v)} aria-expanded={showGitHub}>
@@ -900,6 +1195,185 @@ function BundleCard({ bundle }: { readonly bundle: ArtifactBundle }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ─── Tech Proposal Section ──────────────────────────────────────────────── */
+
+function TechProposalSection({
+  projectId,
+  existingSpec,
+  onProposed,
+}: {
+  readonly projectId: string;
+  readonly existingSpec: Specification | undefined;
+  readonly onProposed: () => void;
+}) {
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState<number | null>(null);
+
+  const proposeMutation = useMutation({
+    mutationFn: () => api.post<TechProposalContent>(`/specifications/project/${projectId}/propose-tech`),
+    onSuccess: () => { onProposed(); },
+  });
+
+  const content = existingSpec
+    ? (existingSpec.content as unknown as TechProposalContent)
+    : proposeMutation.data?.data ?? null;
+
+  if (!content && !proposeMutation.isPending) {
+    return (
+      <div className="rounded-xl border border-[var(--c-border-subtle)] bg-[var(--c-surface)] p-5">
+        <div className="flex items-start gap-3">
+          <Cpu size={18} className="mt-0.5 shrink-0 text-[var(--c-accent)]" />
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold">Propuestas de tecnología</p>
+            <p className="mt-1 text-sm text-[var(--c-text-muted)]">
+              Antes de generar el MVP, obtén 3 propuestas de stack adaptadas a tu proyecto y nivel técnico.
+            </p>
+          </div>
+        </div>
+        {proposeMutation.isError && (
+          <p className="mt-3 rounded-lg bg-amber-400/10 p-3 text-xs text-amber-300">
+            {getErrorMessage(proposeMutation.error)} — se continuará con la arquitectura por defecto.
+          </p>
+        )}
+        <button
+          className="secondary-button mt-4 gap-2 text-sm"
+          onClick={() => proposeMutation.mutate()}
+        >
+          <Cpu size={15} /> Ver propuestas de tecnología
+        </button>
+      </div>
+    );
+  }
+
+  if (proposeMutation.isPending) {
+    return (
+      <div className="flex items-center gap-3 rounded-xl border border-[var(--c-border-subtle)] bg-[var(--c-surface)] p-5 text-sm text-[var(--c-text-muted)]">
+        <Loader2 size={16} className="animate-spin text-[var(--c-accent)]" />
+        Analizando tu proyecto y preparando propuestas de stack...
+      </div>
+    );
+  }
+
+  if (!content) return null;
+
+  return (
+    <div className="grid gap-3">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-bold uppercase tracking-widest text-[var(--c-text-faint)]">
+          Propuestas de tecnología
+        </p>
+        {selectedId !== null && (
+          <span className="rounded-full border border-[var(--c-accent)] px-2 py-0.5 text-xs text-[var(--c-accent)]">
+            Stack seleccionado ✓
+          </span>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-[var(--c-border-subtle)] bg-[var(--c-surface)] px-4 py-3 text-sm">
+        <span className="text-[var(--c-accent)]">💡 </span>
+        <span className="text-[var(--c-text-muted)]">{content.recommendation_reason}</span>
+      </div>
+
+      <div className="grid gap-2">
+        {content.proposals.map((p: TechProposal) => {
+          const isSelected = selectedId === p.id;
+          const isRecommended = p.id === content.recommended_id;
+          const isExpanded = expanded === p.id;
+          return (
+            <div key={p.id} className={`rounded-xl border transition-colors ${
+              isSelected
+                ? "border-[var(--c-accent)] ring-1 ring-[var(--c-accent)] bg-[var(--c-active-bg)]"
+                : "border-[var(--c-border-subtle)] bg-[var(--c-surface)]"
+            }`}>
+              <button
+                className="flex w-full items-start gap-3 p-4 text-left"
+                onClick={() => { setSelectedId(p.id); setExpanded(isExpanded ? null : p.id); }}
+              >
+                <span className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2 ${
+                  isSelected ? "border-[var(--c-accent)] bg-[var(--c-accent)]" : "border-[var(--c-border-med)]"
+                }`}>
+                  {isSelected && <span className="size-2 rounded-full bg-[var(--c-accent-on)]" />}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold">{p.name}</p>
+                    {isRecommended && (
+                      <span className="rounded-full bg-[var(--c-accent)]/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--c-accent)]">
+                        Recomendado
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-xs text-[var(--c-text-muted)]">{p.tagline}</p>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {p.stack.map(t => (
+                      <span key={t} className="rounded border border-[var(--c-border-med)] bg-[var(--c-surface-2)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--c-text-muted)]">
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <span className="mt-1 shrink-0 text-[var(--c-text-faint)]">
+                  {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                </span>
+              </button>
+
+              {isExpanded && (
+                <div className="grid gap-3 border-t border-[var(--c-border-subtle)] p-4 text-sm">
+                  <p className="text-[var(--c-text-muted)]">{p.description}</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-emerald-400">Ventajas</p>
+                      <ul className="grid gap-1">
+                        {p.advantages.map((a, i) => (
+                          <li key={i} className="flex items-start gap-1.5 text-xs text-[var(--c-text-muted)]">
+                            <Check size={11} className="mt-0.5 shrink-0 text-emerald-400" />{a}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-amber-400">Limitaciones</p>
+                      <ul className="grid gap-1">
+                        {p.limitations.map((l, i) => (
+                          <li key={i} className="flex items-start gap-1.5 text-xs text-[var(--c-text-muted)]">
+                            <AlertTriangle size={11} className="mt-0.5 shrink-0 text-amber-400" />{l}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                  {p.learning_outcomes.length > 0 && (
+                    <div>
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--c-text-faint)]">Aprenderás</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {p.learning_outcomes.map((lo, i) => (
+                          <span key={i} className="rounded-full border border-[var(--c-border-med)] px-2 py-0.5 text-xs text-[var(--c-text-faint)]">
+                            {lo}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-3 text-xs text-[var(--c-text-faint)]">
+                    <span className={`rounded border px-2 py-0.5 ${
+                      p.difficulty === "Principiante"
+                        ? "border-emerald-800 text-emerald-400"
+                        : "border-amber-800 text-amber-400"
+                    }`}>{p.difficulty}</span>
+                    {p.docker_ready && <span className="rounded border border-[var(--c-border-med)] px-2 py-0.5">🐳 Docker-ready</span>}
+                    {p.ai_ready    && <span className="rounded border border-[var(--c-border-med)] px-2 py-0.5">🤖 IA integrable</span>}
+                    <span className="rounded border border-[var(--c-border-med)] px-2 py-0.5">⏱ ~{p.estimated_setup_minutes} min setup</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -970,11 +1444,12 @@ export function ProjectDetailPage() {
   const latestBundle = project?.artifactBundles?.[0];
   const isGenerated  = ["GENERATED", "REVIEW", "DEPLOYED"].includes(project?.status ?? "");
 
-  const archSpec     = specs.find(s => s.type === "ARCHITECTURE" && s.status === "GENERATED");
-  const openSpec     = specs.find(s => s.type === "OPENSPEC"      && s.status === "GENERATED");
-  const issuesSpec   = specs.find(s => s.type === "ISSUES"        && s.status === "GENERATED"
+  const archSpec          = specs.find(s => s.type === "ARCHITECTURE"  && s.status === "GENERATED");
+  const openSpec          = specs.find(s => s.type === "OPENSPEC"       && s.status === "GENERATED");
+  const issuesSpec        = specs.find(s => s.type === "ISSUES"         && s.status === "GENERATED"
     && Array.isArray((s.content as IssuesContent).issues));
-  const tutorialSpec = specs.find(s => s.type === "TUTORIAL"      && s.status === "GENERATED");
+  const tutorialSpec      = specs.find(s => s.type === "TUTORIAL"       && s.status === "GENERATED");
+  const techProposalSpec  = specs.find(s => s.type === "TECH_PROPOSAL"  && s.status === "GENERATED");
 
   if (projectQuery.isLoading) {
     return (
@@ -1069,6 +1544,13 @@ export function ProjectDetailPage() {
       {/* ── Pre-generation ─────────────────────────────────────── */}
       {!isGenerated && !pipeline.isRunning && pipeline.stage !== "done" && (
         <div className="grid gap-4">
+          {project.idea && (
+            <TechProposalSection
+              projectId={projectId!}
+              existingSpec={techProposalSpec}
+              onProposed={refetch}
+            />
+          )}
           <WhatIsIncluded />
           <button
             className="primary-button justify-center py-4 text-base"
@@ -1139,6 +1621,7 @@ export function ProjectDetailPage() {
           </p>
           {archSpec     && <ArchitectureCard spec={archSpec} />}
           {openSpec     && <OpenSpecCard     spec={openSpec} />}
+          {openSpec     && <DataModelCard    spec={openSpec} />}
           {issuesSpec   && <IssuesCard       spec={issuesSpec} />}
           {tutorialSpec && <TutorialCard     spec={tutorialSpec} />}
         </div>

@@ -13,32 +13,41 @@ from app.schemas.architecture import (
 
 logger = logging.getLogger(__name__)
 
-_SYSTEM_PROMPT = """Eres un arquitecto de software senior especializado en recomendar arquitecturas para proyectos web.
-Tu misión es analizar la idea del usuario y recomendar la arquitectura más adecuada.
+_SYSTEM_PROMPT = """Eres un arquitecto de software senior especializado en recomendar arquitecturas para proyectos web educativos y profesionales.
 
-Debes devolver un JSON con este esquema:
+Tu misión es recomendar la arquitectura MÁS ADECUADA para el nivel técnico del usuario y el tipo de proyecto.
+
+Devuelve un JSON con este esquema:
 {
   "architecture_type": "LARAVEL_MONOLITH | LARAVEL_INERTIA_REACT | NEXTJS_APP | NESTJS_REACT | REACT_EXPRESS | FASTAPI_AI | DJANGO_REST",
   "name": "nombre legible de la arquitectura",
-  "justification": "explicación clara de por qué esta arquitectura es la más adecuada para este proyecto",
+  "justification": "explicación clara y didáctica de por qué esta arquitectura es la más adecuada",
   "tech_stack": [
-    {"name": "tecnología", "version": "versión", "purpose": "para qué sirve", "official_docs": "https://..."}
+    {"name": "tecnología", "version": "versión", "purpose": "para qué sirve en este proyecto", "official_docs": "https://..."}
   ],
-  "alternatives": ["alternativa 1 con justificación breve", "alternativa 2..."],
+  "alternatives": ["alternativa 1 — cuándo usarla en lugar de la recomendada", "alternativa 2..."],
   "difficulty": "BEGINNER | INTERMEDIATE | ADVANCED",
-  "risks": ["riesgo 1", "riesgo 2"],
-  "first_steps": ["paso 1", "paso 2", ...],
-  "educational_notes": ["nota educativa 1", "nota educativa 2", ...]
+  "risks": ["riesgo concreto del proyecto 1", "riesgo 2"],
+  "first_steps": ["comando o acción concreta paso 1", "paso 2", ...],
+  "educational_notes": ["concepto que el usuario debe entender sobre esta arquitectura", ...]
 }
 
-Criterios de decisión:
-- LARAVEL_MONOLITH: proyectos PHP, equipos con experiencia Laravel, backends CRUD, APIs REST simples
-- LARAVEL_INERTIA_REACT: Laravel + SPA moderna sin API separada, fullstack unificado
-- NEXTJS_APP: apps web modernas con SEO, serverless, despliegue en Vercel/Railway, TypeScript
-- NESTJS_REACT: proyectos con frontend y backend desacoplados, escalabilidad alta, microservicios
+CRITERIOS POR NIVEL TÉCNICO (usar como guía principal):
+- BEGINNER → priorizar LARAVEL_MONOLITH, DJANGO_REST o REACT_EXPRESS (simple, bien documentado, curva baja)
+- INTERMEDIATE → NEXTJS_APP o NESTJS_REACT (moderno, escalable, buenas prácticas)
+- ADVANCED → NESTJS_REACT, FASTAPI_AI o arquitecturas desacopladas (máxima flexibilidad)
+
+CRITERIOS POR TIPO DE PROYECTO:
+- LARAVEL_MONOLITH: backends PHP, CRUD, APIs REST simples, teams PHP
+- LARAVEL_INERTIA_REACT: fullstack PHP+React sin API separada (SPA unificada)
+- NEXTJS_APP: apps con SEO, serverless, Vercel/Railway, TypeScript puro
+- NESTJS_REACT: frontend+backend desacoplados, escalabilidad alta, TypeScript
 - REACT_EXPRESS: proyectos Node.js simples, equipos JavaScript puros
-- FASTAPI_AI: microservicios de IA, RAG, LLMs, procesamiento de datos
-- DJANGO_REST: proyectos Python con admin panel potente, CMS, equipos Python, ecosistema científico
+- FASTAPI_AI: IA, RAG, LLMs, procesamiento de datos, Python
+- DJANGO_REST: admin panel nativo, CMS, Python, ecosistema científico
+
+REGLA CRÍTICA: Si technical_level es BEGINNER, NO recomendar NESTJS_REACT ni FASTAPI_AI.
+Si el proyecto tiene necesidades de IA, puede hacerse una excepción para FASTAPI_AI.
 
 Responde ÚNICAMENTE con el JSON, sin markdown ni texto adicional."""
 
@@ -279,7 +288,8 @@ class ArchitectureAgent:
                 prompt = self._build_prompt(req)
                 resp = llm.invoke([SystemMessage(content=_SYSTEM_PROMPT), HumanMessage(content=prompt)])
                 content = resp.content if hasattr(resp, "content") else str(resp)
-                import json, re as _re
+                import json
+                import re as _re
                 match = _re.search(r"\{.*\}", content, _re.DOTALL)
                 if match:
                     data = json.loads(match.group())
@@ -306,6 +316,7 @@ class ArchitectureAgent:
     @staticmethod
     def _build_prompt(req: ArchitectureRequest) -> str:
         features = "\n".join(f"  - {f}" for f in req.key_features[:10])
+        level = req.technical_level or "INTERMEDIATE"
         return (
             f"Proyecto: {req.project_name}\n"
             f"Sector: {req.sector}\n"
@@ -315,11 +326,13 @@ class ArchitectureAgent:
             f"Necesita auth: {req.needs_auth}\n"
             f"Necesita panel admin: {req.needs_admin_panel}\n"
             f"Necesita IA: {req.needs_ai}\n"
+            f"Nivel técnico del usuario: {level}\n"
             f"Stack preferido: {req.preferred_stack or 'ninguno especificado'}"
         )
 
     def _rule_based(self, req: ArchitectureRequest) -> ArchitectureRecommendation:
         preferred = req.preferred_stack.lower()
+        level = req.technical_level or "INTERMEDIATE"
 
         if any(k in preferred for k in ["inertia vue", "laravel vue", "laravel inertia vue"]):
             arch_type = "LARAVEL_INERTIA_VUE"
@@ -335,6 +348,8 @@ class ArchitectureAgent:
             arch_type = "REACT_EXPRESS"
         elif req.needs_ai:
             arch_type = "FASTAPI_AI"
+        elif level == "BEGINNER":
+            arch_type = "LARAVEL_MONOLITH"
         elif len(req.key_features) <= 6 and not req.needs_admin_panel:
             arch_type = "NEXTJS_APP"
         else:

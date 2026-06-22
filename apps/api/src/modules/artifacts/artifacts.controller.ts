@@ -42,6 +42,12 @@ export class ArtifactsController {
     return this.artifactsService.pushToGithub(user.sub, bundleId, dto);
   }
 
+  @Get(":bundleId/validate")
+  @ApiOkResponse({ description: "Validates the artifact bundle before download: checks for code files, SDD structure, duplicates and dangerous paths." })
+  validate(@CurrentUser() user: JwtUser, @Param("bundleId") bundleId: string) {
+    return this.artifactsService.validateBundle(user.sub, bundleId);
+  }
+
   @Get(":bundleId/export-url")
   @ApiOkResponse({ description: "Uploads the ZIP to MinIO and returns a pre-signed download URL (1 hour TTL)." })
   exportUrl(@CurrentUser() user: JwtUser, @Param("bundleId") bundleId: string) {

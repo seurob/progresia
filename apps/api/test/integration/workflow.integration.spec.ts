@@ -1,7 +1,7 @@
 import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import * as request from "supertest";
-import { Role } from "@prisma/client";
+import { AccountStatus, Role } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
 import { createHash } from "node:crypto";
 import { AppModule } from "../../src/modules/app.module";
@@ -14,7 +14,8 @@ const USER_ID      = "00000000-0000-4000-8000-000000000001";
 const WORKSPACE_ID = "00000000-0000-4000-8000-000000000002";
 const PROJECT_ID   = "00000000-0000-4000-8000-000000000003";
 const SPEC_ID      = "00000000-0000-4000-8000-000000000004";
-const PASSWORD = "change_me_123";
+// Must satisfy RegisterDto: ≥8 chars, uppercase, lowercase, digit, special char
+const PASSWORD = "Change_me_123!";
 
 const dbUser = {
   id: USER_ID,
@@ -22,6 +23,9 @@ const dbUser = {
   name: "Integration User",
   passwordHash: bcrypt.hashSync(PASSWORD, 4),
   role: Role.OWNER,
+  emailVerified: true,
+  emailVerifiedAt: new Date("2026-01-01T00:00:00Z"),
+  accountStatus: AccountStatus.ACTIVE,
   createdAt: new Date("2026-01-01T00:00:00Z"),
   updatedAt: new Date("2026-01-01T00:00:00Z")
 };
@@ -124,6 +128,12 @@ function buildPrismaMock(overrides: Record<string, unknown> = {}) {
       }),
       delete: jest.fn().mockResolvedValue({ id: "refresh-1" })
     },
+    emailVerificationCode: {
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      create: jest.fn().mockResolvedValue({ id: "verification-1" }),
+      findFirst: jest.fn().mockResolvedValue(null),
+      update: jest.fn().mockResolvedValue({ id: "verification-1" })
+    },
     $transaction: jest.fn().mockImplementation((input: unknown) => {
       if (Array.isArray(input)) {
         return Promise.all(input);
@@ -218,7 +228,7 @@ describe("API workflow integration", () => {
   // ── Auth ──────────────────────────────────────────────────────────────
 
   describe("POST /api/auth/register", () => {
-    it("creates a user and returns accessToken", async () => {
+    it("creates a pending user and returns verification state", async () => {
       prismaMock.user.findUnique.mockResolvedValue(null);
 
       const res = await request(app.getHttpServer())
@@ -226,8 +236,8 @@ describe("API workflow integration", () => {
         .send({ name: "Integration User", email: "integration@progresia.local", password: PASSWORD });
 
       expect(res.status).toBe(201);
-      expect(res.body).toHaveProperty("accessToken");
-      expect(res.body.user).not.toHaveProperty("passwordHash");
+      expect(res.body.requiresEmailVerification).toBe(true);
+      expect(res.body.email).toBe("integration@progresia.local");
     });
 
     it("rejects duplicate email with 409", async () => {
@@ -464,6 +474,25 @@ describe("API workflow integration", () => {
         .post(`/api/artifacts/${BUNDLE_ID}/push-to-github`)
         .send({ githubToken: "ghp_fake", repoName: "test-app" });
 
+      expect(res.status).toBe(401);
+    });
+  });
+
+  // ── Admin (RolesGuard) ────────────────────────────────────────────────
+
+  describe("GET /api/users", () => {
+    it("returns 403 for a non-admin authenticated user", async () => {
+      const token = await getToken(); // OWNER role — RolesGuard rejects before reaching service
+
+      const res = await request(app.getHttpServer())
+        .get("/api/users")
+        .set("Authorization", `Bearer ${token}`);
+
+      expect(res.status).toBe(403);
+    });
+
+    it("returns 401 without token", async () => {
+      const res = await request(app.getHttpServer()).get("/api/users");
       expect(res.status).toBe(401);
     });
   });

@@ -4,13 +4,13 @@ import {
   IsBoolean,
   IsOptional,
   IsString,
-  IsUUID,
   MinLength
 } from "class-validator";
 
 export class CreateIdeaDto {
-  @ApiProperty()
-  @IsUUID()
+  @ApiProperty({ description: "UUID or slug of the project" })
+  @IsString()
+  @MinLength(1)
   projectId!: string;
 
   @ApiProperty({ example: "Las reservas de clases se gestionan manualmente." })
@@ -52,4 +52,47 @@ export class CreateIdeaDto {
   @IsOptional()
   @IsString()
   constraints?: string;
+
+  // Structured wizard fields (Sprint 0015)
+  @ApiPropertyOptional({ example: "mvp" })
+  @IsOptional()
+  @IsString()
+  mainObjective?: string;
+
+  @ApiPropertyOptional({ example: "ai_recommends" })
+  @IsOptional()
+  @IsString()
+  techPreference?: string;
+
+  @ApiPropertyOptional({ example: "React + Laravel obligatorio" })
+  @IsOptional()
+  @IsString()
+  mandatoryTechs?: string;
+
+  @ApiPropertyOptional({ example: "frontend_api" })
+  @IsOptional()
+  @IsString()
+  architectureStyle?: string;
+
+  @ApiPropertyOptional({ example: ["relational", "cache"] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  dataNeeds?: string[];
+
+  @ApiPropertyOptional({ example: "online" })
+  @IsOptional()
+  @IsString()
+  aiNeeds?: string;
+
+  @ApiPropertyOptional({ example: "docker_local" })
+  @IsOptional()
+  @IsString()
+  deploymentTarget?: string;
+
+  @ApiPropertyOptional({ example: ["specs_pdf", "zip", "github"] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  expectedResults?: string[];
 }

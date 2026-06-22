@@ -6,6 +6,7 @@ import { GithubService } from "../github/github.service";
 import { StorageService } from "../storage/storage.service";
 import { PrismaService } from "../../database/prisma.service";
 import { ProjectsService } from "../projects/projects.service";
+import { slugify } from "../../common/utils/string";
 import { PushToGithubDto, PushToGithubResult } from "./dto/push-to-github.dto";
 
 interface ManifestFile {
@@ -64,6 +65,21 @@ export class ArtifactsService {
       sourceSpecificationId: specification.id,
       source: specification.content
     });
+
+    // If generateCode() already created a bundle for this spec, update its manifest
+    // rather than creating a new empty bundle — otherwise the user would download
+    // a bundle with no code files.
+    const existing = await this.prisma.artifactBundle.findFirst({
+      where: { projectId: id, specificationId: specification.id },
+      orderBy: { createdAt: "desc" }
+    });
+
+    if (existing) {
+      return this.prisma.artifactBundle.update({
+        where: { id: existing.id },
+        data: { manifest: manifest as unknown as Prisma.InputJsonValue }
+      });
+    }
 
     return this.prisma.artifactBundle.create({
       data: {
@@ -234,6 +250,62 @@ export class ArtifactsService {
     return zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
   }
 
+  async validateBundle(userId: string, bundleId: string): Promise<{
+    valid: boolean;
+    fileCount: number;
+    hasCode: boolean;
+    hasSdd: boolean;
+    hasReadme: boolean;
+    issues: string[];
+  }> {
+    const bundle = await this.prisma.artifactBundle.findUnique({
+      where: { id: bundleId },
+      include: { project: true }
+    });
+
+    if (!bundle) throw new NotFoundException("Artifact bundle not found");
+    await this.projectsService.ensureProjectAccess(bundle.projectId, userId);
+
+    const generated = bundle.generatedContent as unknown as {
+      files?: Array<{ path: string; content: string }>;
+    } | null;
+    const manifest = bundle.manifest as unknown as Manifest;
+
+    const files: Array<{ path: string }> = generated?.files?.length
+      ? generated.files
+      : (manifest.files ?? []);
+
+    const issues: string[] = [];
+    const paths = files.map(f => f.path);
+
+    if (paths.length === 0) issues.push("El bundle no contiene archivos.");
+
+    const dupes = paths.filter((p, i) => paths.indexOf(p) !== i);
+    if (dupes.length > 0) issues.push(`Rutas duplicadas: ${dupes.slice(0, 3).join(", ")}`);
+
+    const dangerous = paths.filter(p => p.includes("..") || p.startsWith("/"));
+    if (dangerous.length > 0) issues.push(`Rutas peligrosas detectadas: ${dangerous[0]}`);
+
+    const hasCode = paths.some(p =>
+      /\.(ts|tsx|js|jsx|py|php|rb|go|rs|java|cs)$/.test(p) ||
+      p.includes("package.json") || p.includes("composer.json")
+    );
+    const hasSdd = paths.some(p => p.includes("sdd/"));
+    const hasReadme = paths.some(p => p.endsWith("README.md"));
+
+    if (!hasCode && !hasSdd) issues.push("El bundle no contiene archivos de codigo ni especificaciones SDD.");
+    if (!hasReadme) issues.push("Falta README.md.");
+
+    return {
+      valid: issues.length === 0,
+      fileCount: paths.length,
+      hasCode,
+      hasSdd,
+      hasReadme,
+      issues,
+    };
+  }
+
   async exportZipUrl(userId: string, bundleId: string): Promise<{ url: string; expiresIn: number }> {
     const buffer = await this.exportZip(userId, bundleId);
     const objectName = `bundles/${bundleId}/artifact.zip`;
@@ -249,44 +321,121 @@ export class ArtifactsService {
   }) {
     const basePath = this.slugify(input.projectName);
     const files: ManifestFile[] = [
+      // ── Root ─────────────────────────────────────────────────────────────
       {
         path: `${basePath}/README.md`,
         kind: "document",
-        description: "Guia de inicio: descripcion del proyecto, setup e instrucciones de arranque.",
+        description: "Guia de inicio: descripcion, setup multi-plataforma e instrucciones de arranque.",
         source: "openspec"
       },
       {
-        path: `${basePath}/docs/requisitos.md`,
-        kind: "document",
-        description: "Requisitos funcionales y no funcionales completos del sistema.",
-        source: "openspec"
-      },
-      {
-        path: `${basePath}/docs/sdd.md`,
-        kind: "document",
-        description: "Software Design Document: arquitectura tecnica, modulos y diseno del sistema.",
-        source: "openspec"
-      },
-      {
-        path: `${basePath}/docs/pasos-implementacion.md`,
-        kind: "document",
-        description: "Plan de implementacion paso a paso con checklist accionable.",
-        source: "openspec"
-      },
-      {
-        path: `${basePath}/docker/docker-compose.yml`,
+        path: `${basePath}/docker-compose.yml`,
         kind: "specification",
         description: "Infraestructura de desarrollo lista para usar con Docker Compose.",
         source: "openspec"
       },
       {
-        path: `${basePath}/docker/.env.example`,
+        path: `${basePath}/.env.example`,
         kind: "specification",
         description: "Variables de entorno requeridas para arrancar los servicios.",
         source: "openspec"
       },
+      // ── SDD ──────────────────────────────────────────────────────────────
       {
-        path: `${basePath}/openspec/spec.json`,
+        path: `${basePath}/sdd/constitution.md`,
+        kind: "document",
+        description: "Constitucion del proyecto: stack, decisiones de arquitectura y principios de desarrollo.",
+        source: "openspec"
+      },
+      {
+        path: `${basePath}/sdd/requirements/requirements.md`,
+        kind: "document",
+        description: "Requisitos funcionales y no funcionales completos del sistema.",
+        source: "openspec"
+      },
+      {
+        path: `${basePath}/sdd/requirements/user-stories.md`,
+        kind: "document",
+        description: "User stories por actor con criterios de aceptacion.",
+        source: "openspec"
+      },
+      {
+        path: `${basePath}/sdd/specifications/openspec.md`,
+        kind: "specification",
+        description: "Resumen del OpenSpec tecnico con endpoints y entidades principales.",
+        source: "openspec"
+      },
+      {
+        path: `${basePath}/sdd/plans/milestones.md`,
+        kind: "document",
+        description: "Milestones del proyecto con tareas organizadas por fase.",
+        source: "openspec"
+      },
+      {
+        path: `${basePath}/sdd/prompts/project-context.md`,
+        kind: "document",
+        description: "Instrucciones para IA: contexto completo del proyecto para Claude, Copilot, etc.",
+        source: "openspec"
+      },
+      {
+        path: `${basePath}/sdd/prompts/resume-session.md`,
+        kind: "document",
+        description: "Prompt para retomar el trabajo en una nueva sesion de IA.",
+        source: "openspec"
+      },
+      {
+        path: `${basePath}/sdd/prompts/add-feature.md`,
+        kind: "document",
+        description: "Prompt para anadir nuevas funcionalidades con ayuda de IA.",
+        source: "openspec"
+      },
+      {
+        path: `${basePath}/sdd/prompts/fix-bug.md`,
+        kind: "document",
+        description: "Prompt para resolver bugs con ayuda de IA.",
+        source: "openspec"
+      },
+      {
+        path: `${basePath}/sdd/setup/environment.md`,
+        kind: "document",
+        description: "Configuracion del entorno de desarrollo con comandos para Windows, Linux y macOS.",
+        source: "openspec"
+      },
+      // ── Docs ─────────────────────────────────────────────────────────────
+      {
+        path: `${basePath}/docs/architecture/overview.md`,
+        kind: "document",
+        description: "Diagrama de componentes y stack tecnologico seleccionado.",
+        source: "openspec"
+      },
+      {
+        path: `${basePath}/docs/adr/adr-001-tech-stack.md`,
+        kind: "document",
+        description: "Architecture Decision Record: seleccion del stack tecnologico.",
+        source: "openspec"
+      },
+      {
+        path: `${basePath}/docs/development/contributing.md`,
+        kind: "document",
+        description: "Guia de contribucion: flujo Git, convenciones de commits y checklist de PR.",
+        source: "openspec"
+      },
+      // ── Data model ───────────────────────────────────────────────────────
+      {
+        path: `${basePath}/sdd/requirements/data-model.md`,
+        kind: "document",
+        description: "Modelo de datos: entidades, relaciones, ORM recomendado e instrucciones de migracion.",
+        source: "openspec"
+      },
+      {
+        path: `${basePath}/docs/architecture/entity-relation-diagram.md`,
+        kind: "document",
+        description: "Diagrama ER en formato Mermaid: entidades, campos clave y relaciones.",
+        source: "openspec"
+      },
+      // ── OpenSpec JSON ─────────────────────────────────────────────────────
+      {
+        path: `${basePath}/sdd/specifications/openspec.json`,
         kind: "specification",
         description: "Especificacion tecnica completa generada por IA (OpenSpec JSON).",
         source: "openspec"
@@ -294,7 +443,7 @@ export class ArtifactsService {
     ];
 
     return {
-      version: "0.2.0",
+      version: "0.3.0",
       project: input.projectName,
       sourceSpecificationId: input.sourceSpecificationId,
       generatedAt: new Date().toISOString(),
@@ -319,35 +468,66 @@ export class ArtifactsService {
       ? (summary.user_stories as Array<Record<string, unknown>>)
       : [];
 
-    if (file.path.endsWith("README.md")) {
+    const p = file.path;
+
+    if (p.endsWith("README.md")) {
       return this.renderReadme(projectName, manifest, modules, stack);
     }
 
-    if (file.path.includes("requisitos.md") || file.path.includes("requirements.md")) {
-      return this.renderRequirements(projectName, requirements, nonFunctional, userStories);
-    }
-
-    if (file.path.endsWith("sdd.md")) {
-      return this.renderSDD(projectName, modules, stack, requirements, constraints);
-    }
-
-    if (file.path.endsWith("pasos-implementacion.md")) {
-      return this.renderImplementationSteps(projectName, modules);
-    }
-
-    if (file.path.endsWith("docker-compose.yml")) {
+    if (p.endsWith("docker-compose.yml")) {
       return this.renderDockerCompose(projectName, stack, modules);
     }
 
-    if (file.path.endsWith(".env.example")) {
+    if (p.endsWith(".env.example")) {
       return this.renderEnvExample(projectName, stack);
     }
 
-    if (file.path.endsWith("spec.json")) {
+    if (p.endsWith("requirements.md")) {
+      return this.renderRequirements(projectName, requirements, nonFunctional, userStories);
+    }
+
+    if (p.endsWith("user-stories.md")) {
+      return this.renderUserStories(projectName, userStories, modules);
+    }
+
+    if (p.endsWith("constitution.md")) {
+      return this.renderConstitution(projectName, stack, modules);
+    }
+
+    if (p.endsWith("milestones.md")) {
+      return this.renderImplementationSteps(projectName, modules);
+    }
+
+    if (p.includes("sdd/prompts/project-context.md")) {
+      return this.renderProjectContextPrompt(projectName, stack, modules);
+    }
+
+    if (p.endsWith("overview.md")) {
+      return this.renderArchOverview(projectName, stack, modules);
+    }
+
+    if (p.endsWith("adr-001-tech-stack.md")) {
+      return this.renderAdr001(projectName, stack);
+    }
+
+    if (p.endsWith("contributing.md")) {
+      return this.renderContributing(projectName);
+    }
+
+    if (p.endsWith("data-model.md")) {
+      return this.renderDataModel(projectName, summary);
+    }
+
+    if (p.endsWith("entity-relation-diagram.md")) {
+      return this.renderErDiagram(projectName, summary);
+    }
+
+    if (p.endsWith(".json")) {
       return JSON.stringify(summary, null, 2);
     }
 
-    return `# ${file.path}\n\n${file.description}`;
+    // Generic markdown stub for remaining SDD files
+    return `# ${p.split("/").pop()?.replace(".md", "").replace(/-/g, " ")}\n\n> Parte del proyecto **${projectName}**.\n\n${file.description}\n`;
   }
 
   private renderReadme(
@@ -356,70 +536,281 @@ export class ArtifactsService {
     modules: string[],
     stack: string[]
   ): string {
-    const lines = [
+    const slug = this.slugify(projectName);
+    const generatedDate = new Date(manifest.generatedAt).toLocaleDateString("es-ES", {
+      year: "numeric", month: "long", day: "numeric"
+    });
+    const stackLine = stack.length > 0 ? stack.slice(0, 4).join(" · ") : "React · NestJS · PostgreSQL";
+
+    return [
       `# ${projectName}`,
       "",
-      `> Generado por **ProgresIA Studio** el ${new Date(manifest.generatedAt).toLocaleDateString("es-ES", { year: "numeric", month: "long", day: "numeric" })}`,
+      `> MVP generado con **ProgresIA Studio** el ${generatedDate}.`,
+      `> Stack: ${stackLine}`,
+      "",
+      "---",
       "",
       "## Inicio rapido",
       "",
+      "### Linux / macOS",
+      "",
       "```bash",
-      "# 1. Copia las variables de entorno",
-      "cp docker/.env.example docker/.env",
-      "",
-      "# 2. Edita las variables con tus valores",
-      "#    (cambia contrasenas y secretos)",
-      "nano docker/.env",
-      "",
-      "# 3. Arranca todos los servicios",
-      "docker compose -f docker/docker-compose.yml up -d",
-      "",
-      "# 4. Comprueba que todo arranca",
-      "docker compose -f docker/docker-compose.yml ps",
+      "cp .env.example .env",
+      "docker compose up -d",
+      "npm install && npm run db:migrate",
+      "npm run dev",
       "```",
+      "",
+      "### Windows (PowerShell)",
+      "",
+      "```powershell",
+      "Copy-Item .env.example .env",
+      "docker compose up -d",
+      "npm install; npm run db:migrate",
+      "npm run dev",
+      "```",
+      "",
+      "---",
       "",
       "## Estructura del proyecto",
       "",
       "```",
-      `${this.slugify(projectName)}/`,
-      "├── docs/                    # Documentacion del proyecto",
-      "│   ├── requisitos.md        # Requisitos funcionales y no funcionales",
-      "│   ├── sdd.md               # Software Design Document",
-      "│   └── pasos-implementacion.md  # Guia de implementacion",
-      "├── docker/                  # Configuracion Docker",
-      "│   ├── docker-compose.yml   # Servicios de infraestructura",
-      "│   └── .env.example         # Variables de entorno de ejemplo",
-      "└── openspec/",
-      "    └── spec.json            # Especificacion tecnica completa",
-      "```"
-    ];
-
-    if (modules.length > 0) {
-      lines.push("", "## Modulos del sistema", "");
-      for (const mod of modules) {
-        lines.push(`- ${mod}`);
-      }
-    }
-
-    if (stack.length > 0) {
-      lines.push("", "## Stack tecnologico", "");
-      for (const s of stack) {
-        lines.push(`- ${s}`);
-      }
-    }
-
-    lines.push(
+      `${slug}/`,
+      "├── apps/",
+      "│   ├── web/              # Frontend",
+      "│   └── api/              # Backend API",
+      "├── sdd/                  # Especificaciones SDD",
+      "│   ├── constitution.md   # Arquitectura y decisiones",
+      "│   ├── requirements/     # Requisitos funcionales y user stories",
+      "│   ├── specifications/   # OpenSpec tecnico",
+      "│   ├── plans/            # Milestones y sprints",
+      "│   ├── prompts/          # Instrucciones para IA (Claude, Copilot...)",
+      "│   └── setup/            # Guia de configuracion del entorno",
+      "├── docs/",
+      "│   ├── architecture/     # Diagramas y overview del sistema",
+      "│   ├── development/      # Guia de contribucion",
+      "│   └── adr/              # Architecture Decision Records",
+      "├── docker-compose.yml",
+      "├── .env.example",
+      "└── README.md             # Este archivo",
+      "```",
       "",
-      "## Archivos incluidos",
+      ...(modules.length > 0 ? ["## Modulos del sistema", "", ...modules.map(m => `- ${m}`), ""] : []),
+      ...(stack.length > 0 ? ["## Stack tecnologico", "", ...stack.map(s => `- ${s}`), ""] : []),
+      "## Continuar con IA",
       "",
-      ...(manifest.files ?? []).map((f) => `- \`${f.path}\` — ${f.description}`),
+      "Este proyecto incluye instrucciones para IA en `sdd/prompts/`:",
+      "",
+      "- `project-context.md` — Contexto completo para abrir una nueva sesion",
+      "- `resume-session.md` — Para retomar el trabajo donde lo dejaste",
+      "- `add-feature.md` — Para anadir nuevas funcionalidades",
+      "- `fix-bug.md` — Para resolver errores con ayuda de IA",
       "",
       "---",
       "",
-      "_Generado con [ProgresIA Studio](https://github.com/progresia)_"
-    );
+      "_Generado con [ProgresIA Studio](https://progresia.studio)_"
+    ].join("\n");
+  }
+
+  private renderUserStories(
+    projectName: string,
+    userStories: Array<Record<string, unknown>>,
+    modules: string[]
+  ): string {
+    const lines = [`# User Stories — ${projectName}`, ""];
+
+    if (userStories.length > 0) {
+      lines.push("## Por actor", "");
+      for (const s of userStories) {
+        const actor = s.actor ?? "Usuario";
+        const goal = s.goal ?? "";
+        const benefit = s.benefit ?? "";
+        const id = s.id ?? "";
+        lines.push(`### ${id}`, "", `**Como** ${actor} **quiero** ${goal} **para** ${benefit}`, "");
+      }
+    } else if (modules.length > 0) {
+      lines.push("## Actor principal: Usuario final", "");
+      modules.slice(0, 6).forEach((m, i) => {
+        lines.push(
+          `### US-${String(i + 1).padStart(3, "0")}`,
+          "",
+          `**Como** usuario final **quiero** ${m.toLowerCase()} **para** mejorar mi flujo de trabajo.`,
+          ""
+        );
+      });
+    } else {
+      lines.push("_Las user stories se generaran durante la especificacion._", "");
+    }
 
     return lines.join("\n");
+  }
+
+  private renderConstitution(
+    projectName: string,
+    stack: string[],
+    modules: string[]
+  ): string {
+    return [
+      `# Constitucion del Proyecto — ${projectName}`,
+      "",
+      "> Este documento es la fuente de verdad del proyecto.",
+      "> Cualquier IA o desarrollador debe leer este archivo antes de trabajar en el codigo.",
+      "",
+      "## Stack tecnologico",
+      "",
+      ...(stack.length > 0 ? stack.map(s => `- ${s}`) : ["- React + NestJS + PostgreSQL"]),
+      "",
+      "## Modulos principales",
+      "",
+      ...(modules.length > 0 ? modules.map(m => `- ${m}`) : ["- (por definir)"]),
+      "",
+      "## Principios de desarrollo",
+      "",
+      "- **SDD-first**: cada cambio empieza con una especificacion, no con codigo",
+      "- **Convenciones sobre configuracion**: seguir las convenciones del framework",
+      "- **Tests antes de refactorizar**: no refactorizar sin cobertura",
+      "- **Seguridad por defecto**: API keys solo en `.env`, nunca en el codigo",
+      "",
+      "## Cambios a este documento",
+      "",
+      "Cualquier cambio de stack o arquitectura debe actualizarse aqui y en `sdd/specifications/openspec.md`.",
+    ].join("\n");
+  }
+
+  private renderProjectContextPrompt(
+    projectName: string,
+    stack: string[],
+    modules: string[]
+  ): string {
+    return [
+      `# Contexto del proyecto para IA — ${projectName}`,
+      "",
+      "> Copia y pega este archivo al inicio de cualquier sesion con Claude, Copilot o ChatGPT.",
+      "",
+      "---",
+      "",
+      `Estoy trabajando en **${projectName}**.`,
+      "",
+      "## Stack tecnologico",
+      "",
+      ...(stack.length > 0 ? stack.map(s => `- ${s}`) : ["- React + NestJS + PostgreSQL"]),
+      "",
+      "## Modulos implementados",
+      "",
+      ...(modules.length > 0 ? modules.map(m => `- ${m}`) : ["- (ver sdd/requirements/requirements.md)"]),
+      "",
+      "## Convenciones",
+      "",
+      "- TypeScript estricto en todo el codigo",
+      "- Nombres de variables y funciones: camelCase",
+      "- Nombres de archivos: kebab-case",
+      "- Commits: Conventional Commits (feat:, fix:, docs:, refactor:)",
+      "",
+      "Lee `sdd/constitution.md` y `sdd/requirements/requirements.md` antes de hacer cambios.",
+    ].join("\n");
+  }
+
+  private renderArchOverview(
+    projectName: string,
+    stack: string[],
+    modules: string[]
+  ): string {
+    const hasAi = stack.some(s => /fastapi|python|langchain|ai/i.test(s));
+    return [
+      `# Arquitectura — ${projectName}`,
+      "",
+      "## Diagrama de componentes",
+      "",
+      "```",
+      "┌─────────────────────────────────────────────────────┐",
+      "│                  Docker Compose                      │",
+      "│                                                      │",
+      "│  ┌────────────┐  ┌────────────┐  ┌──────────────┐  │",
+      "│  │  Frontend  │  │    API     │  │   Database   │  │",
+      `│  │  ${(stack[0] ?? "React").slice(0, 8).padEnd(8)}  │──▶│  ${(stack[1] ?? "NestJS").slice(0, 8).padEnd(8)}  │──▶│  PostgreSQL  │  │`,
+      "│  │   :5173    │  │   :3000    │  │    :5432     │  │",
+      "│  └────────────┘  └────────────┘  └──────────────┘  │",
+      ...(hasAi ? [
+        "│                      ┌────────────┐                 │",
+        "│                      │ AI Service │                 │",
+        "│                      │  FastAPI   │                 │",
+        "│                      │   :8003    │                 │",
+        "│                      └────────────┘                 │",
+      ] : []),
+      "└─────────────────────────────────────────────────────┘",
+      "```",
+      "",
+      "## Modulos del sistema",
+      "",
+      ...(modules.length > 0 ? modules.map(m => `- **${m}**`) : ["- (ver sdd/requirements/requirements.md)"]),
+      "",
+      "## Decisiones de arquitectura",
+      "",
+      "Ver `docs/adr/` para las Architecture Decision Records.",
+    ].join("\n");
+  }
+
+  private renderAdr001(projectName: string, stack: string[]): string {
+    return [
+      "# ADR-001: Seleccion del stack tecnologico",
+      "",
+      "**Estado**: Aceptado",
+      `**Proyecto**: ${projectName}`,
+      "",
+      "## Contexto",
+      "",
+      `Se necesita seleccionar el stack para el MVP de ${projectName}.`,
+      "",
+      "## Decision",
+      "",
+      `Stack seleccionado: **${stack.slice(0, 4).join(", ") || "React + NestJS + PostgreSQL"}**`,
+      "",
+      "## Justificacion",
+      "",
+      "- Ecosistema maduro con amplia documentacion",
+      "- Buena integracion entre los componentes del stack",
+      "- Preparado para escalar cuando el MVP valide la propuesta de valor",
+      "",
+      "## Consecuencias",
+      "",
+      "- **Positivas**: Velocidad de desarrollo, comunidad activa",
+      "- **Negativas**: Requiere conocimiento previo del stack",
+    ].join("\n");
+  }
+
+  private renderContributing(projectName: string): string {
+    return [
+      `# Guia de contribucion — ${projectName}`,
+      "",
+      "## Flujo de trabajo Git",
+      "",
+      "```bash",
+      "# 1. Crea una rama",
+      "git checkout -b feat/nombre-de-la-funcionalidad",
+      "",
+      "# 2. Commit con Conventional Commits",
+      'git commit -m "feat: anadir gestion de reservas"',
+      "",
+      "# 3. Push y Pull Request",
+      "git push origin feat/nombre-de-la-funcionalidad",
+      "```",
+      "",
+      "## Prefijos de commit",
+      "",
+      "| Prefijo | Cuando usarlo |",
+      "|---------|---------------|",
+      "| `feat:` | Nueva funcionalidad |",
+      "| `fix:` | Correccion de bug |",
+      "| `docs:` | Documentacion |",
+      "| `refactor:` | Refactorizacion sin cambio de comportamiento |",
+      "| `test:` | Anadir o corregir tests |",
+      "",
+      "## Antes de un PR",
+      "",
+      "- [ ] Tests pasan: `npm test`",
+      "- [ ] Sin errores TypeScript: `npx tsc --noEmit`",
+      "- [ ] Linting pasa: `npm run lint`",
+    ].join("\n");
   }
 
   private renderRequirements(
@@ -465,110 +856,6 @@ export class ArtifactsService {
       }
       lines.push("");
     }
-
-    return lines.join("\n");
-  }
-
-  private renderSDD(
-    projectName: string,
-    modules: string[],
-    stack: string[],
-    requirements: Array<Record<string, unknown>>,
-    constraints: Record<string, unknown>
-  ): string {
-    const timeline = constraints.timeline ? String(constraints.timeline) : "A definir";
-    const lines = [
-      `# Software Design Document — ${projectName}`,
-      "",
-      "## 1. Resumen ejecutivo",
-      "",
-      `Este documento describe el diseño tecnico del sistema **${projectName}**.`,
-      "Define la arquitectura, los modulos del sistema y los criterios de diseno.",
-      "",
-      "## 2. Alcance",
-      "",
-      ...(requirements.slice(0, 5).map(r => `- ${r.title ?? r.id ?? "Requisito"}`)),
-      requirements.length > 5 ? `- _...y ${requirements.length - 5} requisitos mas (ver docs/requisitos.md)_` : "",
-      "",
-      "## 3. Arquitectura del sistema",
-      "",
-      "### 3.1 Diagrama de componentes",
-      "",
-      "```",
-      "┌─────────────┐     HTTP/REST     ┌──────────────┐",
-      "│  Frontend   │ ◄──────────────► │  API Backend │",
-      "│  (Web App)  │                  │  (REST API)  │",
-      "└─────────────┘                  └──────┬───────┘",
-      "                                        │",
-      "                               ┌────────▼────────┐",
-      "                               │   Base de datos  │",
-      "                               │  (PostgreSQL)    │",
-      "                               └─────────────────┘",
-      "```",
-      "",
-      "### 3.2 Stack tecnologico",
-      ""
-    ];
-
-    if (stack.length > 0) {
-      for (const s of stack) {
-        lines.push(`- ${s}`);
-      }
-    } else {
-      lines.push(
-        "| Capa | Tecnologia |",
-        "|------|-----------|",
-        "| Frontend | React, Vite, TypeScript |",
-        "| Backend | NestJS / FastAPI |",
-        "| Base de datos | PostgreSQL |",
-        "| Infraestructura | Docker Compose |"
-      );
-    }
-
-    lines.push(
-      "",
-      "## 4. Modulos del sistema",
-      ""
-    );
-
-    if (modules.length > 0) {
-      for (let i = 0; i < modules.length; i++) {
-        lines.push(
-          `### 4.${i + 1} ${modules[i]}`,
-          "",
-          "**Responsabilidad:** Gestiona las operaciones relacionadas con este modulo.",
-          "",
-          "**Endpoints principales:**",
-          `- \`GET /${this.slugify(modules[i])}\` — Listar`,
-          `- \`POST /${this.slugify(modules[i])}\` — Crear`,
-          `- \`PUT /${this.slugify(modules[i])}/:id\` — Actualizar`,
-          `- \`DELETE /${this.slugify(modules[i])}/:id\` — Eliminar`,
-          ""
-        );
-      }
-    } else {
-      lines.push("_Los modulos se definiran durante la implementacion._", "");
-    }
-
-    lines.push(
-      "## 5. Modelo de datos",
-      "",
-      "_Diagrama ERD a completar durante la implementacion._",
-      "",
-      "## 6. Seguridad",
-      "",
-      "- Autenticacion: JWT (access token + refresh token)",
-      "- Autorizacion: RBAC por rol de usuario",
-      "- Comunicacion: HTTPS obligatorio en produccion",
-      "- Datos sensibles: variables de entorno, nunca en codigo",
-      "",
-      "## 7. Estimacion",
-      "",
-      `- Timeline estimado: ${timeline}`,
-      `- Modulos: ${modules.length > 0 ? modules.length : "Por definir"}`,
-      `- Requisitos funcionales: ${requirements.length > 0 ? requirements.length : "Por definir"}`,
-      ""
-    );
 
     return lines.join("\n");
   }
@@ -808,14 +1095,117 @@ export class ArtifactsService {
     };
   }
 
-  private slugify(value: string) {
-    return (
-      value
-        .normalize("NFD")
-        .replace(/[̀-ͯ]/g, "")
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)/g, "") || "progresia-project"
-    );
+  private renderDataModel(projectName: string, summary: Record<string, unknown>): string {
+    const dm = (typeof summary.data_model === "object" && summary.data_model)
+      ? (summary.data_model as Record<string, unknown>)
+      : {};
+    const entities = Array.isArray(summary.data_entities)
+      ? (summary.data_entities as Array<Record<string, unknown>>)
+      : [];
+    const technology   = (dm.technology   as string) || "PostgreSQL";
+    const orm          = (dm.orm          as string) || "";
+    const justification = (dm.justification as string) || "";
+    const ormRationale  = (dm.orm_rationale as string) || "";
+    const indexes      = Array.isArray(dm.indexes)       ? (dm.indexes as string[])          : [];
+    const seedInstr    = Array.isArray(dm.seed_instructions) ? (dm.seed_instructions as string[]) : [];
+    const secNotes     = Array.isArray(dm.security_notes) ? (dm.security_notes as string[])   : [];
+    const mvpScope     = Array.isArray(dm.mvp_scope)     ? (dm.mvp_scope as string[])        : [];
+    const futureScope  = Array.isArray(dm.future_scope)  ? (dm.future_scope as string[])     : [];
+    const relationships = Array.isArray(dm.relationships) ? (dm.relationships as Array<Record<string, unknown>>) : [];
+
+    const lines: string[] = [
+      `# Modelo de datos — ${projectName}`,
+      "",
+      `## Base de datos principal: ${technology}`,
+      orm ? `## ORM: ${orm}` : "",
+      "",
+      justification  ? `**Justificación:** ${justification}` : "",
+      ormRationale   ? `**ORM — por qué:** ${ormRationale}`  : "",
+      "",
+    ];
+
+    if (entities.length > 0) {
+      lines.push("## Entidades principales", "");
+      for (const entity of entities) {
+        const fields = Array.isArray(entity.fields) ? (entity.fields as string[]) : [];
+        const rels   = Array.isArray(entity.relations) ? (entity.relations as string[]) : [];
+        lines.push(`### ${entity.name as string}`, "");
+        if (entity.description) lines.push(`${entity.description as string}`, "");
+        if (fields.length > 0) {
+          lines.push("| Campo | Definición |", "| --- | --- |");
+          for (const f of fields) {
+            const [name, ...rest] = f.split(":");
+            lines.push(`| \`${name.trim()}\` | ${rest.join(":").trim()} |`);
+          }
+          lines.push("");
+        }
+        if (rels.length > 0) {
+          lines.push(`**Relaciones:** ${rels.filter(Boolean).join(" · ")}`, "");
+        }
+      }
+    }
+
+    if (relationships.length > 0) {
+      lines.push("## Relaciones entre entidades", "");
+      for (const r of relationships) {
+        const cascade = r.cascade_delete ? " (CASCADE DELETE)" : "";
+        const optional = r.optional ? " [opcional]" : "";
+        lines.push(`- **${r.from_entity} → ${r.to_entity}** (${r.type})${cascade}${optional}`);
+      }
+      lines.push("");
+    }
+
+    if (indexes.length > 0) {
+      lines.push("## Índices recomendados", "", "```sql");
+      lines.push(...indexes);
+      lines.push("```", "");
+    }
+
+    if (mvpScope.length > 0) {
+      lines.push(`## Alcance MVP`, "", `Entidades incluidas en el MVP: ${mvpScope.join(", ")}`, "");
+    }
+    if (futureScope.length > 0) {
+      lines.push(`**Previsto para fases posteriores:** ${futureScope.join(", ")}`, "");
+    }
+
+    if (seedInstr.length > 0) {
+      lines.push("## Seeds y datos iniciales", "");
+      for (const instr of seedInstr) lines.push(`- ${instr}`);
+      lines.push("");
+    }
+
+    if (secNotes.length > 0) {
+      lines.push("## Seguridad y privacidad", "");
+      for (const note of secNotes) lines.push(`- ${note}`);
+      lines.push("");
+    }
+
+    return lines.filter(l => l !== undefined).join("\n");
+  }
+
+  private renderErDiagram(projectName: string, summary: Record<string, unknown>): string {
+    const dm = (typeof summary.data_model === "object" && summary.data_model)
+      ? (summary.data_model as Record<string, unknown>)
+      : {};
+    const diagram = (dm.mermaid_diagram as string) || "";
+
+    const lines = [
+      `# Diagrama Entidad-Relación — ${projectName}`,
+      "",
+      "> Generado automáticamente por ProgresIA Studio. Puedes editarlo en [Mermaid Live Editor](https://mermaid.live).",
+      "",
+    ];
+
+    if (diagram) {
+      lines.push("```mermaid", diagram, "```");
+    } else {
+      lines.push("_Diagrama no disponible — regenera el OpenSpec para obtenerlo._");
+    }
+
+    return lines.join("\n");
+  }
+
+  private slugify(value: string): string {
+    return slugify(value, "progresia-project");
   }
 }

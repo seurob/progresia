@@ -10,6 +10,8 @@ export interface AiIdeaRequest {
   needs_auth: boolean;
   needs_admin_panel: boolean;
   needs_ai: boolean;
+  /** BEGINNER | INTERMEDIATE | ADVANCED — drives architecture and tutorial depth */
+  technical_level?: string;
   /** Forwarded from a stored ARCHITECTURE spec so OpenSpecAgent can embed the chosen stack. */
   architecture_type?: string;
 }
@@ -75,6 +77,8 @@ export interface AiArchitectureRequest {
   needs_admin_panel: boolean;
   needs_ai: boolean;
   preferred_stack: string;
+  /** BEGINNER | INTERMEDIATE | ADVANCED — constrains which architectures to recommend */
+  technical_level?: string;
 }
 
 export interface AiTechStackItem {
@@ -152,6 +156,41 @@ export interface AiCodeGenResponse {
   files: AiGeneratedFile[];
 }
 
+export interface AiTechProposalRequest {
+  name: string;
+  sector: string;
+  level: string;
+  product_type: string;
+  main_objective: string;
+  architecture_style: string;
+  data_needs: string[];
+  ai_needs: string;
+  deployment_target: string;
+  core_features: string[];
+}
+
+export interface AiTechProposal {
+  id: number;
+  name: string;
+  tagline: string;
+  stack: string[];
+  difficulty: string;
+  description: string;
+  advantages: string[];
+  limitations: string[];
+  recommended_for: string;
+  learning_outcomes: string[];
+  docker_ready: boolean;
+  ai_ready: boolean;
+  estimated_setup_minutes: number;
+}
+
+export interface AiTechProposalResponse {
+  proposals: AiTechProposal[];
+  recommended_id: number;
+  recommendation_reason: string;
+}
+
 @Injectable()
 export class AiServiceClient {
   constructor(private readonly configService: ConfigService) {}
@@ -205,5 +244,9 @@ export class AiServiceClient {
 
   async generateTutorial(payload: AiTutorialRequest): Promise<AiTutorialResponse> {
     return this.post<AiTutorialResponse>("/generate-tutorial", payload);
+  }
+
+  async proposeTech(payload: AiTechProposalRequest): Promise<AiTechProposalResponse> {
+    return this.post<AiTechProposalResponse>("/propose-tech", payload);
   }
 }

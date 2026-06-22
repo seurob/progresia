@@ -5,6 +5,13 @@ import { AiServiceClient } from "../ai-service/ai-service.client";
 import { ProjectsService } from "../projects/projects.service";
 import { CreateSpecificationDto } from "./dto/create-specification.dto";
 
+/** Maps idea.complexity (DB) to the technical_level expected by the AI service. */
+function complexityToLevel(complexity: string | null | undefined): string {
+  if (complexity === "simple") return "BEGINNER";
+  if (complexity === "complex") return "ADVANCED";
+  return "INTERMEDIATE";
+}
+
 @Injectable()
 export class SpecificationsService {
   constructor(
@@ -52,7 +59,8 @@ export class SpecificationsService {
       core_features: idea.coreFeatures,
       needs_auth: idea.needsAuth,
       needs_admin_panel: idea.needsAdminPanel,
-      needs_ai: idea.needsAi
+      needs_ai: idea.needsAi,
+      technical_level: complexityToLevel(idea.complexity)
     });
 
     const [specification] = await this.prisma.$transaction([
@@ -97,6 +105,7 @@ export class SpecificationsService {
       needs_auth: idea.needsAuth,
       needs_admin_panel: idea.needsAdminPanel,
       needs_ai: idea.needsAi,
+      technical_level: complexityToLevel(idea.complexity),
       architecture_type: architectureType
     });
 
@@ -120,6 +129,41 @@ export class SpecificationsService {
     ]);
 
     return specification;
+  }
+
+  async proposeTech(userId: string, projectId: string) {
+    const project = await this.projectsService.ensureProjectAccess(projectId, userId);
+    const id = project.id;
+    const idea = await this.prisma.idea.findUnique({ where: { projectId: id } });
+
+    if (!idea) {
+      throw new ConflictException("Idea intake is required before generating tech proposals");
+    }
+
+    const level = complexityToLevel(idea.complexity);
+    const proposals = await this.aiServiceClient.proposeTech({
+      name: project.name,
+      sector: project.sector,
+      level,
+      product_type: (project as Record<string, unknown>).productType as string ?? "web",
+      main_objective: idea.mainObjective ?? "mvp",
+      architecture_style: idea.architectureStyle ?? "frontend_api",
+      data_needs: idea.dataNeeds ?? [],
+      ai_needs: idea.aiNeeds ?? "none",
+      deployment_target: idea.deploymentTarget ?? "docker_local",
+      core_features: idea.coreFeatures
+    });
+
+    await this.prisma.specification.create({
+      data: {
+        projectId: id,
+        type: SpecificationType.TECH_PROPOSAL,
+        status: SpecificationStatus.GENERATED,
+        content: proposals as unknown as Prisma.InputJsonValue
+      }
+    });
+
+    return proposals;
   }
 
   async generateIssues(userId: string, projectId: string) {
@@ -214,7 +258,8 @@ export class SpecificationsService {
       needs_auth:        idea.needsAuth,
       needs_admin_panel: idea.needsAdminPanel,
       needs_ai:          idea.needsAi,
-      preferred_stack:   ""
+      preferred_stack:   "",
+      technical_level:   complexityToLevel(idea.complexity)
     });
 
     return this.prisma.specification.create({

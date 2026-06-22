@@ -5,6 +5,8 @@ export interface User {
   email: string;
   name: string;
   role: Role;
+  emailVerified?: boolean;
+  accountStatus?: "PENDING_VERIFICATION" | "ACTIVE" | "SUSPENDED" | "DELETED";
   createdAt: string;
   updatedAt: string;
 }
@@ -13,6 +15,12 @@ export interface AuthResponse {
   accessToken: string;
   refreshToken: string;
   user: User;
+}
+
+export interface RegisterPendingResponse {
+  requiresEmailVerification: true;
+  email: string;
+  message: string;
 }
 
 export interface WorkspaceMember {
@@ -65,10 +73,32 @@ export interface RequirementsContent {
   user_stories: UserStory[];
 }
 
+export interface TechProposal {
+  id: number;
+  name: string;
+  tagline: string;
+  stack: string[];
+  difficulty: string;
+  description: string;
+  advantages: string[];
+  limitations: string[];
+  recommended_for: string;
+  learning_outcomes: string[];
+  docker_ready: boolean;
+  ai_ready: boolean;
+  estimated_setup_minutes: number;
+}
+
+export interface TechProposalContent {
+  proposals: TechProposal[];
+  recommended_id: number;
+  recommendation_reason: string;
+}
+
 export interface Specification {
   id: string;
   projectId: string;
-  type: "REQUIREMENTS" | "OPENSPEC" | "ARCHITECTURE" | "DATA_MODEL" | "ISSUES" | "TUTORIAL";
+  type: "REQUIREMENTS" | "OPENSPEC" | "ARCHITECTURE" | "DATA_MODEL" | "ISSUES" | "TUTORIAL" | "CODE" | "TECH_PROPOSAL";
   status: "DRAFT" | "GENERATED" | "APPROVED" | "REJECTED";
   content: Record<string, unknown>;
   createdAt: string;

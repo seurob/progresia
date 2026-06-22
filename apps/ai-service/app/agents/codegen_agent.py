@@ -168,8 +168,8 @@ class CodeGenerationAgent:
         if req.architecture_type:
             tmpl = self._ARCHITECTURE_TEMPLATES.get(req.architecture_type)
             if tmpl is not None:
-                import types
-                return tmpl.build(req)  # type: ignore[union-attr]
+                base = tmpl.build(req)  # type: ignore[union-attr]
+                return self._extend_with_sdd(base, req)
 
         sector_lower = req.sector.lower()
         stack_lower  = " ".join(req.stack).lower()
@@ -178,38 +178,38 @@ class CodeGenerationAgent:
         # Check specific sector templates before ACADEMIA to avoid false positives
         # ("recursos" contains "curso" as a substring, which would incorrectly match ACADEMIA)
         if any(k in text for k in self._RRHH_KEYWORDS):
-            return rrhh_template.build(req)
+            return self._extend_with_sdd(rrhh_template.build(req), req)
         # VETERINARIA before SALUD: "clínica veterinaria" contains "clínica" from _SALUD_KEYWORDS
         if any(k in text for k in self._VETERINARIA_KEYWORDS):
-            return veterinaria_template.build(req)
+            return self._extend_with_sdd(veterinaria_template.build(req), req)
         if any(k in text for k in self._SALUD_KEYWORDS):
-            return salud_template.build(req)
+            return self._extend_with_sdd(salud_template.build(req), req)
         if any(k in text for k in self._HORECA_KEYWORDS):
-            return horeca_template.build(req)
+            return self._extend_with_sdd(horeca_template.build(req), req)
         if any(k in text for k in self._INMOBILIARIA_KEYWORDS):
-            return inmobiliaria_template.build(req)
+            return self._extend_with_sdd(inmobiliaria_template.build(req), req)
         if any(k in text for k in self._ECOMMERCE_KEYWORDS):
-            return ecommerce_template.build(req)
+            return self._extend_with_sdd(ecommerce_template.build(req), req)
         if any(k in text for k in self._LOGISTICA_KEYWORDS):
-            return logistica_template.build(req)
+            return self._extend_with_sdd(logistica_template.build(req), req)
         if any(k in text for k in self._FINTECH_KEYWORDS):
-            return fintech_template.build(req)
+            return self._extend_with_sdd(fintech_template.build(req), req)
         if any(k in text for k in self._EVENTOS_KEYWORDS):
-            return eventos_template.build(req)
+            return self._extend_with_sdd(eventos_template.build(req), req)
         if any(k in text for k in self._GYM_KEYWORDS):
-            return gym_template.build(req)
+            return self._extend_with_sdd(gym_template.build(req), req)
         if any(k in text for k in self._FARMACIA_KEYWORDS):
-            return farmacia_template.build(req)
+            return self._extend_with_sdd(farmacia_template.build(req), req)
         if any(k in text for k in self._ABOGADOS_KEYWORDS):
-            return abogados_template.build(req)
+            return self._extend_with_sdd(abogados_template.build(req), req)
         if any(k in sector_lower for k in self._ACADEMIA_KEYWORDS):
-            return academia_template.build(req)
+            return self._extend_with_sdd(academia_template.build(req), req)
         if any(k in text for k in self._LARAVEL_KEYWORDS):
-            return laravel_template.build(req)
+            return self._extend_with_sdd(laravel_template.build(req), req)
         if any(k in text for k in self._NEXTJS_KEYWORDS):
-            return nextjs_template.build(req)
+            return self._extend_with_sdd(nextjs_template.build(req), req)
         if any(k in text for k in self._DJANGO_KEYWORDS):
-            return django_template.build(req)
+            return self._extend_with_sdd(django_template.build(req), req)
 
         slug = _slug(req.project_name)
         modules = req.modules if req.modules else ["Item"]
@@ -242,8 +242,637 @@ class CodeGenerationAgent:
             self._docker_compose(slug, req.needs_ai),
             self._env_example(slug),
         ]
+        files += self._sdd_and_docs_files(req)
 
         return CodeGenerationResponse(project_name=req.project_name, files=files)
+
+    def _extend_with_sdd(
+        self, base: CodeGenerationResponse, req: CodeGenerationRequest
+    ) -> CodeGenerationResponse:
+        """Append SDD + docs scaffold to any template-generated response."""
+        existing_paths = {f.path for f in base.files}
+        extra = [f for f in self._sdd_and_docs_files(req) if f.path not in existing_paths]
+        return CodeGenerationResponse(
+            project_name=base.project_name,
+            files=base.files + extra,
+        )
+
+    # ── SDD + docs folder generation ─────────────────────────────────────────
+
+    def _sdd_and_docs_files(self, req: CodeGenerationRequest) -> list[GeneratedFile]:
+        slug = _slug(req.project_name)
+        stack = req.stack or ["React", "NestJS", "PostgreSQL"]
+        modules_list = "\n".join(f"- {m}" for m in (req.modules or ["Core"]))
+        reqs_list = "\n".join(
+            f"- **{r.get('id', '')}** {r.get('title', '')}" for r in req.requirements[:10]
+        ) or "- (pendiente de definir)"
+
+        readme = self._readme_file(req, slug, stack)
+
+        constitution = GeneratedFile(
+            path="sdd/constitution.md",
+            language="markdown",
+            content=f"""# Constitución del Proyecto — {req.project_name}
+
+> Este documento es la fuente de verdad del proyecto.
+> Cualquier IA o desarrollador debe leer este archivo antes de trabajar en el código.
+
+## Propósito
+
+{req.project_name} es un MVP del sector **{req.sector}**.
+
+## Stack tecnológico seleccionado
+
+{chr(10).join(f'- {t}' for t in stack)}
+
+## Módulos principales
+
+{modules_list}
+
+## Decisiones de arquitectura
+
+| # | Decisión | Motivo |
+|---|----------|--------|
+| 1 | {stack[0] if stack else 'React'} como frontend | Ecosistema maduro, compatibilidad con TypeScript |
+| 2 | {'PostgreSQL' if any('postgres' in s.lower() for s in stack) else stack[-1] if stack else 'PostgreSQL'} como base de datos | ACID, soporte JSON, extensiones vectoriales |
+| 3 | Docker Compose para desarrollo local | Reproducibilidad en cualquier OS |
+
+## Principios de desarrollo
+
+- **SDD-first**: cada cambio empieza con una especificación, no con código
+- **Convenciones sobre configuración**: seguir las convenciones del framework elegido
+- **Test antes de refactorizar**: no refactorizar código sin cobertura de tests
+
+## Cambios a este documento
+
+Cualquier cambio de stack, arquitectura o módulos debe actualizarse aquí y en `sdd/specifications/openspec.md`.
+""",
+        )
+
+        requirements_md = GeneratedFile(
+            path="sdd/requirements/requirements.md",
+            language="markdown",
+            content=f"""# Requisitos — {req.project_name}
+
+## Requisitos funcionales
+
+{reqs_list}
+
+## Requisitos no funcionales
+
+- **Seguridad**: autenticación JWT con refresh tokens
+- **Rendimiento**: respuesta API < 300ms en p95
+- **Fiabilidad**: 99.9% uptime en producción
+- **Mantenibilidad**: cobertura de tests > 70%
+- **Escalabilidad**: arquitectura preparada para múltiples instancias
+
+## Funcionalidades prioritarias (MoSCoW)
+
+### Must have
+{chr(10).join(f'- {m}' for m in (req.modules[:3] if req.modules else ['Autenticación de usuarios', 'Dashboard principal', 'CRUD de entidades']))}
+
+### Should have
+- Notificaciones por email
+- Exportación de datos
+
+### Could have
+- Modo oscuro
+- Integración con terceros
+
+### Won't have (MVP)
+- App móvil nativa
+- Funcionalidades offline
+""",
+        )
+
+        user_stories = GeneratedFile(
+            path="sdd/requirements/user-stories.md",
+            language="markdown",
+            content=f"""# User Stories — {req.project_name}
+
+## Actor principal: Usuario final
+
+{chr(10).join(
+    f'- **US-{i+1:03d}**: Como usuario quiero {m.lower()} para mejorar mi flujo de trabajo.'
+    for i, m in enumerate(req.modules[:6] if req.modules else ['gestionar mis datos'])
+)}
+
+## Actor: Administrador
+
+- **US-A01**: Como administrador quiero gestionar usuarios para mantener el acceso controlado.
+- **US-A02**: Como administrador quiero ver métricas del sistema para tomar decisiones informadas.
+
+## Criterios de aceptación generales
+
+- Los formularios validan datos en cliente y servidor
+- Los errores muestran mensajes descriptivos al usuario
+- Las acciones destructivas piden confirmación
+""",
+        )
+
+        openspec_stub = GeneratedFile(
+            path="sdd/specifications/openspec.md",
+            language="markdown",
+            content=f"""# OpenSpec — {req.project_name}
+
+> Generado por ProgresIA Studio. Ver especificación completa en el panel del proyecto.
+
+## Resumen
+
+- **Proyecto**: {req.project_name}
+- **Sector**: {req.sector}
+- **Stack**: {', '.join(stack)}
+- **Módulos**: {', '.join(req.modules or ['Core'])}
+
+## Endpoints principales
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST | /auth/login | Autenticación de usuario |
+| POST | /auth/refresh | Renovar token de acceso |
+| GET | /api/v1/{(req.modules[0] if req.modules else 'items').lower().replace(' ', '-')}s | Listar recursos |
+| POST | /api/v1/{(req.modules[0] if req.modules else 'items').lower().replace(' ', '-')}s | Crear recurso |
+| PUT | /api/v1/{(req.modules[0] if req.modules else 'items').lower().replace(' ', '-')}s/:id | Actualizar recurso |
+| DELETE | /api/v1/{(req.modules[0] if req.modules else 'items').lower().replace(' ', '-')}s/:id | Eliminar recurso |
+
+## Entidades de datos
+
+{chr(10).join(f'### {m}{chr(10)}- id: UUID{chr(10)}- createdAt: DateTime{chr(10)}- updatedAt: DateTime{chr(10)}' for m in (req.modules[:3] if req.modules else ['Item']))}
+
+## Ver especificación completa
+
+La especificación OpenSpec completa en JSON está disponible en el panel de ProgresIA Studio
+bajo el proyecto **{req.project_name}** → Especificaciones → OpenSpec.
+""",
+        )
+
+        milestones = GeneratedFile(
+            path="sdd/plans/milestones.md",
+            language="markdown",
+            content=f"""# Milestones — {req.project_name}
+
+## M1: Foundation (Semana 1-2)
+
+- [ ] Setup del entorno de desarrollo con Docker Compose
+- [ ] Autenticación JWT (registro, login, refresh)
+- [ ] Estructura base del proyecto
+- [ ] CI básica con GitHub Actions
+
+## M2: Core features (Semana 3-5)
+
+{chr(10).join(f'- [ ] {m}' for m in (req.modules[:4] if req.modules else ['CRUD de entidades principales']))}
+
+## M3: Polish & deploy (Semana 6-8)
+
+- [ ] Tests de integración > 70% cobertura
+- [ ] Dockerización para producción
+- [ ] Documentación de API (Swagger/OpenAPI)
+- [ ] Deploy en entorno de staging
+""",
+        )
+
+        context_prompt = GeneratedFile(
+            path="sdd/prompts/project-context.md",
+            language="markdown",
+            content=f"""# Contexto del proyecto para IA — {req.project_name}
+
+> Copia y pega este archivo al inicio de cualquier sesión con Claude, Copilot o ChatGPT
+> para que la IA tenga el contexto completo del proyecto.
+
+---
+
+## Descripción del proyecto
+
+Estoy trabajando en **{req.project_name}**, un MVP del sector **{req.sector}**.
+
+## Stack tecnológico
+
+{chr(10).join(f'- {t}' for t in stack)}
+
+## Módulos implementados
+
+{modules_list}
+
+## Convenciones del proyecto
+
+- TypeScript estricto en todo el código
+- Nombres de variables y funciones en camelCase
+- Nombres de archivos en kebab-case
+- Commits siguiendo Conventional Commits (feat:, fix:, docs:, refactor:)
+- Cada módulo tiene su propio directorio con: entity, service, controller/router
+
+## Qué puedes hacer ahora
+
+Lee los archivos de `sdd/` para entender el contexto completo antes de hacer cambios.
+Empieza siempre con `sdd/constitution.md` y `sdd/requirements/requirements.md`.
+""",
+        )
+
+        resume_prompt = GeneratedFile(
+            path="sdd/prompts/resume-session.md",
+            language="markdown",
+            content=f"""# Prompt: Retomar sesión de trabajo
+
+> Usa este prompt cuando abras una nueva sesión con una IA y quieras continuar donde lo dejaste.
+
+---
+
+Estoy retomando el trabajo en **{req.project_name}**.
+
+Por favor lee estos archivos en orden:
+1. `sdd/constitution.md` — Arquitectura y decisiones del proyecto
+2. `sdd/requirements/requirements.md` — Requisitos del sistema
+3. `sdd/plans/milestones.md` — Estado actual del desarrollo
+
+El stack es: {', '.join(stack)}.
+
+Cuando termines de leer, dime qué entiendes del proyecto y espera mis instrucciones.
+""",
+        )
+
+        add_feature_prompt = GeneratedFile(
+            path="sdd/prompts/add-feature.md",
+            language="markdown",
+            content="""# Prompt: Añadir nueva funcionalidad
+
+> Usa este prompt cuando quieras añadir un nuevo módulo o funcionalidad al proyecto.
+
+---
+
+Quiero añadir la siguiente funcionalidad al proyecto:
+
+**Descripción**: [describe qué debe hacer]
+**Módulo afectado**: [nombre del módulo o "nuevo módulo"]
+**Casos de uso**:
+- Como [actor], quiero [acción] para [beneficio]
+
+Antes de escribir código:
+1. Dime qué archivos vas a crear o modificar
+2. Explica las decisiones de arquitectura
+3. Muestra el schema de base de datos si es necesario
+4. Pide confirmación antes de proceder
+
+No toques archivos fuera del módulo afectado sin justificación.
+""",
+        )
+
+        fix_bug_prompt = GeneratedFile(
+            path="sdd/prompts/fix-bug.md",
+            language="markdown",
+            content="""# Prompt: Corregir un bug
+
+> Usa este prompt cuando necesites ayuda para resolver un error.
+
+---
+
+Tengo el siguiente error en el proyecto:
+
+**Error**:
+```
+[pega aquí el mensaje de error completo]
+```
+
+**Contexto**: [describe qué estabas haciendo cuando ocurrió]
+**Archivo**: [ruta del archivo si la conoces]
+
+Por favor:
+1. Identifica la causa raíz del error
+2. Explica por qué ocurre
+3. Propón la solución mínima necesaria
+4. No refactorices código que no está relacionado con el bug
+""",
+        )
+
+        env_setup = GeneratedFile(
+            path="sdd/setup/environment.md",
+            language="markdown",
+            content=f"""# Configuración del entorno — {req.project_name}
+
+## Requisitos previos
+
+| Herramienta | Versión mínima | Instalación |
+|-------------|---------------|-------------|
+| Node.js | 20 LTS | https://nodejs.org |
+| Docker Desktop | 4.x | https://docker.com/products/docker-desktop |
+| Git | 2.x | https://git-scm.com |
+
+## Variables de entorno
+
+Copia `.env.example` a `.env` y rellena los valores:
+
+```bash
+# Linux / macOS
+cp .env.example .env
+
+# Windows (PowerShell)
+Copy-Item .env.example .env
+```
+
+## Levantar el entorno
+
+```bash
+# Linux / macOS
+docker compose up -d && npm install && npm run db:migrate
+
+# Windows (PowerShell)
+docker compose up -d; npm install; npm run db:migrate
+```
+
+## Verificar que todo funciona
+
+```bash
+# Comprueba el health de la API
+curl http://localhost:3000/health
+
+# O en Windows con PowerShell
+Invoke-RestMethod http://localhost:3000/health
+```
+""",
+        )
+
+        arch_overview = GeneratedFile(
+            path="docs/architecture/overview.md",
+            language="markdown",
+            content=f"""# Arquitectura — {req.project_name}
+
+## Diagrama de componentes
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Docker Compose                        │
+│                                                         │
+│  ┌──────────────┐   ┌──────────────┐   ┌────────────┐  │
+│  │   Frontend   │   │     API      │   │  Database  │  │
+│  │  {stack[0][:12]:12} │──▶│  {stack[1][:12]:12} │──▶│ PostgreSQL │  │
+│  │   :5173      │   │   :3000      │   │   :5432    │  │
+│  └──────────────┘   └──────────────┘   └────────────┘  │
+│                                                         │
+{'│                       ┌──────────────┐                │' if req.needs_ai else ''}
+{'│                       │  AI Service  │                │' if req.needs_ai else ''}
+{'│                       │  FastAPI     │                │' if req.needs_ai else ''}
+{'│                       │   :8003      │                │' if req.needs_ai else ''}
+{'│                       └──────────────┘                │' if req.needs_ai else ''}
+└─────────────────────────────────────────────────────────┘
+```
+
+## Stack seleccionado
+
+{chr(10).join(f'| {t.split(" ")[0]} | {" ".join(t.split(" ")[1:])} | |' for t in stack) if stack else '| React | Frontend | SPA |'}
+
+## Decisiones de registro (ADR)
+
+Ver `docs/adr/` para las decisiones de arquitectura documentadas.
+""",
+        )
+
+        adr_001 = GeneratedFile(
+            path="docs/adr/adr-001-tech-stack.md",
+            language="markdown",
+            content=f"""# ADR-001: Selección del stack tecnológico
+
+**Estado**: Aceptado
+**Fecha**: {__import__('datetime').date.today().isoformat()}
+**Deciders**: ProgresIA Studio (generado automáticamente)
+
+## Contexto
+
+Se necesita seleccionar el stack tecnológico para el MVP de {req.project_name},
+un proyecto del sector {req.sector}.
+
+## Decisión
+
+Stack seleccionado: **{', '.join(stack[:4])}**
+
+## Justificación
+
+- Ecosistema maduro con amplia documentación
+- Buena integración entre los componentes del stack
+- Preparado para escalar cuando el MVP valide la propuesta de valor
+
+## Consecuencias
+
+- **Positivas**: Velocidad de desarrollo, comunidad activa, compatibilidad
+- **Negativas**: Requiere conocimiento previo del stack
+- **Neutras**: Dependencia del ecosistema JavaScript/TypeScript
+
+## Alternativas consideradas
+
+- Stack alternativo A: descartado por mayor complejidad operacional
+- Stack alternativo B: descartado por menor soporte de la comunidad
+""",
+        )
+
+        contributing = GeneratedFile(
+            path="docs/development/contributing.md",
+            language="markdown",
+            content=f"""# Guía de contribución — {req.project_name}
+
+## Flujo de trabajo Git
+
+```bash
+# 1. Crea una rama para tu tarea
+git checkout -b feat/nombre-de-la-funcionalidad
+
+# 2. Trabaja en tu cambio
+# ...
+
+# 3. Commit con Conventional Commits
+git commit -m "feat: añadir gestión de reservas"
+
+# 4. Push y crea un Pull Request
+git push origin feat/nombre-de-la-funcionalidad
+```
+
+## Convenciones de commits
+
+| Prefijo | Cuándo usarlo |
+|---------|---------------|
+| `feat:` | Nueva funcionalidad |
+| `fix:` | Corrección de bug |
+| `docs:` | Documentación |
+| `refactor:` | Refactorización sin cambio de comportamiento |
+| `test:` | Añadir o corregir tests |
+| `chore:` | Mantenimiento (deps, config) |
+
+## Antes de hacer un PR
+
+- [ ] Los tests pasan: `npm test`
+- [ ] Sin errores TypeScript: `npx tsc --noEmit`
+- [ ] Linting pasa: `npm run lint`
+- [ ] Actualizar `sdd/plans/milestones.md` si la tarea estaba en el backlog
+""",
+        )
+
+        return [
+            readme,
+            constitution,
+            requirements_md,
+            user_stories,
+            openspec_stub,
+            milestones,
+            context_prompt,
+            resume_prompt,
+            add_feature_prompt,
+            fix_bug_prompt,
+            env_setup,
+            arch_overview,
+            adr_001,
+            contributing,
+        ]
+
+    def _readme_file(
+        self, req: CodeGenerationRequest, slug: str, stack: list[str]
+    ) -> GeneratedFile:
+        has_python   = any(s.lower() in {"fastapi", "django", "flask", "python"} for s in stack)
+        db_name      = next((s for s in stack if any(db in s.lower() for db in ["postgres", "mysql", "mongo", "sqlite"])), "PostgreSQL")
+        api_port     = "8003" if has_python else "3000"
+        web_port     = "5173"
+
+        content = f"""# {req.project_name}
+
+> MVP generado con [ProgresIA Studio](https://progresia.studio) — metodología SDD.
+
+**Sector**: {req.sector} | **Stack**: {', '.join(stack[:4])}
+
+---
+
+## Requisitos previos
+
+| Herramienta | Versión | Descarga |
+|-------------|---------|----------|
+| Node.js | 20 LTS | https://nodejs.org |
+| Docker Desktop | 4.x+ | https://docker.com/products/docker-desktop |
+| Git | 2.x+ | https://git-scm.com |
+{'| Python | 3.12+ | https://python.org |' if has_python else ''}
+
+---
+
+## Instalación y arranque
+
+### 1. Clonar el repositorio
+
+```bash
+git clone <repo-url> {slug}
+cd {slug}
+```
+
+### 2. Configurar variables de entorno
+
+```bash
+# Linux / macOS
+cp .env.example .env
+
+# Windows (PowerShell)
+Copy-Item .env.example .env
+```
+
+Edita `.env` con tus valores.
+
+### 3. Levantar la base de datos
+
+```bash
+docker compose up -d
+```
+
+### 4. Instalar dependencias y migrar
+
+```bash
+# Linux / macOS
+npm install && npm run db:migrate
+
+# Windows (PowerShell)
+npm install; npm run db:migrate
+```
+
+{'### 5. Instalar dependencias Python' + chr(10) + chr(10) + '```bash' + chr(10) + '# Linux / macOS' + chr(10) + 'cd apps/ai-service && pip install -r requirements.txt && cd ../' + chr(10) + chr(10) + '# Windows (PowerShell)' + chr(10) + 'cd apps\\ai-service; pip install -r requirements.txt; cd ../' + chr(10) + '```' + chr(10) if has_python else ''}
+### {6 if has_python else 5}. Arrancar en desarrollo
+
+```bash
+# Linux / macOS — arranca todos los servicios
+npm run dev
+
+# Windows (PowerShell) — arranca cada servicio por separado
+# Terminal 1 — API
+cd apps/api; npm run dev
+
+# Terminal 2 — Frontend
+cd apps/web; npm run dev
+{'# Terminal 3 — AI Service' + chr(10) + 'cd apps/ai-service; python -m uvicorn app.main:app --port 8003 --reload' if has_python else ''}
+```
+
+---
+
+## URLs en desarrollo
+
+| Servicio | URL |
+|----------|-----|
+| Frontend | http://localhost:{web_port} |
+| API | http://localhost:{api_port} |
+{'| AI Service | http://localhost:8003 |' if has_python else ''}
+| {db_name} | localhost:5432 |
+
+---
+
+## Estructura del proyecto
+
+```
+{slug}/
+├── apps/
+│   ├── web/          # Frontend ({stack[0] if stack else 'React'})
+│   ├── api/          # Backend ({stack[1] if len(stack) > 1 else 'API'})
+{'│   └── ai-service/  # Servicio de IA (FastAPI)' if has_python else ''}
+├── sdd/              # Especificaciones SDD del proyecto
+│   ├── constitution.md
+│   ├── requirements/
+│   ├── specifications/
+│   ├── plans/
+│   ├── prompts/      # Instrucciones para IA (Claude, Copilot...)
+│   └── setup/
+├── docs/             # Documentación técnica
+│   ├── architecture/
+│   ├── development/
+│   └── adr/          # Architecture Decision Records
+├── docker-compose.yml
+├── .env.example
+└── README.md
+```
+
+---
+
+## Comandos útiles
+
+```bash
+# Ver logs de todos los servicios
+docker compose logs -f
+
+# Resetear la base de datos
+npm run db:reset
+
+# Ejecutar tests
+npm test
+
+# Comprobar tipos TypeScript
+npx tsc --noEmit
+```
+
+---
+
+## Continuar con IA
+
+Este proyecto incluye instrucciones optimizadas para IA en `sdd/prompts/`:
+
+- `project-context.md` — Contexto completo para abrir una nueva sesión
+- `resume-session.md` — Para retomar el trabajo donde lo dejaste
+- `add-feature.md` — Para añadir nuevas funcionalidades
+- `fix-bug.md` — Para resolver errores con ayuda de IA
+
+---
+
+## Licencia
+
+MIT © {req.project_name}
+"""
+        return GeneratedFile(path="README.md", language="markdown", content=content)
 
     # ── Backend files ───────────────────────────────────────────────────────
 

@@ -22,6 +22,8 @@ describe("ArtifactsService", () => {
         findFirst: jest.fn().mockResolvedValue(specification)
       },
       artifactBundle: {
+        // findFirst returns null — no prior bundle, so create is called
+        findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({ id: "bundle-1" })
       }
     };
@@ -55,9 +57,9 @@ describe("ArtifactsService", () => {
           sourceSpecificationId: "spec-1",
           files: expect.arrayContaining([
             expect.objectContaining({ path: "reservas-clinica/README.md" }),
-            expect.objectContaining({ path: "reservas-clinica/docs/requisitos.md" }),
-            expect.objectContaining({ path: "reservas-clinica/docs/sdd.md" }),
-            expect.objectContaining({ path: "reservas-clinica/openspec/spec.json" })
+            expect.objectContaining({ path: "reservas-clinica/sdd/requirements/requirements.md" }),
+            expect.objectContaining({ path: "reservas-clinica/sdd/constitution.md" }),
+            expect.objectContaining({ path: "reservas-clinica/sdd/specifications/openspec.json" })
           ])
         })
       })

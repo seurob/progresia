@@ -9,6 +9,7 @@ from app.agents.issue_generator_agent import IssueGeneratorAgent
 from app.agents.openspec_agent import OpenSpecAgent, _OpenSpecLLMOutput
 from app.agents.requirements_agent import RequirementsAgent
 from app.agents.supervisor_agent import SupervisorAgent
+from app.agents.tech_proposal_agent import TechProposalAgent, _catalog_key
 from app.agents.tutorial_agent import TutorialAgent
 from app.main import app
 from app.schemas.architecture import ArchitectureRequest
@@ -1369,3 +1370,214 @@ class TestAbogadosTemplate:
 
         paths = [f.path for f in result.files]
         assert len(paths) == len(set(paths)), "Duplicate file paths in ABOGADOS template"
+
+
+# ── TechProposalAgent ─────────────────────────────────────────────────────────
+
+from app.schemas.tech_proposal import TechProposalRequest, TechProposalResponse  # noqa: E402
+
+_TECH_REQ_BEGINNER_SINGLE = TechProposalRequest(
+    name="Mi App",
+    sector="Educación",
+    level="BEGINNER",
+    product_type="web",
+    main_objective="mvp",
+    architecture_style="single",
+    data_needs=[],
+    ai_needs="none",
+    deployment_target="docker_local",
+    core_features=["CRUD básico", "Login"],
+)
+
+_TECH_REQ_BEGINNER_FRONTEND_API = _TECH_REQ_BEGINNER_SINGLE.model_copy(
+    update={"architecture_style": "frontend_api"}
+)
+
+_TECH_REQ_INTERMEDIATE_FRONTEND_API = _TECH_REQ_BEGINNER_SINGLE.model_copy(
+    update={"level": "INTERMEDIATE", "architecture_style": "frontend_api"}
+)
+
+_TECH_REQ_INTERMEDIATE_AI = _TECH_REQ_BEGINNER_SINGLE.model_copy(
+    update={"level": "INTERMEDIATE", "architecture_style": "frontend_api", "ai_needs": "chat_assistant"}
+)
+
+_TECH_REQ_INTERMEDIATE_SINGLE = _TECH_REQ_BEGINNER_SINGLE.model_copy(
+    update={"level": "INTERMEDIATE", "architecture_style": "single"}
+)
+
+
+class TestCatalogKey:
+    def test_beginner_single_key(self) -> None:
+        assert _catalog_key(_TECH_REQ_BEGINNER_SINGLE) == "BEGINNER_single"
+
+    def test_beginner_frontend_api_key(self) -> None:
+        assert _catalog_key(_TECH_REQ_BEGINNER_FRONTEND_API) == "BEGINNER_frontend_api"
+
+    def test_intermediate_frontend_api_key(self) -> None:
+        assert _catalog_key(_TECH_REQ_INTERMEDIATE_FRONTEND_API) == "INTERMEDIATE_frontend_api"
+
+    def test_intermediate_ai_overrides_arch(self) -> None:
+        assert _catalog_key(_TECH_REQ_INTERMEDIATE_AI) == "INTERMEDIATE_ai_service"
+
+    def test_intermediate_single_key(self) -> None:
+        assert _catalog_key(_TECH_REQ_INTERMEDIATE_SINGLE) == "INTERMEDIATE_single"
+
+    def test_ai_none_does_not_trigger_ai_service(self) -> None:
+        req = _TECH_REQ_INTERMEDIATE_FRONTEND_API.model_copy(update={"ai_needs": "none"})
+        assert _catalog_key(req) != "INTERMEDIATE_ai_service"
+
+    def test_ai_recommendation_does_not_trigger_ai_service(self) -> None:
+        req = _TECH_REQ_INTERMEDIATE_FRONTEND_API.model_copy(update={"ai_needs": "recommendation"})
+        assert _catalog_key(req) != "INTERMEDIATE_ai_service"
+
+    def test_beginner_ai_does_not_produce_ai_service(self) -> None:
+        req = _TECH_REQ_BEGINNER_SINGLE.model_copy(update={"ai_needs": "chat_assistant"})
+        key = _catalog_key(req)
+        assert key != "INTERMEDIATE_ai_service"
+        assert key.startswith("BEGINNER_")
+
+    def test_mobile_api_normalized_to_frontend_api(self) -> None:
+        req = _TECH_REQ_INTERMEDIATE_FRONTEND_API.model_copy(update={"architecture_style": "mobile_api"})
+        assert _catalog_key(req) == "INTERMEDIATE_frontend_api"
+
+    def test_unknown_arch_defaults_to_frontend_api(self) -> None:
+        req = _TECH_REQ_INTERMEDIATE_FRONTEND_API.model_copy(update={"architecture_style": "unknown_xyz"})
+        assert _catalog_key(req) == "INTERMEDIATE_frontend_api"
+
+
+class TestTechProposalAgent:
+    def test_all_catalog_variants_return_three_proposals(self) -> None:
+        for req in [
+            _TECH_REQ_BEGINNER_SINGLE,
+            _TECH_REQ_BEGINNER_FRONTEND_API,
+            _TECH_REQ_INTERMEDIATE_FRONTEND_API,
+            _TECH_REQ_INTERMEDIATE_AI,
+            _TECH_REQ_INTERMEDIATE_SINGLE,
+        ]:
+            with patch("app.agents.tech_proposal_agent.get_llm", return_value=None):
+                result = TechProposalAgent().propose(req)
+            assert len(result.proposals) == 3, f"Expected 3 proposals for {_catalog_key(req)}, got {len(result.proposals)}"
+
+    def test_proposals_have_sequential_ids(self) -> None:
+        with patch("app.agents.tech_proposal_agent.get_llm", return_value=None):
+            result = TechProposalAgent().propose(_TECH_REQ_BEGINNER_SINGLE)
+
+        ids = [p.id for p in result.proposals]
+        assert ids == [1, 2, 3]
+
+    def test_recommended_id_in_range(self) -> None:
+        for req in [_TECH_REQ_BEGINNER_SINGLE, _TECH_REQ_INTERMEDIATE_AI, _TECH_REQ_INTERMEDIATE_SINGLE]:
+            with patch("app.agents.tech_proposal_agent.get_llm", return_value=None):
+                result = TechProposalAgent().propose(req)
+            assert result.recommended_id in {p.id for p in result.proposals}
+
+    def test_recommendation_reason_not_empty(self) -> None:
+        with patch("app.agents.tech_proposal_agent.get_llm", return_value=None):
+            result = TechProposalAgent().propose(_TECH_REQ_INTERMEDIATE_AI)
+
+        assert len(result.recommendation_reason) > 0
+
+    def test_each_proposal_has_required_fields(self) -> None:
+        with patch("app.agents.tech_proposal_agent.get_llm", return_value=None):
+            result = TechProposalAgent().propose(_TECH_REQ_INTERMEDIATE_FRONTEND_API)
+
+        for p in result.proposals:
+            assert p.name, "name must not be empty"
+            assert p.tagline, "tagline must not be empty"
+            assert len(p.stack) >= 2, "stack must have at least 2 entries"
+            assert len(p.advantages) >= 1, "advantages must not be empty"
+            assert len(p.limitations) >= 1, "limitations must not be empty"
+            assert len(p.learning_outcomes) >= 1, "learning_outcomes must not be empty"
+            assert p.estimated_setup_minutes > 0
+
+    def test_ai_service_variant_has_ai_ready_proposals(self) -> None:
+        with patch("app.agents.tech_proposal_agent.get_llm", return_value=None):
+            result = TechProposalAgent().propose(_TECH_REQ_INTERMEDIATE_AI)
+
+        assert all(p.ai_ready for p in result.proposals), "All INTERMEDIATE_ai_service proposals must be ai_ready"
+
+    def test_uses_llm_when_available(self) -> None:
+        from app.schemas.tech_proposal import TechProposal as TP
+        mock_response = TechProposalResponse(
+            proposals=[
+                TP(id=1, name="A", tagline="t", stack=["X"], difficulty="Principiante",
+                   description="d", advantages=["a"], limitations=["l"],
+                   recommended_for="r", learning_outcomes=["o"],
+                   docker_ready=True, ai_ready=False, estimated_setup_minutes=10),
+                TP(id=2, name="B", tagline="t", stack=["Y"], difficulty="Principiante",
+                   description="d", advantages=["a"], limitations=["l"],
+                   recommended_for="r", learning_outcomes=["o"],
+                   docker_ready=True, ai_ready=False, estimated_setup_minutes=10),
+            ],
+            recommended_id=1,
+            recommendation_reason="LLM reason",
+        )
+        mock_llm = MagicMock()
+        mock_structured = MagicMock()
+        mock_llm.with_structured_output.return_value = mock_structured
+        mock_structured.invoke.return_value = mock_response
+
+        result = TechProposalAgent().propose(_TECH_REQ_BEGINNER_SINGLE, llm=mock_llm)
+
+        mock_llm.with_structured_output.assert_called_once_with(TechProposalResponse)
+        assert result.recommendation_reason == "LLM reason"
+
+    def test_falls_back_when_llm_raises(self) -> None:
+        mock_llm = MagicMock()
+        mock_structured = MagicMock()
+        mock_llm.with_structured_output.return_value = mock_structured
+        mock_structured.invoke.side_effect = RuntimeError("LLM timeout")
+
+        result = TechProposalAgent().propose(_TECH_REQ_BEGINNER_SINGLE, llm=mock_llm)
+
+        assert len(result.proposals) == 3
+
+    def test_falls_back_when_llm_returns_too_few_proposals(self) -> None:
+        from app.schemas.tech_proposal import TechProposal as TP
+        short_response = TechProposalResponse(
+            proposals=[
+                TP(id=1, name="A", tagline="t", stack=["X"], difficulty="Principiante",
+                   description="d", advantages=["a"], limitations=["l"],
+                   recommended_for="r", learning_outcomes=["o"],
+                   docker_ready=True, ai_ready=False, estimated_setup_minutes=10),
+            ],
+            recommended_id=1,
+            recommendation_reason="only one",
+        )
+        mock_llm = MagicMock()
+        mock_structured = MagicMock()
+        mock_llm.with_structured_output.return_value = mock_structured
+        mock_structured.invoke.return_value = short_response
+
+        result = TechProposalAgent().propose(_TECH_REQ_BEGINNER_SINGLE, llm=mock_llm)
+
+        assert len(result.proposals) == 3
+
+    def test_endpoint_propose_tech_returns_valid_response(self) -> None:
+        with patch("app.agents.tech_proposal_agent.get_llm", return_value=None):
+            response = client.post("/propose-tech", json=_TECH_REQ_BEGINNER_SINGLE.model_dump())
+
+        assert response.status_code == 200
+        body = response.json()
+        assert len(body["proposals"]) == 3
+        assert body["recommended_id"] in {p["id"] for p in body["proposals"]}
+        assert body["recommendation_reason"]
+
+    def test_endpoint_intermediate_ai_returns_ai_ready_stacks(self) -> None:
+        with patch("app.agents.tech_proposal_agent.get_llm", return_value=None):
+            response = client.post("/propose-tech", json=_TECH_REQ_INTERMEDIATE_AI.model_dump())
+
+        assert response.status_code == 200
+        body = response.json()
+        assert all(p["ai_ready"] for p in body["proposals"])
+
+    def test_endpoint_proposal_fields_complete(self) -> None:
+        with patch("app.agents.tech_proposal_agent.get_llm", return_value=None):
+            response = client.post("/propose-tech", json=_TECH_REQ_INTERMEDIATE_FRONTEND_API.model_dump())
+
+        assert response.status_code == 200
+        for p in response.json()["proposals"]:
+            assert all(k in p for k in ("id", "name", "tagline", "stack", "difficulty",
+                                        "description", "advantages", "limitations",
+                                        "recommended_for", "learning_outcomes",
+                                        "docker_ready", "ai_ready", "estimated_setup_minutes"))

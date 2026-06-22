@@ -23,6 +23,8 @@ describe("SpecificationsService", () => {
         findUnique: jest.fn().mockResolvedValue(idea)
       },
       specification: {
+        // findFirst returns null — no prior architecture spec in this scenario
+        findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({ id: "spec-1" })
       },
       project: {
@@ -55,7 +57,9 @@ describe("SpecificationsService", () => {
       core_features: idea.coreFeatures,
       needs_auth: true,
       needs_admin_panel: true,
-      needs_ai: false
+      needs_ai: false,
+      technical_level: "INTERMEDIATE", // complexityToLevel(undefined) → INTERMEDIATE
+      architecture_type: undefined      // no architecture spec in this test scenario
     });
     expect(prisma.specification.create).toHaveBeenCalledWith({
       data: {
