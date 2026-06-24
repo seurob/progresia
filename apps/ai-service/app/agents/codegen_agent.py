@@ -6,12 +6,6 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.core.llm import TaskType, get_llm
 from app.schemas.codegen import CodeGenerationRequest, CodeGenerationResponse, GeneratedFile
-from app.agents.templates import academia as academia_template
-from app.agents.templates import django_rest as django_template
-from app.agents.templates import express_beginner as express_template
-from app.agents.templates import laravel_monolith as laravel_template
-from app.agents.templates import nextjs_app as nextjs_template
-
 logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """You are an expert fullstack developer generating a production-ready MVP scaffold.
@@ -131,47 +125,10 @@ class CodeGenerationAgent:
         # Reject if more than 60 files (LLM hallucination) or duplicate paths
         return len(paths) <= 60 and len(paths) == len(set(paths))
 
-    # ── Architecture keyword hints ─────────────────────────────────────────
-    # Used only to pick the RIGHT TECH STACK — not to inject hardcoded domain models.
-    # Domain models come from OpenSpec data_entities.
-
-    _ACADEMIA_KEYWORDS = {"educac", "formac", "ensena", "academia", "curso", "escuela", "capacitac"}
-    _LARAVEL_KEYWORDS  = {"laravel", "php", "blade", "eloquent", "artisan"}
-    _NEXTJS_KEYWORDS   = {"nextjs", "next.js", "next js", "vercel", "app router"}
-    _DJANGO_KEYWORDS   = {"django", "drf", "django rest", "python web"}
-
-    _ARCHITECTURE_TEMPLATES: dict[str, object] = {
-        "LARAVEL_MONOLITH":       laravel_template,
-        "LARAVEL_INERTIA_REACT":  laravel_template,
-        "LARAVEL_INERTIA_VUE":    laravel_template,
-        "NEXTJS_APP":             nextjs_template,
-        "ACADEMIA":               academia_template,
-        "DJANGO_REST":            django_template,
-        "REACT_EXPRESS":          express_template,
-    }
-
     def _scaffold_fallback(self, req: CodeGenerationRequest) -> CodeGenerationResponse:
-        # Explicit architecture_type takes priority
-        if req.architecture_type:
-            tmpl = self._ARCHITECTURE_TEMPLATES.get(req.architecture_type)
-            if tmpl is not None:
-                base = tmpl.build(req)  # type: ignore[union-attr]
-                return self._extend_with_sdd(base, req)
-
-        # BEGINNER level → simpler Express+React scaffold
-        if req.technical_level == "BEGINNER":
-            return self._extend_with_sdd(express_template.build(req), req)
-
-        text = f"{req.sector.lower()} {' '.join(req.stack).lower()}"
-        if any(k in text for k in self._ACADEMIA_KEYWORDS):
-            return self._extend_with_sdd(academia_template.build(req), req)
-        if any(k in text for k in self._LARAVEL_KEYWORDS):
-            return self._extend_with_sdd(laravel_template.build(req), req)
-        if any(k in text for k in self._NEXTJS_KEYWORDS):
-            return self._extend_with_sdd(nextjs_template.build(req), req)
-        if any(k in text for k in self._DJANGO_KEYWORDS):
-            return self._extend_with_sdd(django_template.build(req), req)
-
+        # Generic fallback used only when the LLM is unavailable or returns invalid output.
+        # Generates a minimal but runnable tRPC+Next.js scaffold from OpenSpec data_entities.
+        # Stack-specific generation is the LLM's responsibility.
         slug = _slug(req.project_name)
         modules = req.modules if req.modules else ["Item"]
         first_mod = modules[0]
