@@ -134,15 +134,15 @@ apps/ai-service (FastAPI)
 | Tecnología | Versión | Rol |
 |-----------|---------|-----|
 | **React** | 19.1 | UI framework — concurrent rendering, Suspense |
-| **Vite** | 8.0 | Bundler + dev server — HMR instantáneo |
+| **Vite** | 6.3+ | Bundler + dev server — HMR instantáneo |
 | **Tailwind CSS** | 4.3 | Estilos utility-first — CSS custom properties nativas |
-| **React Router** | 7.6 | Enrutamiento SPA con loaders |
+| **React Router** | 7.6 | Enrutamiento SPA |
 | **TanStack Query** | 5.81 | Server state, caché, invalidación automática |
 | **React Hook Form** | 7.59 | Formularios performantes sin re-renders |
 | **Zod** | 4.4 | Validación de esquemas en cliente |
 | **Axios** | 1.10 | HTTP client con interceptores de auth |
 | **Lucide React** | 1.21 | Iconografía |
-| **Vitest** | 4.1 | Testing unitario |
+| **Vitest** | — | Testing unitario (pendiente de configurar) |
 
 ### Páginas y rutas
 
@@ -152,9 +152,10 @@ apps/ai-service (FastAPI)
 | `/register` | `AuthPage` (mode=register) | Registro con CAPTCHA integrado |
 | `/` | `DashboardPage` | Listado de workspaces y proyectos |
 | `/projects/new` | `NewProjectPage` | Wizard SDD de 6 pasos |
-| `/projects/:id` | `ProjectDetailPage` | Pipeline + tarjetas de resultado con polling |
+| `/projects/:projectId` | `ProjectDetailPage` | Pipeline + tarjetas de resultado con polling |
 | `/ai-settings` | `AiSettingsPage` | Configuración de proveedores LLM en tiempo real |
-| `/gestion-usuarios` | `AdminDashboard` | Panel admin (ruta oculta, auth separada) — `seurobman` / `$eurobman2026` |
+| `/gestion-usuarios` | `AdminPage` | Panel admin (ruta oculta, auth separada) — `seurobman` / `$eurobman2026` |
+| `*` | `NotFoundPage` | 404 con navegación de vuelta al dashboard |
 
 ### Características de la UI
 
@@ -179,10 +180,10 @@ apps/ai-service (FastAPI)
 | **Prisma** | 6.19 | ORM type-safe — migrations, query builder |
 | **PostgreSQL** | 16 | Base de datos relacional principal |
 | **BullMQ** | 5.79 | Cola de jobs distribuida sobre Redis |
-| **Passport + JWT** | — | Autenticación — access token (1 día) + refresh rotativo (7 días) |
+| **@nestjs/jwt + Passport** | — | Autenticación — access token (1 día) + refresh rotativo (7 días) |
 | **class-validator** | 0.15 | Validación de DTOs con decorators |
 | **@nestjs/swagger** | 11.2 | Documentación OpenAPI automática en `/api/docs` |
-| **@nestjs/throttler** | 6.5 | Rate limiting — protección DDoS |
+| **@nestjs/throttler** | 6.5 | Rate limiting — 300 req/min por IP |
 | **bcryptjs** | 3.0 | Hash de contraseñas (bcrypt, coste 10) |
 | **JSZip** | 3.10 | Generación de bundles ZIP en memoria |
 | **MinIO SDK** | 8.0 | Object storage para ZIPs generados |
@@ -199,8 +200,11 @@ src/modules/
 ├── ideas/          Intake del wizard → modelo Idea en DB
 ├── specifications/ Pipeline SDD — cola BullMQ → ai-service → DB
 ├── artifacts/      Bundle ZIP + code generation + validación + push GitHub
+├── github/         Integración con API de GitHub (crear repos, push código)
 ├── ai-service/     Cliente HTTP hacia FastAPI (AiServiceClient)
 ├── llm-config/     Proxy GET/PATCH /llm-config → AI service (configuración LLM)
+├── jobs/           Gestión de jobs BullMQ — cola asíncrona del pipeline
+├── storage/        Object storage (MinIO SDK)
 ├── health/         Health check con estado de DB
 └── admin/          Panel admin — usuarios + proyectos (guard AdminJwtGuard)
 ```
@@ -237,20 +241,44 @@ src/modules/
 | **Ruff** | 0.12 | Linter + formatter Python |
 | **pytest** | 8.4 | Testing |
 
-### Agentes implementados
+### Agentes implementados (10)
 
 | Agente | Archivo | Tarea LLM | Descripción |
 |--------|---------|-----------|-------------|
-| `ProductAgent` | `product_agent.py` | general | Análisis inicial de idea |
+| `ProductAgent` | `product_agent.py` | general | Análisis inicial de idea — valida alcance y funcionalidades clave |
 | `RequirementsAgent` | `requirements_agent.py` | reasoning | Requisitos funcionales, no funcionales y user stories |
-| `ArchitectureAgent` | `architecture_agent.py` | reasoning | Stack recomendado + learning path + upgrade signals |
-| `SupervisorAgent` | `supervisor_agent.py` | spec | Orquestador LangGraph del OpenSpec |
-| `OpenSpecAgent` | `openspec_agent.py` | spec | OpenSpec completo (JSON estructurado) |
-| `IssueGeneratorAgent` | `issue_generator_agent.py` | reasoning | Issues GitHub con milestones y labels |
-| `TutorialAgent` | `tutorial_agent.py` | general | Tutorial paso a paso por arquitectura |
-| `CodeGenerationAgent` | `codegen_agent.py` | code | Archivos de código generados |
-| `TechProposalAgent` | `tech_proposal_agent.py` | general | 3 propuestas de stack adaptadas al proyecto |
-| `RAGAgent` | `rag_agent.py` | general | Respuestas fundamentadas en documentos indexados |
+| `ArchitectureAgent` | `architecture_agent.py` | reasoning | Stack recomendado + learning path + señales de upgrade por arquitectura |
+| `SupervisorAgent` | `supervisor_agent.py` | spec | Orquestador LangGraph del OpenSpec — enruta a fallback si los requisitos son insuficientes |
+| `OpenSpecAgent` | `openspec_agent.py` | spec | OpenSpec completo (JSON estructurado) — fuente de verdad para agentes downstream |
+| `IssueGeneratorAgent` | `issue_generator_agent.py` | reasoning | Issues de GitHub con milestones, labels y prioridad a partir del OpenSpec |
+| `TutorialAgent` | `tutorial_agent.py` | general | Tutorial paso a paso con comandos específicos por arquitectura |
+| `CodeGenerationAgent` | `codegen_agent.py` | code | Scaffold de código — usa `data_entities` y `api_endpoints` del OpenSpec + 17 templates de sector |
+| `TechProposalAgent` | `tech_proposal_agent.py` | general | 3 propuestas de stack con ventajas, limitaciones y learning outcomes |
+| `RAGAgent` | `rag_agent.py` | general | Respuestas fundamentadas en documentos indexados — retrieval sobre Qdrant + citas de fuente |
+
+### Templates de sector (17)
+
+Los templates generan scaffolds deterministas (sin LLM) adaptados a cada sector. El `CodeGenerationAgent` selecciona el template por keywords del sector + stack, o por `architecture_type` explícito del `ArchitectureAgent`.
+
+| Template | Arquitectura base | Sectores cubiertos |
+|----------|------------------|--------------------|
+| `academia.py` | Next.js 14 + tRPC + Fastify | Formación, cursos, escuelas |
+| `django_rest.py` | Django 5 + DRF + PostgreSQL | APIs REST con panel admin Django |
+| `express_beginner.py` | Express.js + React + Prisma | Proyectos sencillos Node.js (nivel principiante) |
+| `laravel_monolith.py` | Laravel 11 + Blade | Monolitos PHP tradicionales |
+| `nextjs_app.py` | Next.js 15 App Router + Prisma | Apps fullstack modernas |
+| `ecommerce.py` | tRPC + Next.js + Prisma | Tiendas online, marketplaces |
+| `horeca.py` | tRPC + Next.js + Prisma | Restaurantes, hostelería |
+| `salud.py` | tRPC + Next.js + Prisma | Clínicas, pacientes, citas |
+| `veterinaria.py` | tRPC + Next.js + Prisma | Clínicas veterinarias |
+| `inmobiliaria.py` | tRPC + Next.js + Prisma | Agencias inmobiliarias, CRM |
+| `rrhh.py` | tRPC + Next.js + Prisma | Recursos humanos, nóminas |
+| `logistica.py` | tRPC + Next.js + Prisma | Logística, flota, tracking |
+| `fintech.py` | tRPC + Next.js + Prisma | Finanzas, presupuesto, inversión |
+| `eventos.py` | tRPC + Next.js + Prisma | Eventos, ticketing, check-in |
+| `gym.py` | tRPC + Next.js + Prisma | Gimnasios, membresías, clases |
+| `farmacia.py` | tRPC + Next.js + Prisma | Farmacias, stock, recetas |
+| `abogados.py` | tRPC + Next.js + Prisma | Bufetes, expedientes, horas facturables |
 
 ### Cadena de fallback LLM (por tipo de tarea)
 
@@ -270,12 +298,34 @@ Tipo "general" (features, tutorial):
 
 Si se configura un proveedor forzado desde `/ai-settings`, ese proveedor se intenta primero para todos los tipos.
 
-### Endpoints de configuración LLM
+### Endpoints del AI service
 
 ```
-GET  /config/llm           → estado actual (proveedor activo, modelos, enrutamiento)
-PATCH /config/llm          → forzar proveedor / cambiar modelos en caliente
-GET  /ollama/models        → modelos instalados en Ollama local
+Pipeline de generación
+POST /analyze-idea              → ProductAgent — análisis de idea inicial
+POST /generate-requirements     → RequirementsAgent — requisitos y user stories
+POST /recommend-architecture    → ArchitectureAgent — stack + learning path
+POST /generate-openspec         → SupervisorAgent → OpenSpecAgent — OpenSpec completo
+POST /propose-tech              → TechProposalAgent — 3 propuestas de stack
+POST /generate-issues           → IssueGeneratorAgent — issues GitHub
+POST /generate-tutorial         → TutorialAgent — tutorial paso a paso
+POST /generate-code             → CodeGenerationAgent — archivos de scaffold
+POST /suggest-features          → sugerencias de funcionalidades por sector
+
+Configuración LLM (en caliente, sin reiniciar)
+GET  /config/llm                → estado actual (proveedor, modelos, enrutamiento)
+PATCH /config/llm               → forzar proveedor / cambiar modelos
+GET  /ollama/models             → modelos instalados en Ollama local
+
+RAG (Retrieval-Augmented Generation)
+POST /rag/index                 → indexar documentos en Qdrant
+POST /rag/search                → búsqueda semántica en chunks
+POST /rag/query                 → RAGAgent: retrieval + respuesta con citas
+GET  /rag/eval/{collection}     → evaluación de coherencia del retrieval
+DELETE /rag/collection/{name}   → eliminar colección de Qdrant
+
+Salud
+GET  /health                    → {"status": "ok", "service": "progresia-ai-service"}
 ```
 
 ### Patrón de resiliencia de agentes
@@ -297,18 +347,27 @@ def generate(self, req):
 ```json
 {
   "project":        { "name", "sector", "target_users", "problem", "description" },
-  "architecture":   { "type", "name", "stack", "difficulty" },
-  "requirements":   [{ "id", "title", "description", "acceptance_criteria" }],
+  "architecture":   { "type", "name", "stack[]", "difficulty" },
+  "requirements":   [{ "id", "title", "description", "acceptance_criteria[]" }],
   "user_stories":   [{ "id", "actor", "goal", "benefit" }],
   "modules":        ["Auth", "Reservas", "Pagos"],
-  "data_entities":  [{ "name", "fields": [{ "name", "type", "required" }], "relations" }],
+  "milestones":     ["M1: Foundation", "M2: Core features"],
+  "data_entities":  [{ "name", "description", "fields[]", "relations[]" }],
+  "data_model":     { "storage_type", "technology", "orm", "relationships[]", "indexes[]", "mermaid_diagram" },
   "api_endpoints":  [{ "method", "path", "description", "auth_required", "request_body", "response" }],
   "business_rules": ["string"],
-  "dev_steps":      [{ "step", "title", "description", "commands" }],
-  "milestones":     ["string"],
-  "constraints":    { "delivery", "environments" }
+  "dev_steps":      [{ "step", "title", "description", "commands[]" }],
+  "constraints":    { "delivery", "environments[]" }
 }
 ```
+
+Todos los campos son consumidos downstream:
+- `requirements` → `IssueGeneratorAgent`
+- `architecture.type` → `CodeGenerationAgent` (selección de template)
+- `architecture.stack` → `TutorialAgent` (comandos específicos)
+- `data_entities` → `CodeGenerationAgent` (schema Prisma real)
+- `api_endpoints` → `CodeGenerationAgent` (stub OpenSpec en SDD docs)
+- `dev_steps` → `TutorialAgent` (fases del tutorial)
 
 ---
 
@@ -322,10 +381,10 @@ def generate(self, req):
 | `RefreshToken` | userId, tokenHash, expiresAt | Tokens de refresco activos |
 | `Workspace` | id, name, ownerId | Espacio de trabajo del equipo |
 | `WorkspaceMember` | workspaceId, userId, role | Membresías con rol |
-| `Project` | id, slug, name, sector, productType, status | Proyecto SDD |
-| `Idea` | problem, targetUsers, coreFeatures[], complexity, needsAi | Intake del wizard |
-| `Specification` | type (enum), status, content (JSON) | Artefactos del pipeline |
-| `ArtifactBundle` | manifest (JSON), generatedContent (JSON), status | Bundle final descargable |
+| `Project` | id, slug, name, sector, productType, status, workspaceId | Proyecto SDD — slug único |
+| `Idea` | problem, targetUsers, coreFeatures[], complexity, needsAuth, needsAdminPanel, needsAi, mandatoryTechs | Intake del wizard |
+| `Specification` | type (enum), status, content (JSON), projectId | Artefactos del pipeline |
+| `ArtifactBundle` | manifest (JSON), generatedContent (JSON), status, specificationId | Bundle final descargable |
 
 ### Enums relevantes
 
@@ -443,6 +502,7 @@ VITE_CAPTCHA_SITE_KEY=<Cloudflare Turnstile site key>
 - [x] Wizard conversacional de 6 pasos con mensajes de IA en cola
 - [x] Pipeline SDD completo: requisitos → arquitectura → OpenSpec → issues → tutorial → código → ZIP
 - [x] 12 arquitecturas soportadas: 8 web + 2 mobile + 2 desktop
+- [x] **17 templates de sector** — scaffolds deterministas adaptados por palabras clave (horeca, salud, fintech, rrhh, ecommerce, logística, eventos, veterinaria, gym, farmacia, abogados, academia, django, laravel, nextjs, express, inmobiliaria)
 - [x] Cadena de fallback LLM con 4 proveedores (Groq → OpenAI → Gemini → Ollama → determinístico)
 - [x] Enrutamiento de tarea: cada tipo de agente usa el proveedor óptimo
 - [x] **UI de configuración LLM** (`/ai-settings`) — cambio de proveedor y modelo en caliente sin reiniciar
@@ -451,8 +511,10 @@ VITE_CAPTCHA_SITE_KEY=<Cloudflare Turnstile site key>
 - [x] Panel de administración aislado (`/gestion-usuarios`) con auth separada
 - [x] Bundle ZIP descargable con validación y secrets scanning
 - [x] Push a repositorio GitHub desde el panel de proyecto
-- [x] RAG pipeline (indexar documentos, búsqueda vectorial, respuestas fundamentadas)
-- [x] Propuestas de stack tecnológico antes de generar el MVP (`TechProposalAgent`)
+- [x] RAG pipeline (indexar documentos en Qdrant, búsqueda vectorial, respuestas con citas)
+- [x] Propuestas de stack tecnológico antes de generar el MVP (`TechProposalAgent`) con tarjeta visual en `ProjectDetailPage`
+- [x] **TutorialCard** en `ProjectDetailPage` — muestra el tutorial por fases con comandos expandibles
+- [x] **`CodeGenerationAgent` lee OpenSpec** — usa `data_entities` para generar el schema Prisma real y `api_endpoints` para el stub de documentación
 - [x] Routing mobile/desktop determinístico (bypasa LLM — sin alucinaciones de stack)
 - [x] Learning paths y upgrade signals por arquitectura
 - [x] Rate limiting en todos los endpoints públicos
@@ -465,23 +527,22 @@ VITE_CAPTCHA_SITE_KEY=<Cloudflare Turnstile site key>
 
 ### Alta prioridad
 
-- [ ] **TutorialCard en el frontend** — `ProjectDetailPage.tsx` necesita la tarjeta de visualización del tutorial; el agente ya funciona pero el resultado no se muestra en la UI
-- [ ] **Fortalecer `code_generation_agent.py`** — debe leer `data_entities` y `api_endpoints` del OpenSpec para generar código coherente con el modelo de datos real
 - [ ] **Tests completos del AI service** — `TutorialAgent`, `CodeGenerationAgent`, `TechProposalAgent` e `IssueGeneratorAgent` no tienen tests
+- [ ] **Dependabot alerts** — 1 alerta alta + 2 moderadas en GitHub — revisar y actualizar dependencias
 
 ### Media prioridad
 
-- [ ] **Extender el pipeline a 7 pasos visuales** — el paso `TECH_PROPOSAL` existe en DB pero no tiene tarjeta en `ProjectDetailPage`
-- [ ] **Visor de OpenSpec en el frontend** — el JSON se guarda pero no hay UI para inspeccionarlo ni editarlo
-- [ ] **Exportación de especificaciones** — `/export-pdf` y `/export-md` existen en el controlador pero la generación de contenido es básica
-- [ ] **Dependabot alerts** — revisar y actualizar dependencias con alertas de seguridad pendientes
+- [ ] **Visor de OpenSpec en el frontend** — el JSON se guarda pero no hay UI para inspeccionarlo ni editarlo inline
+- [ ] **Exportación de especificaciones** — `/export-pdf` y `/export-md` existen en el controlador pero la generación de contenido es básica (sin estilos, sin maquetación)
+- [ ] **CodeGenAgent multi-step** — plan → implementar módulo por módulo → revisar (mejor calidad que generación en paso único)
+- [ ] **RAG en el wizard** — el pipeline RAG existe pero no está conectado al wizard de nueva idea (podría sugerir funcionalidades basadas en proyectos anteriores)
 
 ### Baja prioridad / Post-MVP
 
-- [ ] **Despliegue en producción** — Dockerfiles preparados pero sin CI/CD configurado
+- [ ] **Despliegue en producción** — Dockerfiles preparados pero sin CI/CD configurado (GitHub Actions pendiente)
 - [ ] **Colaboradores en workspace** — el modelo de datos soporta `WorkspaceMember` con roles, pero la UI solo permite al owner trabajar
 - [ ] **MinIO activo** — el SDK está integrado pero el flujo de subida de ZIPs al object storage no está activo (se devuelve directamente como stream)
-- [ ] **CodeGenAgent multi-step** — plan → implementar módulo por módulo → revisar (mejor calidad que paso único)
+- [ ] **Historial de generaciones** — los `ArtifactBundle` anteriores se listan pero no permiten restaurar una versión anterior completa
 
 ---
 
