@@ -21,6 +21,11 @@ class CodeGenerationRequest(BaseModel):
     # Optional: explicit architecture type from the architecture recommender.
     # When set, codegen bypasses LLM and picks the matching template directly.
     architecture_type: str | None = None
+    # BEGINNER | INTERMEDIATE | ADVANCED — routes to simpler scaffold when BEGINNER
+    technical_level: str | None = None
+    # Populated from OpenSpec — drives Prisma schema and tRPC/REST route generation
+    data_entities: list[dict] = Field(default_factory=list)
+    api_endpoints: list[dict] = Field(default_factory=list)
 
 
 class CodeGenerationResponse(BaseModel):

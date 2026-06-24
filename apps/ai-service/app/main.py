@@ -1,9 +1,7 @@
 from fastapi import FastAPI
 
 from app.api.routes import router
-from app.core.settings import get_settings
-
-settings = get_settings()
+from app.core.settings import settings
 
 app = FastAPI(
     title="ProgresIA Studio AI Service",

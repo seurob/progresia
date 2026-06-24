@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowRight, Braces } from "lucide-react";
+import { ArrowRight, Braces, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, Navigate, useNavigate } from "react-router";
@@ -8,7 +8,7 @@ import { CaptchaBox } from "../components/CaptchaBox";
 import { FormField } from "../components/FormField";
 import { useAuth } from "../features/auth/auth-context";
 import { api, getErrorMessage } from "../lib/api";
-import { AuthResponse, RegisterPendingResponse } from "../types/api";
+import { AuthResponse } from "../types/api";
 
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_=+{};:,<.>?])/;
 
@@ -32,7 +32,7 @@ function buildSchema(isRegister: boolean) {
 
 type AuthForm = z.infer<typeof baseSchema>;
 
-export function AuthPage({ mode }: { mode: "login" | "register" }) {
+export function AuthPage({ mode }: Readonly<{ mode: "login" | "register" }>) {
   const auth = useAuth();
   const navigate = useNavigate();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -59,17 +59,15 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
       : { email: values.email, password: values.password, captchaToken };
 
     try {
-      const response = await api.post<AuthResponse | RegisterPendingResponse>(endpoint, payload);
-      if ("requiresEmailVerification" in response.data) {
-        navigate(`/verify-email?email=${encodeURIComponent(response.data.email)}`, { replace: true });
-        return;
-      }
+      const response = await api.post<AuthResponse>(endpoint, payload);
       auth.setSession(response.data.accessToken, response.data.user, response.data.refreshToken);
       navigate("/");
     } catch (error) {
       setServerError(getErrorMessage(error));
     }
   }
+
+  const submitLabel = isRegister ? "Crear cuenta" : "Entrar";
 
   return (
     <main className="grid min-h-screen bg-zinc-950 px-5 py-6 text-zinc-50 lg:grid-cols-[0.95fr_1.05fr]">
@@ -94,7 +92,7 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
       </section>
 
       <section className="flex items-center justify-center">
-        <form onSubmit={form.handleSubmit(onSubmit)} className="w-full max-w-md rounded-md border border-white/10 bg-white/[0.04] p-6">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="w-full max-w-md rounded-md border border-white/10 bg-white/4 p-6">
           <div className="mb-6">
             <p className="text-sm font-semibold uppercase text-emerald-300">{isRegister ? "Crear cuenta" : "Acceso"}</p>
             <h2 className="mt-2 text-3xl font-semibold">{isRegister ? "Empieza un workspace" : "Entra al estudio"}</h2>
@@ -122,8 +120,17 @@ export function AuthPage({ mode }: { mode: "login" | "register" }) {
           {serverError ? <p className="mt-4 rounded-md border border-rose-400/30 bg-rose-400/10 p-3 text-sm text-rose-200">{serverError}</p> : null}
 
           <button className="primary-button mt-6 w-full" type="submit" disabled={form.formState.isSubmitting}>
-            {form.formState.isSubmitting ? "Procesando" : isRegister ? "Crear cuenta" : "Entrar"}
-            <ArrowRight size={18} />
+            {form.formState.isSubmitting ? (
+              <>
+                <Loader2 size={18} className="animate-spin" aria-hidden="true" />
+                Procesando...
+              </>
+            ) : (
+              <>
+                {submitLabel}
+                <ArrowRight size={18} aria-hidden="true" />
+              </>
+            )}
           </button>
 
           <p className="mt-5 text-center text-sm text-zinc-400">

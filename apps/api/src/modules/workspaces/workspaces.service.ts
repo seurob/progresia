@@ -50,7 +50,9 @@ export class WorkspacesService {
 
   async inviteMember(workspaceId: string, inviterId: string, dto: InviteMemberDto) {
     const workspace = await this.ensureMember(workspaceId, inviterId);
-    if (workspace.members[0].role !== Role.OWNER) {
+    // ensureMember filters members by userId, so [0] is the requester's own membership record
+    const requester = workspace.members[0];
+    if (requester.role !== Role.OWNER) {
       throw new ForbiddenException("Only workspace owners can invite members");
     }
 
@@ -76,7 +78,8 @@ export class WorkspacesService {
 
   async removeMember(workspaceId: string, removerId: string, targetUserId: string) {
     const workspace = await this.ensureMember(workspaceId, removerId);
-    if (workspace.members[0].role !== Role.OWNER) {
+    const requester = workspace.members[0];
+    if (requester.role !== Role.OWNER) {
       throw new ForbiddenException("Only workspace owners can remove members");
     }
     if (targetUserId === removerId) {

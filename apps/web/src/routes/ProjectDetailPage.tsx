@@ -9,6 +9,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { api, getErrorMessage } from "../lib/api";
 import { getAccessToken } from "../lib/auth-token";
 import { ArtifactBundle, JobStatus, Project, PushToGithubResult, Specification, TechProposal, TechProposalContent } from "../types/api";
+import { STATUS_LABELS } from "../constants/status";
 
 /* ─── Pipeline ─────────────────────────────────────────────────────────── */
 
@@ -345,47 +346,18 @@ function ArchitectureCard({ spec }: { readonly spec: Specification }) {
         </div>
       )}
 
-      {/* Learning path */}
-      {(arch.learning_path ?? []).length > 0 && (
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--c-text-faint)]">
-            Ruta de aprendizaje
-          </p>
-          <div className="grid gap-1.5">
-            {arch.learning_path!.map((res, i) => {
-              const levelClass =
-                res.level === "BEGINNER"     ? "text-emerald-400 border-emerald-800" :
-                res.level === "INTERMEDIATE" ? "text-amber-400 border-amber-800"    :
-                                               "text-rose-400 border-rose-800";
-              const typeLabel: Record<string, string> = {
-                docs: "Docs", course: "Curso", book: "Libro", video: "Video", article: "Artículo"
-              };
-              return (
-                <a
-                  key={i}
-                  href={res.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-between gap-3 rounded-md border border-[var(--c-border-subtle)] px-3 py-2 text-xs hover:border-[var(--c-border-med)] transition-colors"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-medium ${levelClass}`}>
-                      {res.level === "BEGINNER" ? "Básico" : res.level === "INTERMEDIATE" ? "Medio" : "Avanzado"}
-                    </span>
-                    <span className="truncate text-[var(--c-text-muted)]">{res.title}</span>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1.5 text-[var(--c-text-faint)]">
-                    <span>{typeLabel[res.type] ?? res.type}</span>
-                    <ExternalLink size={11} />
-                  </div>
-                </a>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      <div className="flex justify-end gap-2">
+        <button className="secondary-button gap-2 text-sm" onClick={() => downloadSpecification(spec, "md")}>
+          <Download size={15} />
+          Descargar MD
+        </button>
+        <button className="secondary-button gap-2 text-sm" onClick={() => downloadSpecification(spec, "pdf")}>
+          <Download size={15} />
+          Descargar PDF
+        </button>
+      </div>
 
-      {/* When to upgrade */}
+      {/* When to upgrade — kept inline as architecture context */}
       {(arch.when_to_upgrade ?? []).length > 0 && (
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--c-text-faint)]">
@@ -421,6 +393,91 @@ interface OpenSpecContent {
   constraints?: { delivery: string; environments: string[] };
 }
 
+function downloadSpecification(spec: Specification, format: "pdf" | "md") {
+  const token = getAccessToken();
+  if (!token) return;
+  const apiBase = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:3000/api";
+  void fetch(`${apiBase}/specifications/${spec.id}/export-${format}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  })
+    .then(response => {
+      if (!response.ok) throw new Error(`No se pudo generar el ${format.toUpperCase()}`);
+      return response.blob();
+    })
+    .then(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `progresia-spec-${spec.id}.${format}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+}
+
+function LearningItineraryCard({ spec }: { readonly spec: Specification }) {
+  const [open, setOpen] = useState(false);
+  const arch = spec.content as ArchContent;
+  const resources = arch.learning_path ?? [];
+
+  if (resources.length === 0) return null;
+
+  const byLevel: Record<string, typeof resources> = {};
+  for (const r of resources) {
+    const key = r.level ?? "OTHER";
+    if (!byLevel[key]) byLevel[key] = [];
+    byLevel[key].push(r);
+  }
+
+  const levelOrder = ["BEGINNER", "INTERMEDIATE", "ADVANCED"];
+  const levelLabel: Record<string, string> = {
+    BEGINNER: "Básico", INTERMEDIATE: "Intermedio", ADVANCED: "Avanzado",
+  };
+  const levelClass: Record<string, string> = {
+    BEGINNER: "text-emerald-400 border-emerald-800",
+    INTERMEDIATE: "text-amber-400 border-amber-800",
+    ADVANCED: "text-rose-400 border-rose-800",
+  };
+  const typeLabel: Record<string, string> = {
+    docs: "Docs", course: "Curso", book: "Libro", video: "Video", article: "Artículo",
+  };
+
+  return (
+    <SpecAccordion
+      icon={<BookOpen size={16} />}
+      label="Itinerario formativo"
+      summary={`${resources.length} recursos de aprendizaje personalizados`}
+      open={open}
+      onToggle={() => setOpen(v => !v)}
+    >
+      {levelOrder.filter(l => byLevel[l]).map(level => (
+        <div key={level}>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--c-text-faint)]">
+            Nivel {levelLabel[level] ?? level}
+          </p>
+          <div className="grid gap-1.5 mb-3">
+            {byLevel[level].map((res, i) => (
+              <a key={i} href={res.url} target="_blank" rel="noopener noreferrer"
+                className="flex items-center justify-between gap-3 rounded-md border border-[var(--c-border-subtle)] px-3 py-2 text-xs hover:border-[var(--c-border-med)] transition-colors"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-medium ${levelClass[level] ?? ""}`}>
+                    {levelLabel[level] ?? level}
+                  </span>
+                  <span className="truncate text-[var(--c-text-muted)]">{res.title}</span>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5 text-[var(--c-text-faint)]">
+                  <span>{typeLabel[res.type] ?? res.type}</span>
+                  <ExternalLink size={11} />
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      ))}
+    </SpecAccordion>
+  );
+}
+
 function OpenSpecCard({ spec }: { readonly spec: Specification }) {
   const [open, setOpen]     = useState(false);
   const [reqOpen, setReqOpen] = useState<number | null>(null);
@@ -438,6 +495,13 @@ function OpenSpecCard({ spec }: { readonly spec: Specification }) {
       open={open}
       onToggle={() => setOpen(v => !v)}
     >
+      <div className="flex justify-end">
+        <button className="secondary-button gap-2 text-sm" onClick={() => downloadSpecification(spec, "pdf")}>
+          <Download size={15} />
+          Descargar PDF
+        </button>
+      </div>
+
       {/* Project description */}
       {doc.project?.description && (
         <p className="text-sm text-[var(--c-text-muted)] leading-relaxed">{doc.project.description}</p>
@@ -584,6 +648,17 @@ function IssuesCard({ spec }: { readonly spec: Specification }) {
       open={open}
       onToggle={() => setOpen(v => !v)}
     >
+      <div className="flex justify-end gap-2">
+        <button className="secondary-button gap-2 text-sm" onClick={() => downloadSpecification(spec, "md")}>
+          <Download size={15} />
+          Descargar MD
+        </button>
+        <button className="secondary-button gap-2 text-sm" onClick={() => downloadSpecification(spec, "pdf")}>
+          <Download size={15} />
+          Descargar PDF
+        </button>
+      </div>
+
       {Object.entries(grouped).map(([ms, msIssues]) => msIssues.length > 0 && (
         <div key={ms}>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--c-text-faint)]">
@@ -666,6 +741,17 @@ function TutorialCard({ spec }: { readonly spec: Specification }) {
       open={open}
       onToggle={() => setOpen(v => !v)}
     >
+      <div className="flex justify-end gap-2">
+        <button className="secondary-button gap-2 text-sm" onClick={() => downloadSpecification(spec, "md")}>
+          <Download size={15} />
+          Descargar MD
+        </button>
+        <button className="secondary-button gap-2 text-sm" onClick={() => downloadSpecification(spec, "pdf")}>
+          <Download size={15} />
+          Descargar PDF
+        </button>
+      </div>
+
       {phases.map((phase, pi) => (
         <div key={pi} className="rounded-lg border border-[var(--c-border-subtle)]">
           <button
@@ -1049,8 +1135,25 @@ function BundleCard({ bundle }: { readonly bundle: ArtifactBundle }) {
   const [pushError, setPushError]   = useState<string | null>(null);
   const [showFiles, setShowFiles]   = useState(false);
   const [validation, setValidation] = useState<{
-    valid: boolean; fileCount: number; hasCode: boolean; hasSdd: boolean; hasReadme: boolean; issues: string[];
+    valid: boolean; canDownload: boolean; fileCount: number; hasCode: boolean; hasSdd: boolean; hasReadme: boolean;
+    hasEnvExample?: boolean; hasDockerCompose?: boolean; hasDocs?: boolean;
+    issues: Array<{ message: string; severity: "error" | "warning" }>;
   } | null>(null);
+
+  const summaryQuery = useQuery({
+    queryKey: ["artifact-summary", bundle.id],
+    queryFn: () => api.get<{
+      projectName: string;
+      stack: string[];
+      modules: string[];
+      services: Array<{ name: string; port: number; url: string }>;
+      costs: Record<string, string>;
+      prerequisites: string[];
+      quickstart: string[];
+      nextSteps: string[];
+      fileCount: number;
+    }>(`/artifacts/${bundle.id}/summary`).then(r => r.data),
+  });
 
   const pushMutation = useMutation({
     mutationFn: () =>
@@ -1064,18 +1167,32 @@ function BundleCard({ bundle }: { readonly bundle: ArtifactBundle }) {
     onSuccess: (data) => setValidation(data),
   });
 
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
   function downloadZip() {
+    if (validation && !validation.canDownload) return;
     const token = getAccessToken();
     if (!token) return;
+    setDownloadError(null);
     void fetch(`${apiBase}/artifacts/${bundle.id}/export`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.blob())
+      .then(async r => {
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({ message: "Error desconocido al generar el ZIP" })) as { message?: string };
+          throw new Error(err.message ?? "No se pudo descargar el ZIP");
+        }
+        return r.blob();
+      })
       .then(blob => {
         const url = URL.createObjectURL(blob);
         const a   = document.createElement("a");
         a.href     = url;
         a.download = `proyecto-mvp-${bundle.id}.zip`;
         a.click();
-        URL.revokeObjectURL(url);
+        setTimeout(() => URL.revokeObjectURL(url), 100);
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : "Error al descargar el ZIP";
+        setDownloadError(msg);
       });
   }
 
@@ -1114,8 +1231,8 @@ function BundleCard({ bundle }: { readonly bundle: ArtifactBundle }) {
           {validation.issues.length > 0 && (
             <ul className="mt-2 grid gap-1">
               {validation.issues.map((issue, i) => (
-                <li key={i} className="flex items-start gap-1.5 text-xs text-amber-300">
-                  <AlertTriangle size={11} className="mt-0.5 shrink-0" />{issue}
+                <li key={i} className={`flex items-start gap-1.5 text-xs ${issue.severity === "error" ? "text-red-300" : "text-amber-300"}`}>
+                  <AlertTriangle size={11} className="mt-0.5 shrink-0" />{issue.message}
                 </li>
               ))}
             </ul>
@@ -1123,10 +1240,52 @@ function BundleCard({ bundle }: { readonly bundle: ArtifactBundle }) {
         </div>
       )}
 
+      {summaryQuery.data && (
+        <div className="rounded-xl border border-[var(--c-border-subtle)] bg-[var(--c-surface)] p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-[var(--c-text-faint)]">Resumen antes de descargar</p>
+              <p className="mt-1 font-semibold">{summaryQuery.data.projectName}</p>
+              <p className="mt-1 text-xs text-[var(--c-text-muted)]">
+                {summaryQuery.data.fileCount} archivos · {summaryQuery.data.stack.slice(0, 4).join(" · ") || "Stack pendiente"}
+              </p>
+            </div>
+            <span className="rounded border border-[var(--c-border-med)] px-2 py-1 text-xs text-[var(--c-text-faint)]">
+              {summaryQuery.data.services.length} servicios
+            </span>
+          </div>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <div>
+              <p className="text-xs font-semibold text-[var(--c-text-muted)]">Servicios</p>
+              <ul className="mt-1 grid gap-1 text-xs text-[var(--c-text-faint)]">
+                {summaryQuery.data.services.slice(0, 5).map(service => (
+                  <li key={`${service.name}-${service.port}`}>{service.name}: {service.url}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-[var(--c-text-muted)]">Siguiente paso</p>
+              <ul className="mt-1 grid gap-1 text-xs text-[var(--c-text-faint)]">
+                {summaryQuery.data.nextSteps.slice(0, 3).map(step => <li key={step}>{step}</li>)}
+              </ul>
+            </div>
+          </div>
+          <details className="mt-3">
+            <summary className="cursor-pointer text-xs font-semibold text-[var(--c-accent)]">Ver comandos y costes</summary>
+            <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-[var(--c-surface-2)] p-3 text-xs text-[var(--c-text-muted)]">
+{summaryQuery.data.quickstart.join("\n")}
+            </pre>
+            <ul className="mt-2 grid gap-1 text-xs text-[var(--c-text-faint)]">
+              {Object.entries(summaryQuery.data.costs).map(([key, value]) => <li key={key}>{key}: {value}</li>)}
+            </ul>
+          </details>
+        </div>
+      )}
+
       <div className="flex gap-2">
-        <button className="primary-button flex-1 justify-center py-4 text-base" onClick={downloadZip}>
+        <button className="primary-button flex-1 justify-center py-4 text-base" onClick={downloadZip} disabled={validation?.canDownload === false}>
           <Download size={20} />
-          Descargar ZIP
+          {validation?.canDownload === false ? "Corrige errores antes de descargar" : "Descargar ZIP"}
         </button>
         <button
           className="secondary-button px-4"
@@ -1137,6 +1296,13 @@ function BundleCard({ bundle }: { readonly bundle: ArtifactBundle }) {
           {validateMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
         </button>
       </div>
+
+      {downloadError && (
+        <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">
+          <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+          <span>{downloadError}</span>
+        </div>
+      )}
 
       {hasCode && !pushResult && (
         <button className="secondary-button justify-center" onClick={() => setShowGitHub(v => !v)} aria-expanded={showGitHub}>
@@ -1204,10 +1370,12 @@ function BundleCard({ bundle }: { readonly bundle: ArtifactBundle }) {
 function TechProposalSection({
   projectId,
   existingSpec,
+  mandatoryTechs,
   onProposed,
 }: {
   readonly projectId: string;
   readonly existingSpec: Specification | undefined;
+  readonly mandatoryTechs?: string | null;
   readonly onProposed: () => void;
 }) {
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -1232,6 +1400,14 @@ function TechProposalSection({
             <p className="mt-1 text-sm text-[var(--c-text-muted)]">
               Antes de generar el MVP, obtén 3 propuestas de stack adaptadas a tu proyecto y nivel técnico.
             </p>
+            {mandatoryTechs && (
+              <p className="mt-2 flex items-center gap-1.5 text-xs text-[var(--c-text-faint)]">
+                <span className="rounded border border-[var(--c-border-med)] bg-[var(--c-surface-2)] px-1.5 py-0.5 font-mono text-[10px]">
+                  {mandatoryTechs}
+                </span>
+                <span>— tecnologías que has indicado como obligatorias</span>
+              </p>
+            )}
           </div>
         </div>
         {proposeMutation.isError && (
@@ -1397,18 +1573,6 @@ function Tag({ children }: { readonly children: React.ReactNode }) {
   );
 }
 
-/* ─── Status labels ──────────────────────────────────────────────────────── */
-
-const STATUS_LABELS: Record<Project["status"], string> = {
-  DRAFT: "Borrador",
-  REQUIREMENTS_READY: "Requisitos listos",
-  SPEC_READY: "OpenSpec listo",
-  GENERATING: "Generando...",
-  GENERATED: "MVP generado",
-  REVIEW: "En revisión",
-  DEPLOYED: "Publicado"
-};
-
 /* ─── Main page ─────────────────────────────────────────────────────────── */
 
 export function ProjectDetailPage() {
@@ -1548,6 +1712,7 @@ export function ProjectDetailPage() {
             <TechProposalSection
               projectId={projectId!}
               existingSpec={techProposalSpec}
+              mandatoryTechs={project.idea?.mandatoryTechs}
               onProposed={refetch}
             />
           )}
@@ -1574,10 +1739,19 @@ export function ProjectDetailPage() {
       {pipeline.isRunning && (
         <div className="grid gap-4">
           <div className="rounded-xl border border-[var(--c-border-subtle)] bg-[var(--c-surface)] p-5">
-            <p className="text-xs font-bold uppercase tracking-widest text-[var(--c-accent)]">Generando tu MVP</p>
-            <p className="mt-1 text-sm text-[var(--c-text-muted)]">
-              Esto puede tardar entre 2 y 5 minutos. No cierres esta página.
-            </p>
+            <div className="flex items-center gap-3">
+              <Loader2 size={22} className="shrink-0 animate-spin text-[var(--c-accent)]" />
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-[var(--c-accent)]">
+                  {isGenerated ? "Regenerando tu proyecto" : "Generando tu MVP"}
+                </p>
+                <p className="mt-1 text-sm text-[var(--c-text-muted)]">
+                  {isGenerated
+                    ? "El proyecto anterior no está disponible durante la regeneración. Esto puede tardar entre 2 y 5 minutos."
+                    : "Esto puede tardar entre 2 y 5 minutos. No cierres esta página."}
+                </p>
+              </div>
+            </div>
           </div>
           <PipelineProgress stage={pipeline.stage} />
         </div>
@@ -1612,15 +1786,16 @@ export function ProjectDetailPage() {
       )}
 
       {/* ── Generated: bundle + spec cards ───────────────────── */}
-      {isGenerated && latestBundle && <BundleCard bundle={latestBundle} />}
+      {isGenerated && !pipeline.isRunning && latestBundle && <BundleCard bundle={latestBundle} />}
 
-      {isGenerated && (archSpec || openSpec || issuesSpec || tutorialSpec) && (
+      {isGenerated && !pipeline.isRunning && (archSpec || openSpec || issuesSpec || tutorialSpec) && (
         <div className="grid gap-3">
           <p className="text-xs font-bold uppercase tracking-widest text-[var(--c-text-faint)]">
             Especificaciones generadas
           </p>
-          {archSpec     && <ArchitectureCard spec={archSpec} />}
-          {openSpec     && <OpenSpecCard     spec={openSpec} />}
+          {archSpec     && <ArchitectureCard        spec={archSpec} />}
+          {archSpec     && <LearningItineraryCard  spec={archSpec} />}
+          {openSpec     && <OpenSpecCard            spec={openSpec} />}
           {openSpec     && <DataModelCard    spec={openSpec} />}
           {issuesSpec   && <IssuesCard       spec={issuesSpec} />}
           {tutorialSpec && <TutorialCard     spec={tutorialSpec} />}
@@ -1630,7 +1805,7 @@ export function ProjectDetailPage() {
       {/* ── Regenerate ────────────────────────────────────────── */}
       {isGenerated && !pipeline.isRunning && (
         <div className="border-t border-[var(--c-border-subtle)] pt-4">
-          <button className="secondary-button text-sm" onClick={pipeline.reset}>
+          <button className="secondary-button text-sm" onClick={pipeline.start}>
             <RefreshCw size={14} /> Regenerar proyecto
           </button>
           <p className="mt-2 text-xs text-[var(--c-text-faint)]">
@@ -1640,7 +1815,7 @@ export function ProjectDetailPage() {
       )}
 
       {/* ── Previous bundles ──────────────────────────────────── */}
-      {isGenerated && (project.artifactBundles ?? []).length > 1 && (
+      {isGenerated && !pipeline.isRunning && (project.artifactBundles ?? []).length > 1 && (
         <details className="rounded-xl border border-[var(--c-border-subtle)]">
           <summary className="cursor-pointer p-4 text-sm text-[var(--c-text-muted)]">
             Ver versiones anteriores ({project.artifactBundles!.length - 1} más)

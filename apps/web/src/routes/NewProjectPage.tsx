@@ -11,7 +11,7 @@ type ChatStep =
   | "greeting" | "name" | "idea"
   | "product_type" | "objective" | "level"
   | "architecture" | "data_ai" | "deployment"
-  | "features" | "summary" | "submitting";
+  | "mandatory_techs" | "features" | "summary" | "submitting";
 
 type TechLevel = "BEGINNER" | "INTERMEDIATE";
 
@@ -49,7 +49,7 @@ const STEPS: ChatStep[] = [
   "greeting", "name", "idea",
   "product_type", "objective", "level",
   "architecture", "data_ai", "deployment",
-  "features", "summary"
+  "mandatory_techs", "features", "summary"
 ];
 
 /* ─── Sector / product detection ────────────────────────────────────────── */
@@ -108,6 +108,36 @@ function looksLikeProjectName(val: string): boolean {
 function looksLikeFeature(val: string): boolean {
   const words = val.trim().split(/\s+/);
   return words.length >= 2 && val.trim().length >= 8;
+}
+
+const NAME_REACTIONS = [
+  (name: string) => `**"${name}"** — suena directo y recordable. Buen punto de partida.`,
+  (name: string) => `**"${name}"** — claro; ya deja imaginar el producto sin explicarlo demasiado.`,
+  (name: string) => `**"${name}"** — tiene personalidad propia. Vamos a darle estructura.`,
+  (name: string) => `**"${name}"** — buen nombre para empezar: concreto, humano y fácil de defender.`,
+  (name: string) => `**"${name}"** — funciona como marca de MVP: simple primero, sofisticado después.`,
+];
+
+function reactToProjectName(name: string): string {
+  const normalized = name.trim();
+  const lower = normalized.toLowerCase();
+  const words = normalized.split(/\s+/).filter(Boolean);
+
+  if (/\bhoy\b|\bnow\b|\bya\b/i.test(lower)) {
+    return `**"${normalized}"** — transmite inmediatez. Eso puede ser una ventaja fuerte si el producto resuelve algo urgente.`;
+  }
+  if (/boda|evento|reserva|cita|turno/i.test(lower)) {
+    return `**"${normalized}"** — se entiende rápido y apunta a un momento concreto. Buena señal para un MVP.`;
+  }
+  if (words.length === 1 && normalized.length <= 8) {
+    return `**"${normalized}"** — corto, limpio y fácil de recordar. Me gusta para una primera versión.`;
+  }
+  if (words.length >= 3) {
+    return `**"${normalized}"** — descriptivo. Luego podremos decidir si conviene mantenerlo así o convertirlo en una marca más breve.`;
+  }
+
+  const score = Array.from(normalized).reduce((acc, char) => acc + char.charCodeAt(0), normalized.length);
+  return NAME_REACTIONS[score % NAME_REACTIONS.length](normalized);
 }
 
 /* ─── Option cards data ──────────────────────────────────────────────────── */
@@ -341,7 +371,7 @@ export function NewProjectPage() {
 
   useEffect(() => {
     pushAI(
-      `Soy **ProgresIA Studio**, tu asistente para construir proyectos de software con metodología SDD.\n\nVoy a guiarte paso a paso para definir:\n\n📋 Requisitos y arquitectura recomendada\n📑 Especificación técnica completa (OpenSpec)\n🐛 Issues de GitHub organizados por fases\n📚 Tutorial paso a paso con comandos reales\n💻 Código base + carpeta ZIP lista\n📄 Documentación SDD para continuar con IA\n\nEmpecemos. ¿Cuál es el **nombre** de tu proyecto?`,
+      `Soy **ProgresIA Studio**, tu asistente para convertir una idea en un proyecto de software usando metodología **SDD**: primero especificamos bien, luego generamos.\n\nVoy a guiarte paso a paso para definir:\n\n📋 Requisitos y arquitectura recomendada\n📑 Especificación técnica completa (OpenSpec)\n🐛 Issues de GitHub organizados por fases\n📚 Tutorial paso a paso con comandos reales\n💻 Código base + carpeta ZIP lista\n📄 Documentación SDD para continuar con IA\n\nEn esta primera parte te haré preguntas guiadas. Después, los agentes de IA generarán requisitos, stack, OpenSpec, issues, tutorial y código.\n\nEmpecemos. ¿Cuál es el **nombre** de tu proyecto?`,
       () => setStep("name")
     );
   }, [pushAI]);
@@ -357,14 +387,8 @@ export function NewProjectPage() {
       pushAI(NAME_NOT_VALID[_nameIdx++ % NAME_NOT_VALID.length]);
       return;
     }
-    const len = val.length;
-    const reaction = len <= 5
-      ? `**"${val}"** — corto y directo. Fácil de recordar, fácil de escribir.`
-      : len <= 12
-      ? `**"${val}"** — claro y con personalidad propia.`
-      : `**"${val}"** — tiene nombre de proyecto serio.`;
     setData(d => ({ ...d, name: val }));
-    pushAI(reaction);
+    pushAI(reactToProjectName(val));
     pushAI(
       `Cuéntame la idea en 2-3 frases.\n\nIncluye: **qué problema resuelve**, **para quién** y **qué tipo de aplicación es**.\n\n💡 *No necesitas saber las tecnologías todavía — primero la idea, después la arquitectura.*`,
       () => setStep("idea")
@@ -410,16 +434,41 @@ export function NewProjectPage() {
   function submitLevel(level: TechLevel) {
     const labels: Record<TechLevel, string> = { BEGINNER: "Principiante", INTERMEDIATE: "Intermedio" };
     pushUser(labels[level]);
-    setData(d => ({ ...d, level }));
-    const reactions: Record<TechLevel, string> = {
-      BEGINNER: `Bien. Recomendaré stacks con menor curva de aprendizaje — Laravel, Django, Next.js o React+Express — con tutoriales paso a paso que explican cada comando.\n\nEl proyecto será sencillo pero profesional: una arquitectura comprensible con buenas prácticas desde el día 1.`,
-      INTERMEDIATE: `Perfecto. Iremos a una arquitectura moderna con buenas prácticas: separación frontend/backend, TypeScript, contenedorización y CI básica desde el principio.\n\nEl tutorial asumirá experiencia con el stack y se centrará en las decisiones de diseño, no en los fundamentos.`,
+
+    // For mobile/desktop product types, architecture is unambiguous — auto-set and skip that step.
+    const autoArchMap: Record<string, { value: string; label: string }> = {
+      mobile:  { value: "mobile_api",  label: "App móvil + API" },
+      desktop: { value: "desktop_api", label: "Escritorio + API" },
     };
+    const autoArch = autoArchMap[data.productType ?? ""];
+
+    setData(d => ({ ...d, level, ...(autoArch ? { architectureStyle: autoArch.value } : {}) }));
+
+    const productLabel = PRODUCT_TYPES.find(p => p.value === data.productType)?.label.toLowerCase() ?? "aplicación";
+
+    const reactions: Record<TechLevel, string> = autoArch
+      ? {
+          BEGINNER:     `Bien. Recomendaré stacks multiplataforma para ${productLabel}s — Flutter, React Native o Expo — con tutoriales paso a paso que explican cada herramienta.`,
+          INTERMEDIATE: `Perfecto. Iremos a una arquitectura moderna para ${productLabel}s con buenas prácticas, TypeScript y contenedorización.`,
+        }
+      : {
+          BEGINNER:     `Bien. Recomendaré stacks con menor curva de aprendizaje — Laravel, Django, Next.js o React+Express — con tutoriales paso a paso que explican cada comando.\n\nEl proyecto será sencillo pero profesional: una arquitectura comprensible con buenas prácticas desde el día 1.`,
+          INTERMEDIATE: `Perfecto. Iremos a una arquitectura moderna con buenas prácticas: separación frontend/backend, TypeScript, contenedorización y CI básica desde el principio.\n\nEl tutorial asumirá experiencia con el stack y se centrará en las decisiones de diseño, no en los fundamentos.`,
+        };
+
     pushAI(reactions[level]);
-    pushAI(
-      `¿Qué **arquitectura** prefieres para este proyecto?`,
-      () => setStep("architecture")
-    );
+
+    if (autoArch) {
+      pushAI(
+        `Como tu producto es una **${productLabel}**, la arquitectura es **${autoArch.label}** — no hay otras opciones relevantes aquí.\n\n¿Qué tipo de base de datos necesitas? ¿Y necesitas integración con inteligencia artificial?`,
+        () => setStep("data_ai")
+      );
+    } else {
+      pushAI(
+        `¿Qué **arquitectura** prefieres para este proyecto?`,
+        () => setStep("architecture")
+      );
+    }
   }
 
   function submitArchitecture(arch: string) {
@@ -447,6 +496,17 @@ export function NewProjectPage() {
     const opt = DEPLOYMENT_OPTIONS.find(o => o.value === dep);
     pushUser(opt?.label ?? dep);
     setData(d => ({ ...d, deploymentTarget: dep }));
+    pushAI(
+      `¿Hay alguna tecnología que **necesites usar** o que prefieras evitar?\n\nEjemplos: *React, Python, PostgreSQL, no TypeScript*...\n\nEscribe **ninguna** o pulsa Saltar si prefieres que la IA elija el stack.`,
+      () => setStep("mandatory_techs")
+    );
+  }
+
+  function submitMandatoryTechs(val: string) {
+    const normalized = val.trim();
+    const isEmpty = !normalized || /^(no|ninguna|ninguno|skip|saltar|nada|n\/a)$/i.test(normalized);
+    pushUser(isEmpty ? "La IA elige el stack" : normalized);
+    setData(d => ({ ...d, mandatoryTechs: isEmpty ? "" : normalized }));
     pushAI(
       `Ya casi. Las **funcionalidades esenciales** del MVP.\n\n**¿Qué 3-5 funciones son imprescindibles?** Sin ellas el producto no tendría valor.\n\n💡 *Sé específico: "Gestión de reservas con calendario" > "Gestión de reservas".*`,
       () => setStep("features")
@@ -522,7 +582,7 @@ export function NewProjectPage() {
         workspaceId: ws.id,
         name: data.name,
         sector,
-        productType: data.productType || "SaaS operativo",
+        productType: data.productType || "web",
         description: data.idea
       })).data;
 
@@ -630,9 +690,12 @@ export function NewProjectPage() {
     }
 
     if (step === "architecture") {
+      const filteredArchOptions = ARCHITECTURE_OPTIONS.filter(
+        o => !["mobile_api", "desktop_api"].includes(o.value)
+      );
       return (
         <div className="grid gap-2">
-          {ARCHITECTURE_OPTIONS.map(o => (
+          {filteredArchOptions.map(o => (
             <OptionCard key={o.value} icon={o.icon} label={o.label} hint={o.hint}
               selected={data.architectureStyle === o.value}
               onClick={() => submitArchitecture(o.value)} />
@@ -653,6 +716,27 @@ export function NewProjectPage() {
               selected={data.deploymentTarget === o.value}
               onClick={() => submitDeployment(o.value)} />
           ))}
+        </div>
+      );
+    }
+
+    if (step === "mandatory_techs") {
+      return (
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <input className="input flex-1 text-sm"
+              placeholder="Ej: React, Node.js, PostgreSQL…"
+              value={textInput}
+              onChange={e => setTextInput(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && submitMandatoryTechs(textInput)}
+              autoFocus />
+            <button className="icon-button self-end" onClick={() => submitMandatoryTechs(textInput)}>
+              <Send size={16} />
+            </button>
+          </div>
+          <button className="secondary-button justify-center text-sm" onClick={() => submitMandatoryTechs("")}>
+            Saltar — la IA elige el stack
+          </button>
         </div>
       );
     }

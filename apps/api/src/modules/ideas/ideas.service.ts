@@ -13,29 +13,21 @@ export class IdeasService {
   async upsert(userId: string, dto: CreateIdeaDto) {
     const project = await this.projectsService.ensureProjectAccess(dto.projectId, userId);
 
+    const data = {
+      problem: dto.problem,
+      targetUsers: dto.targetUsers,
+      coreFeatures: dto.coreFeatures,
+      complexity: dto.complexity ?? "standard",
+      needsAi: dto.needsAi ?? false,
+      needsAuth: dto.needsAuth ?? true,
+      needsAdminPanel: dto.needsAdminPanel ?? true,
+      constraints: dto.constraints
+    };
+
     return this.prisma.idea.upsert({
       where: { projectId: project.id },
-      create: {
-        projectId: project.id,
-        problem: dto.problem,
-        targetUsers: dto.targetUsers,
-        coreFeatures: dto.coreFeatures,
-        complexity: dto.complexity ?? "standard",
-        needsAi: dto.needsAi ?? false,
-        needsAuth: dto.needsAuth ?? true,
-        needsAdminPanel: dto.needsAdminPanel ?? true,
-        constraints: dto.constraints
-      },
-      update: {
-        problem: dto.problem,
-        targetUsers: dto.targetUsers,
-        coreFeatures: dto.coreFeatures,
-        complexity: dto.complexity ?? "standard",
-        needsAi: dto.needsAi ?? false,
-        needsAuth: dto.needsAuth ?? true,
-        needsAdminPanel: dto.needsAdminPanel ?? true,
-        constraints: dto.constraints
-      }
+      create: { projectId: project.id, ...data },
+      update: data
     });
   }
 

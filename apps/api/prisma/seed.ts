@@ -1,54 +1,56 @@
-import {
-  AccountStatus,
-  PrismaClient,
-  Role,
-  ProjectStatus,
-  SpecificationType,
-  SpecificationStatus
-} from "@prisma/client";
+import { PrismaClient, Role, ProjectStatus, SpecificationType, SpecificationStatus } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const passwordHash = await bcrypt.hash("change_me_123", 12);
+  // ── Admin user ──────────────────────────────────────────────────────────
+  // DEVELOPMENT CREDENTIALS ONLY — change via env vars before deploying to production
+  const adminEmail = process.env.ADMIN_EMAIL ?? "admin@progresia.local";
+  const adminName = process.env.ADMIN_USERNAME ?? "seurobman";
+  const adminPassword = process.env.ADMIN_PASSWORD ?? "$eurobman2026";
 
-  const user = await prisma.user.upsert({
-    where: { email: "demo@progresia.local" },
-    update: {
-      emailVerified: true,
-      emailVerifiedAt: new Date(),
-      accountStatus: AccountStatus.ACTIVE
-    },
+  await prisma.user.upsert({
+    where: { email: adminEmail },
+    update: { role: Role.ADMIN },
     create: {
-      email: "demo@progresia.local",
-      name: "Demo User",
-      passwordHash,
-      role: Role.OWNER,
-      emailVerified: true,
-      emailVerifiedAt: new Date(),
-      accountStatus: AccountStatus.ACTIVE
+      email: adminEmail,
+      name: adminName,
+      passwordHash: await bcrypt.hash(adminPassword, 12),
+      role: Role.ADMIN
     }
   });
 
+  // ── Demo user ───────────────────────────────────────────────────────────
+  const demoPasswordHash = await bcrypt.hash("change_me_123", 12);
+
+  const demoUser = await prisma.user.upsert({
+    where: { email: "demo@progresia.local" },
+    update: {},
+    create: {
+      email: "demo@progresia.local",
+      name: "Demo User",
+      passwordHash: demoPasswordHash,
+      role: Role.OWNER
+    }
+  });
+
+  // ── Demo workspace ──────────────────────────────────────────────────────
   const workspace = await prisma.workspace.upsert({
     where: { id: "10000000-0000-0000-0000-000000000001" },
     update: {},
     create: {
       id: "10000000-0000-0000-0000-000000000001",
       name: "Demo Workspace",
-      ownerId: user.id,
-      members: {
-        create: { userId: user.id, role: Role.OWNER }
-      }
+      ownerId: demoUser.id,
+      members: { create: { userId: demoUser.id, role: Role.OWNER } }
     }
   });
 
+  // ── Demo project ────────────────────────────────────────────────────────
   const project = await prisma.project.upsert({
     where: { id: "10000000-0000-0000-0000-000000000002" },
-    update: {
-      slug: "sistema-de-reservas"
-    },
+    update: { slug: "sistema-de-reservas" },
     create: {
       id: "10000000-0000-0000-0000-000000000002",
       workspaceId: workspace.id,
@@ -61,6 +63,7 @@ async function main() {
     }
   });
 
+  // ── Demo idea ───────────────────────────────────────────────────────────
   await prisma.idea.upsert({
     where: { projectId: project.id },
     update: {},
@@ -90,6 +93,7 @@ async function main() {
     }
   });
 
+  // ── Demo specification ──────────────────────────────────────────────────
   await prisma.specification.upsert({
     where: { id: "10000000-0000-0000-0000-000000000003" },
     update: {},
@@ -120,7 +124,11 @@ async function main() {
     }
   });
 
-  console.log(`Seed completed. Demo user: demo@progresia.local / change_me_123`);
+  console.log("Seed completed.");
+  console.log(`  Admin:    ${adminEmail} / ${adminPassword}`);
+  console.log(`  Demo:     demo@progresia.local / change_me_123`);
+  console.log("");
+  console.log("  ⚠  DEVELOPMENT ONLY — change admin credentials before deploying to production.");
 }
 
 main()

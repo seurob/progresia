@@ -67,6 +67,10 @@ _ARCH_DB: dict[str, tuple[str, str, str]] = {
     "FASTAPI_AI":            ("PostgreSQL + Qdrant",  _ORM_SQLMODEL, "SQLModel combina Pydantic y SQLAlchemy para el modelo relacional; Qdrant gestiona embeddings vectoriales."),
     "DJANGO_REST":           ("PostgreSQL",           _ORM_DJANGO,   "Django ORM incorpora migraciones automáticas, admin panel y validaciones de modelo."),
     "REACT_EXPRESS":         ("PostgreSQL",           _ORM_PRISMA,   "Prisma es el ORM más completo para proyectos Node.js/TypeScript con validación de tipos en tiempo de compilación."),
+    "FLUTTER_FASTAPI":       ("PostgreSQL",           _ORM_SQLMODEL, "SQLModel combina Pydantic y SQLAlchemy: el mismo modelo define validación y tabla — ideal para la API REST del backend Flutter."),
+    "REACT_NATIVE_NESTJS":   ("PostgreSQL",           _ORM_PRISMA,   _RATIONALE_PRISMA),
+    "TAURI_FASTAPI":         ("SQLite + PostgreSQL",  _ORM_SQLMODEL, "SQLite local (embebido en el instalable) para offline-first; PostgreSQL remoto para sincronización cloud opcional."),
+    "ELECTRON_NESTJS":       ("SQLite",               "better-sqlite3", "SQLite embebido con better-sqlite3 para persistencia local en el escritorio; NestJS gestiona el backend cloud si se requiere."),
 }
 
 # ── Architecture metadata lookup ────────────────────────────────────────────────
@@ -79,6 +83,12 @@ _ARCH_META: dict[str, tuple[str, list[str], str]] = {
     "FASTAPI_AI":            (f"{_V_FASTAPI} + Microservicio IA (RAG+Agents)", [_V_FASTAPI, "LangChain 0.3", "LangGraph 0.5", "Qdrant 1", _V_PG],                "ADVANCED"),
     "DJANGO_REST":           (f"{_V_DJANGO} + Django REST Framework",          [_V_DJANGO, "DRF 3", "simplejwt 5", _V_PG, "psycopg2 2", "Docker"],               "BEGINNER"),
     "REACT_EXPRESS":         ("React + Express (Node.js sencillo)",            [_V_REACT, "Express 5", _V_TS, _ORM_PRISMA, _V_PG],                               "BEGINNER"),
+    # Mobile
+    "FLUTTER_FASTAPI":       ("Flutter 3 + FastAPI (App Móvil + API REST)",   ["Flutter 3.24", "Dart 3.5", _V_FASTAPI, "SQLModel 0.0.21", _V_PG, "Docker"],    "INTERMEDIATE"),
+    "REACT_NATIVE_NESTJS":   ("React Native (Expo 51) + NestJS (App Móvil)",  ["Expo SDK 51", _V_REACT, _V_TS, _V_NESTJS, _ORM_PRISMA, _V_PG],               "INTERMEDIATE"),
+    # Desktop
+    "TAURI_FASTAPI":         ("Tauri 2 + FastAPI (Escritorio + API REST)",    ["Tauri 2.x", "Rust", _V_REACT, _V_TS, _V_FASTAPI, "SQLite 3"],                "INTERMEDIATE"),
+    "ELECTRON_NESTJS":       ("Electron 31 + NestJS (Escritorio + API REST)", ["Electron 31", _V_REACT, _V_TS, _V_NESTJS, "SQLite 3", "better-sqlite3"],      "BEGINNER"),
 }
 
 _DEFAULT_MILESTONES = [

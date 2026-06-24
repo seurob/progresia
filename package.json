@@ -23,7 +23,8 @@
     "prettier": "^3.6.2"
   },
   "overrides": {
-    "esbuild": "^0.28.1"
+    "esbuild": "^0.28.1",
+    "js-yaml": "4.2.0"
   },
   "engines": {
     "node": ">=22"

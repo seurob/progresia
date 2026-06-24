@@ -12,6 +12,7 @@ class TechProposalRequest(BaseModel):
     ai_needs: str = Field(default="none")
     deployment_target: str = Field(default="docker_local")
     core_features: list[str] = Field(default_factory=list)
+    mandatory_techs: str | None = Field(default=None, description="Free-text mandatory technologies the user explicitly requested")
 
 
 class TechProposal(BaseModel):

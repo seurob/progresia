@@ -1,27 +1,30 @@
 import json
 import logging
-import re
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Response, status
 
 from app.agents.architecture_agent import ArchitectureAgent
 from app.agents.issue_generator_agent import IssueGeneratorAgent
 from app.agents.codegen_agent import CodeGenerationAgent
 from app.agents.product_agent import ProductAgent
+from app.agents.rag_agent import RAGAgent
 from app.agents.requirements_agent import RequirementsAgent
 from app.agents.supervisor_agent import SupervisorAgent
 from app.agents.tech_proposal_agent import TechProposalAgent
 from app.agents.tutorial_agent import TutorialAgent
-from app.core.llm import get_llm
+from app.core.llm import apply_config_update, get_config_state, get_llm
 from app.schemas.architecture import ArchitectureRecommendation, ArchitectureRequest
 from app.schemas.issues import IssueGenerationRequest, IssueGenerationResponse
 from app.schemas.codegen import CodeGenerationRequest, CodeGenerationResponse
 from app.schemas.idea import IdeaRequest
+from app.schemas.llm_config import LLMConfigResponse, LLMConfigUpdate, OllamaModel, OllamaModelsResponse
 from app.schemas.openspec import OpenSpecResponse
+from app.schemas.rag import IndexRequest, IndexResponse, RAGQueryRequest, RAGQueryResponse, SearchRequest, SearchResponse
 from app.schemas.requirements import RequirementsResponse
 from app.schemas.suggestion import FeatureSuggestionRequest, FeatureSuggestionResponse
 from app.schemas.tech_proposal import TechProposalRequest, TechProposalResponse
 from app.schemas.tutorial import TutorialRequest, TutorialResponse
+from app.services.rag_service import RAGService
 
 logger = logging.getLogger(__name__)
 
@@ -106,9 +109,10 @@ def suggest_features(payload: FeatureSuggestionRequest) -> FeatureSuggestionResp
         try:
             resp = llm.invoke(prompt)
             content = resp.content if hasattr(resp, "content") else str(resp)
-            match = re.search(r"\[[^\]]*\]", content, re.DOTALL)
-            if match:
-                features = json.loads(match.group())
+            start = content.find("[")
+            end = content.rfind("]")
+            if start != -1 and end > start:
+                features = json.loads(content[start : end + 1])
                 if isinstance(features, list) and features:
                     return FeatureSuggestionResponse(features=[str(f) for f in features[:10]])
         except Exception as exc:
@@ -134,3 +138,91 @@ def generate_issues(payload: IssueGenerationRequest) -> IssueGenerationResponse:
 def generate_tutorial(payload: TutorialRequest) -> TutorialResponse:
     """Generates a step-by-step implementation tutorial from an OpenSpec and architecture type."""
     return TutorialAgent().generate(payload)
+
+
+# ---------------------------------------------------------------------------
+# RAG endpoints
+# ---------------------------------------------------------------------------
+
+@router.post("/rag/index", status_code=201, response_model=IndexResponse)
+def rag_index(payload: IndexRequest) -> IndexResponse:
+    """Chunk, embed and index documents into a named Qdrant collection."""
+    return RAGService().index(payload)
+
+
+@router.post("/rag/search", response_model=SearchResponse)
+def rag_search(payload: SearchRequest) -> SearchResponse:
+    """Semantic search: embed the query and return the top-k similar chunks."""
+    return RAGService().search(payload)
+
+
+@router.post("/rag/query", response_model=RAGQueryResponse)
+def rag_query(payload: RAGQueryRequest) -> RAGQueryResponse:
+    """RAG pipeline: retrieve relevant chunks, then generate a grounded answer."""
+    return RAGAgent().query(payload)
+
+
+@router.get("/rag/eval/{collection}")
+def rag_eval(collection: str, top_k: int = 5):
+    """Self-consistency evaluation: sample chunks, use their prefix as query,
+    measure how often the original chunk surfaces in top-k results."""
+    return RAGService().eval(collection, top_k)
+
+
+@router.delete("/rag/collection/{collection}", status_code=204)
+def rag_delete_collection(collection: str) -> Response:
+    """Delete a Qdrant collection and all its indexed vectors."""
+    RAGService().delete(collection)
+    return Response(status_code=204)
+
+
+# ---------------------------------------------------------------------------
+# LLM configuration endpoints
+# ---------------------------------------------------------------------------
+
+@router.get("/config/llm", response_model=LLMConfigResponse)
+def get_llm_config() -> LLMConfigResponse:
+    """Return the current LLM provider configuration and task routing."""
+    return LLMConfigResponse(**get_config_state())
+
+
+@router.patch("/config/llm", response_model=LLMConfigResponse)
+def update_llm_config(payload: LLMConfigUpdate) -> LLMConfigResponse:
+    """Override the active LLM provider and/or individual model names at runtime.
+
+    Changes take effect immediately for all subsequent agent calls.
+    They reset when the process restarts (use .env for persistent config).
+    """
+    apply_config_update(payload)
+    return LLMConfigResponse(**get_config_state())
+
+
+@router.get("/ollama/models", response_model=OllamaModelsResponse)
+def list_ollama_models() -> OllamaModelsResponse:
+    """List models available in the local Ollama instance."""
+    import json as _json
+    import urllib.request
+    from app.core.settings import settings as _s
+
+    base_url = _s.ollama_base_url
+    try:
+        req = urllib.request.Request(
+            f"{base_url}/api/tags",
+            headers={"Accept": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            data = _json.loads(resp.read().decode())
+        models = [
+            OllamaModel(
+                name=m["name"],
+                size=m.get("size"),
+                modified_at=m.get("modified_at"),
+                parameter_size=m.get("details", {}).get("parameter_size"),
+                quantization_level=m.get("details", {}).get("quantization_level"),
+            )
+            for m in data.get("models", [])
+        ]
+        return OllamaModelsResponse(available=True, base_url=base_url, models=models)
+    except Exception as exc:
+        logger.debug("Ollama not reachable at %s: %s", base_url, exc)
+        return OllamaModelsResponse(available=False, base_url=base_url, models=[], error=str(exc))

@@ -43,9 +43,15 @@ export class ArtifactsController {
   }
 
   @Get(":bundleId/validate")
-  @ApiOkResponse({ description: "Validates the artifact bundle before download: checks for code files, SDD structure, duplicates and dangerous paths." })
+  @ApiOkResponse({ description: "Validates the artifact bundle before download: checks for code files, SDD structure, secrets, missing files and dangerous paths." })
   validate(@CurrentUser() user: JwtUser, @Param("bundleId") bundleId: string) {
     return this.artifactsService.validateBundle(user.sub, bundleId);
+  }
+
+  @Get(":bundleId/summary")
+  @ApiOkResponse({ description: "Returns a rich pre-download summary: stack, services, costs, prerequisites, quickstart commands and next steps." })
+  summary(@CurrentUser() user: JwtUser, @Param("bundleId") bundleId: string) {
+    return this.artifactsService.bundleSummary(user.sub, bundleId);
   }
 
   @Get(":bundleId/export-url")

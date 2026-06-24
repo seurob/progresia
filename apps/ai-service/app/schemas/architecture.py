@@ -20,6 +20,8 @@ class ArchitectureRequest(BaseModel):
     preferred_stack: str = Field(default="")
     # BEGINNER | INTERMEDIATE | ADVANCED — constrains which architectures to recommend
     technical_level: str = Field(default="INTERMEDIATE")
+    # web | mobile | desktop | api | saas | ai_tool — bypasses LLM for mobile/desktop
+    product_type: str = Field(default="web")
 
 
 class LearningResource(BaseModel):

@@ -71,5 +71,5 @@ export function getErrorMessage(error: unknown) {
     return Array.isArray(message) ? message.join(", ") : message ?? error.message;
   }
 
-  return "No se pudo completar la operacion.";
+  return "No se pudo completar la operación.";
 }

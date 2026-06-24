@@ -10,12 +10,18 @@ import { AuthPage } from "./routes/AuthPage";
 import { DashboardPage } from "./routes/DashboardPage";
 import { NewProjectPage } from "./routes/NewProjectPage";
 import { ProjectDetailPage } from "./routes/ProjectDetailPage";
-import { VerifyEmailPage } from "./routes/VerifyEmailPage";
+import { AdminPage } from "./routes/admin/AdminPage";
+import { AiSettingsPage } from "./routes/AiSettingsPage";
+import { NotFoundPage } from "./routes/NotFoundPage";
 import "./styles.css";
 
 const queryClient = new QueryClient();
 
 const router = createBrowserRouter([
+  {
+    path: "/gestion-usuarios",
+    element: <AdminPage />
+  },
   {
     path: "/login",
     element: <AuthPage mode="login" />
@@ -23,10 +29,6 @@ const router = createBrowserRouter([
   {
     path: "/register",
     element: <AuthPage mode="register" />
-  },
-  {
-    path: "/verify-email",
-    element: <VerifyEmailPage />
   },
   {
     path: "/",
@@ -46,10 +48,18 @@ const router = createBrowserRouter([
           {
             path: "projects/:projectId",
             element: <ProjectDetailPage />
+          },
+          {
+            path: "ai-settings",
+            element: <AiSettingsPage />
           }
         ]
       }
     ]
+  },
+  {
+    path: "*",
+    element: <NotFoundPage />
   }
 ]);
 

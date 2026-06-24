@@ -5,7 +5,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "ProgresIA Studio AI Service"
-    ai_service_port: int = 8000
 
     # Default provider used when no task-specific override is set.
     # Values: groq | openai | gemini | ollama

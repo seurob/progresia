@@ -120,13 +120,18 @@ describe("ArtifactsService", () => {
       storageServiceMock
     );
 
-    await expect(service.validateBundle("user-1", "bundle-1")).resolves.toMatchObject({
+    const result = await service.validateBundle("user-1", "bundle-1");
+    expect(result).toMatchObject({
       valid: true,
+      canDownload: true,
       fileCount: 4,
       hasCode: true,
       hasSdd: true,
       hasReadme: true,
-      issues: []
+      secretsFound: []
     });
+    // Warnings (missing .env.example, docker-compose, docs) are expected for a minimal test bundle
+    expect(result.issues.every(i => i.severity === "warning")).toBe(true);
+    expect(result.issues.some(i => i.severity === "error")).toBe(false);
   });
 });

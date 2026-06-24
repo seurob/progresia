@@ -140,7 +140,7 @@ Revisión de código del branch actual o de un PR de GitHub.
 cd apps/api && npx tsc --project tsconfig.build.json && node --enable-source-maps dist/main
 
 # Ver logs del ai-service (incluye LLM calls y fallbacks)
-cd apps/ai-service && uvicorn app.main:app --port 8001 --reload --log-level debug
+cd apps/ai-service && uvicorn app.main:app --port 8003 --reload --log-level debug
 
 # Probar un agente directamente
 cd apps/ai-service && python -c "
@@ -150,7 +150,7 @@ from app.schemas.idea import IdeaRequest
 "
 
 # Health check del ai-service
-curl http://localhost:8001/health
+curl http://localhost:8003/health
 ```
 
 ---
@@ -168,6 +168,18 @@ ArtifactBundle id, status, zipUrl, projectId
 
 `Project.slug` es único y se genera desde el nombre en el momento de creación.
 Todos los endpoints aceptan `projectId` como UUID o slug — `ensureProjectAccess()` resuelve ambos.
+
+---
+
+## Panel de administración
+
+Ruta: `http://localhost:5173/gestion-usuarios` — no aparece en ninguna navegación normal.
+
+- **Auth separada**: `POST /api/admin/auth/login` (acepta email o username). Usa `ADMIN_JWT_SECRET` y emite tokens con `type: "admin"`. Los tokens admin no son válidos en el app normal y viceversa.
+- **Guard**: `AdminJwtGuard` verifica `ADMIN_JWT_SECRET` y comprueba `payload.type === "admin"`.
+- **Seed**: `npx ts-node prisma/seed.ts` → crea `admin@progresia.local / $eurobman2026` (rol ADMIN).
+- **Seguridad**: no devuelve `passwordHash`, no permite eliminar el último admin, no permite que el admin se elimine a sí mismo.
+- **Frontend**: usa `sessionStorage` (clave `admin_access_token`), completamente aislado del `localStorage` del app normal.
 
 ---
 

@@ -54,12 +54,34 @@ def _camel(name: str) -> str:
     return p[0].lower() + p[1:] if p else name
 
 
+def _entity_fields_summary(entity: dict) -> str:
+    fields = entity.get("fields", [])[:6]
+    rels = entity.get("relations", [])[:3]
+    fields_str = " | ".join(fields) if fields else "id, name"
+    rel_str = f" — {', '.join(rels)}" if rels else ""
+    return f"  - {entity.get('name', '?')}: [{fields_str}]{rel_str}"
+
+
 def _build_human_message(req: CodeGenerationRequest) -> str:
     modules = ", ".join(req.modules) if req.modules else "Core"
     stack = ", ".join(req.stack)
     reqs = "\n".join(
         f"  - {r.get('id', '')}: {r.get('title', '')}" for r in req.requirements[:8]
     )
+
+    entities_section = ""
+    if req.data_entities:
+        lines = [_entity_fields_summary(e) for e in req.data_entities[:10]]
+        entities_section = "\n\nData entities (use for Prisma schema and domain classes):\n" + "\n".join(lines)
+
+    endpoints_section = ""
+    if req.api_endpoints:
+        lines = [
+            f"  - {ep.get('method','GET')} {ep.get('path','/')}: {ep.get('description','')} (auth={ep.get('auth_required', True)})"
+            for ep in req.api_endpoints[:14]
+        ]
+        endpoints_section = "\n\nAPI endpoints (implement as tRPC procedures):\n" + "\n".join(lines)
+
     return f"""Project: {req.project_name}
 Sector: {req.sector}
 Modules / bounded contexts: {modules}
@@ -70,6 +92,7 @@ Needs AI service: {req.needs_ai}
 
 Top requirements:
 {reqs if reqs else "  (none provided)"}
+{entities_section}{endpoints_section}
 
 First module name (for file naming): {(req.modules[0] if req.modules else "item").lower().replace(" ", "-")}"""
 
@@ -224,7 +247,7 @@ class CodeGenerationAgent:
             self._api_index(slug),
             self._api_trpc(req),
             self._api_router(modules),
-            self._prisma_schema(modules, req.needs_auth),
+            self._prisma_schema(modules, req.needs_auth, req.data_entities or None),
             self._module_entity(first_slug, first_pascal),
             self._module_service(first_slug, first_pascal, first_camel),
             self._module_router(first_slug, first_pascal, first_camel),
@@ -370,6 +393,38 @@ Cualquier cambio de stack, arquitectura o módulos debe actualizarse aquí y en 
 """,
         )
 
+        # Build endpoints table from OpenSpec data if available, otherwise use generic placeholders
+        if req.api_endpoints:
+            endpoint_rows = "\n".join(
+                f"| {ep.get('method','GET')} | {ep.get('path','/')} | {ep.get('description','')} |"
+                for ep in req.api_endpoints[:14]
+            )
+        else:
+            first_res = (req.modules[0] if req.modules else "items").lower().replace(" ", "-") + "s"
+            endpoint_rows = (
+                "| POST | /auth/login | Autenticación de usuario |\n"
+                "| POST | /auth/refresh | Renovar token de acceso |\n"
+                f"| GET | /api/v1/{first_res} | Listar recursos |\n"
+                f"| POST | /api/v1/{first_res} | Crear recurso |\n"
+                f"| PUT | /api/v1/{first_res}/:id | Actualizar recurso |\n"
+                f"| DELETE | /api/v1/{first_res}/:id | Eliminar recurso |"
+            )
+
+        # Build entities section from OpenSpec data if available
+        if req.data_entities:
+            entities_md = "\n\n".join(
+                f"### {e.get('name','Entity')}\n"
+                + (f"_{e.get('description','')}_\n\n" if e.get('description') else "")
+                + "\n".join(f"- `{f}`" for f in e.get('fields', [])[:8])
+                + ("\n\n**Relaciones**: " + ", ".join(e.get('relations', [])) if e.get('relations') else "")
+                for e in req.data_entities[:8]
+            )
+        else:
+            entities_md = "\n\n".join(
+                f"### {m}\n- id: UUID\n- createdAt: DateTime\n- updatedAt: DateTime"
+                for m in (req.modules[:3] if req.modules else ["Item"])
+            )
+
         openspec_stub = GeneratedFile(
             path="sdd/specifications/openspec.md",
             language="markdown",
@@ -388,16 +443,11 @@ Cualquier cambio de stack, arquitectura o módulos debe actualizarse aquí y en 
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| POST | /auth/login | Autenticación de usuario |
-| POST | /auth/refresh | Renovar token de acceso |
-| GET | /api/v1/{(req.modules[0] if req.modules else 'items').lower().replace(' ', '-')}s | Listar recursos |
-| POST | /api/v1/{(req.modules[0] if req.modules else 'items').lower().replace(' ', '-')}s | Crear recurso |
-| PUT | /api/v1/{(req.modules[0] if req.modules else 'items').lower().replace(' ', '-')}s/:id | Actualizar recurso |
-| DELETE | /api/v1/{(req.modules[0] if req.modules else 'items').lower().replace(' ', '-')}s/:id | Eliminar recurso |
+{endpoint_rows}
 
 ## Entidades de datos
 
-{chr(10).join(f'### {m}{chr(10)}- id: UUID{chr(10)}- createdAt: DateTime{chr(10)}- updatedAt: DateTime{chr(10)}' for m in (req.modules[:3] if req.modules else ['Item']))}
+{entities_md}
 
 ## Ver especificación completa
 
@@ -999,7 +1049,79 @@ MIT © {req.project_name}
         )
         return GeneratedFile(path="apps/api/src/router.ts", language="typescript", content=content)
 
-    def _prisma_schema(self, modules: list[str], needs_auth: bool) -> GeneratedFile:
+    @staticmethod
+    def _sql_type_to_prisma(type_str: str) -> str:
+        t = type_str.upper()
+        if "BOOL" in t:
+            return "Boolean"
+        if "BIGINT" in t:
+            return "BigInt"
+        if "INT" in t:
+            return "Int"
+        if "DECIMAL" in t or "NUMERIC" in t or "MONEY" in t:
+            return "Decimal"
+        if "FLOAT" in t or "REAL" in t or "DOUBLE" in t:
+            return "Float"
+        if "TIMESTAMP" in t or "DATE" in t or "TIME" in t:
+            return "DateTime"
+        if "JSON" in t:
+            return "Json"
+        if "UUID" in t:
+            return "String"
+        return "String"
+
+    def _entity_to_prisma_model(self, entity: dict) -> str:
+        pascal_name = _pascal(entity.get("name", "Entity"))
+        raw_fields = entity.get("fields", [])
+        lines = []
+        has_id = False
+
+        for field_str in raw_fields[:20]:
+            colon_idx = field_str.find(":")
+            if colon_idx == -1:
+                continue
+            field_name = field_str[:colon_idx].strip()
+            rest = field_str[colon_idx + 1:].strip()
+            rest_upper = rest.upper()
+
+            prisma_type = self._sql_type_to_prisma(rest_upper)
+            decorators = []
+            is_pk = "PK" in rest_upper
+            is_unique = "UNIQUE" in rest_upper
+            is_nullable = "NOT NULL" not in rest_upper and not is_pk
+
+            if is_pk:
+                has_id = True
+                decorators.append("@id @default(uuid())")
+            elif is_unique:
+                decorators.append("@unique")
+
+            name_lower = field_name.lower()
+            if name_lower in ("createdat", "created_at"):
+                decorators.append("@default(now())")
+            elif name_lower in ("updatedat", "updated_at"):
+                decorators.append("@updatedAt")
+            elif "default now()" in rest.lower() or "default now ()" in rest.lower():
+                decorators.append("@default(now())")
+
+            suffix = "?" if is_nullable else ""
+            dec_str = " ".join(decorators)
+            lines.append(f"  {field_name:<20} {prisma_type}{suffix}{'  ' + dec_str if dec_str else ''}")
+
+        if not has_id:
+            lines.insert(0, f"  {'id':<20} String  @id @default(uuid())")
+
+        # Always add createdAt/updatedAt if not already present
+        field_names_lower = {f.strip().split()[0].lower() for f in lines}
+        if "createdat" not in field_names_lower and "created_at" not in field_names_lower:
+            lines.append(f"  {'createdAt':<20} DateTime  @default(now())")
+        if "updatedat" not in field_names_lower and "updated_at" not in field_names_lower:
+            lines.append(f"  {'updatedAt':<20} DateTime  @updatedAt")
+
+        body = "\n".join(lines)
+        return f"\nmodel {pascal_name} {{\n{body}\n}}\n"
+
+    def _prisma_schema(self, modules: list[str], needs_auth: bool, data_entities: list[dict] | None = None) -> GeneratedFile:
         user_model = (
             "\nmodel User {\n"
             "  id           String   @id @default(uuid())\n"
@@ -1012,19 +1134,27 @@ MIT © {req.project_name}
             "}\n"
         ) if needs_auth else ""
 
-        module_models = ""
-        for mod in modules[:5]:
-            pascal = _pascal(mod)
-            module_models += (
-                f"\nmodel {pascal} {{\n"
-                "  id          String   @id @default(uuid())\n"
-                "  name        String\n"
-                "  description String?\n"
-                '  status      String   @default("active")\n'
-                "  createdAt   DateTime @default(now())\n"
-                "  updatedAt   DateTime @updatedAt\n"
-                "}\n"
-            )
+        if data_entities:
+            # Use actual OpenSpec entities — skip auto-generating a User model if one is in the spec
+            entity_names_lower = {e.get("name", "").lower() for e in data_entities}
+            has_user_entity = "user" in entity_names_lower
+            entity_models = "".join(self._entity_to_prisma_model(e) for e in data_entities[:12])
+            domain_models = entity_models if has_user_entity else (user_model + entity_models)
+        else:
+            module_models = ""
+            for mod in modules[:5]:
+                pascal = _pascal(mod)
+                module_models += (
+                    f"\nmodel {pascal} {{\n"
+                    "  id          String   @id @default(uuid())\n"
+                    "  name        String\n"
+                    "  description String?\n"
+                    '  status      String   @default("active")\n'
+                    "  createdAt   DateTime @default(now())\n"
+                    "  updatedAt   DateTime @updatedAt\n"
+                    "}\n"
+                )
+            domain_models = user_model + module_models
 
         content = (
             "generator client {\n"
@@ -1035,7 +1165,7 @@ MIT © {req.project_name}
             '  provider = "postgresql"\n'
             '  url      = env("DATABASE_URL")\n'
             "}\n"
-            f"{user_model}{module_models}"
+            f"{domain_models}"
         )
         return GeneratedFile(path="apps/api/prisma/schema.prisma", language="prisma", content=content)
 

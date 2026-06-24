@@ -4,6 +4,7 @@ import {
   IsBoolean,
   IsOptional,
   IsString,
+  MaxLength,
   MinLength
 } from "class-validator";
 
@@ -16,16 +17,19 @@ export class CreateIdeaDto {
   @ApiProperty({ example: "Las reservas de clases se gestionan manualmente." })
   @IsString()
   @MinLength(10)
+  @MaxLength(2000)
   problem!: string;
 
   @ApiProperty({ example: "Academias pequenas y profesores particulares" })
   @IsString()
   @MinLength(2)
+  @MaxLength(500)
   targetUsers!: string;
 
   @ApiProperty({ example: ["CRUD de profesores", "Reserva de clases"] })
   @IsArray()
   @IsString({ each: true })
+  @MaxLength(200, { each: true })
   coreFeatures!: string[];
 
   @ApiPropertyOptional({ example: "standard" })
@@ -51,12 +55,13 @@ export class CreateIdeaDto {
   @ApiPropertyOptional({ example: "Debe ser desplegable con Docker." })
   @IsOptional()
   @IsString()
+  @MaxLength(1000)
   constraints?: string;
 
-  // Structured wizard fields (Sprint 0015)
   @ApiPropertyOptional({ example: "mvp" })
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   mainObjective?: string;
 
   @ApiPropertyOptional({ example: "ai_recommends" })
@@ -67,6 +72,7 @@ export class CreateIdeaDto {
   @ApiPropertyOptional({ example: "React + Laravel obligatorio" })
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   mandatoryTechs?: string;
 
   @ApiPropertyOptional({ example: "frontend_api" })

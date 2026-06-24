@@ -1,0 +1,823 @@
+# ProgresIA Studio — Documento de Proyecto Final de Máster
+
+> **Máster en Desarrollo de Software con IA**
+> Proyecto final — plataforma educativa de generación de MVPs guiada por IA
+
+---
+
+## 1. Descripción general
+
+**ProgresIA Studio** es una plataforma web que convierte cualquier idea de producto en un MVP técnico completo y coherente, siguiendo la metodología **SDD (Spec-Driven Development)**. El usuario no recibe código mágico: aprende a especificar antes de generar. Cada paso del pipeline le explica la decisión arquitectónica, el tradeoff y cómo implementarlo.
+
+### El problema que resuelve
+
+Los desarrolladores junior y estudiantes se lanzan a codificar sin especificar. El resultado son proyectos sin estructura, sin documentación y difíciles de mantener. Las herramientas de IA actuales (GitHub Copilot, ChatGPT) generan código sin contexto previo, lo que agrava el problema.
+
+### La solución
+
+Un pipeline orquestado de agentes de IA donde **cada artefacto depende del anterior**: requisitos → arquitectura → especificación técnica (OpenSpec) → issues de GitHub → tutorial de implementación → código base → bundle ZIP descargable. El usuario entiende cada paso porque la IA explica su razonamiento.
+
+### Diferenciador clave
+
+No es un generador de código. Es una **plataforma pedagógica**: el OpenSpec que genera el sistema puede ser leído por cualquier LLM para continuar el desarrollo, y el tutorial generado enseña exactamente cómo construir lo que se ha especificado.
+
+---
+
+## 2. Metodología SDD — El Pipeline
+
+```
+Wizard (idea del usuario)
+        │
+        ▼
+1. Requisitos        ← requirements_agent.py    → Specification(REQUIREMENTS)
+        │
+        ▼
+2. Arquitectura      ← architecture_agent.py    → Specification(ARCHITECTURE)
+        │
+        ▼
+3. OpenSpec ★        ← openspec_agent.py         → Specification(OPENSPEC)
+        │                  [FUENTE DE VERDAD]
+        ├──────────────────────────────────────────┐
+        ▼                                          ▼
+4. Issues GitHub     ← issue_generator_agent.py  5. Tutorial  ← tutorial_agent.py
+        │                                          │
+        └──────────────┬───────────────────────────┘
+                       ▼
+               6. Código base       ← codegen_agent.py
+                       │
+                       ▼
+               7. Bundle ZIP        ← artifacts.service.ts
+                                       (validación + secrets scan + export)
+```
+
+El **OpenSpec** es el artefacto central: un documento JSON estructurado con entidades de datos, contratos de API, reglas de negocio y pasos de implementación. Todos los agentes downstream lo leen; si se mejora el OpenSpec, todos los artefactos mejoran automáticamente.
+
+### Wizard del proyecto (6 pasos)
+
+| Paso | Pregunta | Campo resultante |
+|------|----------|-----------------|
+| 1 | Tipo de producto | `productType` (web / mobile / desktop / api / saas / ai_tool) |
+| 2 | Sector | `sector` |
+| 3 | Nivel técnico | `complexity` → `BEGINNER / INTERMEDIATE / ADVANCED` |
+| 4 | Arquitectura preferida | `architectureStyle` (auto para mobile/desktop) |
+| 5 | Datos e IA | `dataNeeds`, `aiNeeds` |
+| 6 | Despliegue | `deploymentTarget` |
+
+### Arquitecturas soportadas
+
+| ID | Stack | Nivel | Tipo |
+|----|-------|-------|------|
+| `LARAVEL_MONOLITH` | Laravel 11 + Blade | Principiante | Web |
+| `LARAVEL_INERTIA_REACT` | Laravel + Inertia.js + React | Intermedio | Web |
+| `LARAVEL_INERTIA_VUE` | Laravel + Inertia.js + Vue | Intermedio | Web |
+| `DJANGO_REST` | Django 5 + DRF | Principiante | Web |
+| `REACT_EXPRESS` | React + Express.js | Principiante | Web |
+| `NEXTJS_APP` | Next.js 15 App Router | Intermedio | Web |
+| `NESTJS_REACT` | NestJS 11 + React desacoplado | Intermedio/Avanzado | Web |
+| `FASTAPI_AI` | FastAPI + LangChain + LangGraph | Avanzado | Web/IA |
+| `FLUTTER_FASTAPI` | Flutter + FastAPI | Principiante Mobile | Mobile |
+| `REACT_NATIVE_NESTJS` | React Native (Expo) + NestJS | Intermedio Mobile | Mobile |
+| `ELECTRON_NESTJS` | Electron + NestJS + SQLite | Principiante Desktop | Desktop |
+| `TAURI_FASTAPI` | Tauri (Rust) + FastAPI + SQLite | Intermedio Desktop | Desktop |
+
+---
+
+## 3. Arquitectura del sistema
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        MONOREPO                             │
+│                                                             │
+│  apps/web/          → React 19 + Vite        :5173          │
+│  apps/api/          → NestJS 11 + Prisma     :3000          │
+│  apps/ai-service/   → FastAPI + LangChain    :8003          │
+│                                                             │
+│  Infraestructura Docker:                                    │
+│  ├── PostgreSQL 16                           :5432          │
+│  ├── Redis 7                                 :6380 *        │
+│  ├── MinIO (object storage)                  :9000          │
+│  ├── Qdrant (vector DB)                      :6333          │
+│  └── Mailpit (SMTP dev)                      :1025/:8025    │
+│                                                             │
+│  * Redis en 6380 para evitar conflicto con Docker Desktop   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Flujo de datos completo
+
+```
+Usuario (browser)
+    │  HTTP/JSON
+    ▼
+apps/web (React)
+    │  axios → http://localhost:3000/api
+    ▼
+apps/api (NestJS)
+    │  Prisma ORM → PostgreSQL (persistencia)
+    │  BullMQ → Redis (cola de jobs asíncrona)
+    │  fetch → http://localhost:8003 (ai-service)
+    ▼
+apps/ai-service (FastAPI)
+    │  LangChain → Groq / OpenAI / Gemini / Ollama (LLMs)
+    │  Pydantic → validación y estructuración de salidas
+    └─ Qdrant (búsqueda vectorial para RAG)
+```
+
+---
+
+## 4. Frontend — `apps/web/`
+
+**Puerto:** 5173
+
+### Stack
+
+| Tecnología | Versión | Rol |
+|-----------|---------|-----|
+| **React** | 19.1 | UI framework — concurrent rendering, Suspense |
+| **Vite** | 8.0 | Bundler + dev server — HMR instantáneo |
+| **Tailwind CSS** | 4.3 | Estilos utility-first — CSS custom properties nativas |
+| **React Router** | 7.6 | Enrutamiento SPA con loaders |
+| **TanStack Query** | 5.81 | Server state, caché, invalidación automática |
+| **React Hook Form** | 7.59 | Formularios performantes sin re-renders |
+| **Zod** | 4.4 | Validación de esquemas en cliente |
+| **Axios** | 1.10 | HTTP client con interceptores de auth |
+| **Lucide React** | 1.21 | Iconografía |
+| **Vitest** | 4.1 | Testing unitario |
+
+### Páginas y rutas
+
+| Ruta | Componente | Descripción |
+|------|-----------|-------------|
+| `/login` | `AuthPage` (mode=login) | Login con CAPTCHA integrado |
+| `/register` | `AuthPage` (mode=register) | Registro con CAPTCHA integrado |
+| `/` | `DashboardPage` | Listado de workspaces y proyectos |
+| `/projects/new` | `NewProjectPage` | Wizard SDD de 6 pasos |
+| `/projects/:id` | `ProjectDetailPage` | Pipeline + tarjetas de resultado con polling |
+| `/ai-settings` | `AiSettingsPage` | Configuración de proveedores LLM en tiempo real |
+| `/gestion-usuarios` | `AdminDashboard` | Panel admin (ruta oculta, auth separada) — `seurobman` / `$eurobman2026` |
+
+### Características de la UI
+
+- **Wizard conversacional**: cada paso del wizard muestra mensajes de la IA con efecto de cola (typewriter)
+- **Polling automático**: `ProjectDetailPage` hace polling cada 2.500ms mientras el pipeline está activo
+- **Auth JWT**: interceptor Axios rota el access token automáticamente usando el refresh token
+- **CAPTCHA integrado**: widget estilo Cloudflare Turnstile en login y registro — se auto-verifica
+- **Admin panel**: completamente aislado del app normal, usa `sessionStorage` y `ADMIN_JWT_SECRET` distinto
+- **Configuración IA**: página `/ai-settings` para cambiar proveedor LLM y modelos en caliente
+
+---
+
+## 5. Backend de Gestión — `apps/api/`
+
+**Puerto:** 3000
+
+### Stack
+
+| Tecnología | Versión | Rol |
+|-----------|---------|-----|
+| **NestJS** | 11.1 | Framework Node.js — módulos, DI, guards, interceptors |
+| **Prisma** | 6.19 | ORM type-safe — migrations, query builder |
+| **PostgreSQL** | 16 | Base de datos relacional principal |
+| **BullMQ** | 5.79 | Cola de jobs distribuida sobre Redis |
+| **Passport + JWT** | — | Autenticación — access token (1 día) + refresh rotativo (7 días) |
+| **class-validator** | 0.15 | Validación de DTOs con decorators |
+| **@nestjs/swagger** | 11.2 | Documentación OpenAPI automática en `/api/docs` |
+| **@nestjs/throttler** | 6.5 | Rate limiting — protección DDoS |
+| **bcryptjs** | 3.0 | Hash de contraseñas (bcrypt, coste 10) |
+| **JSZip** | 3.10 | Generación de bundles ZIP en memoria |
+| **MinIO SDK** | 8.0 | Object storage para ZIPs generados |
+| **TypeScript** | 5.9 | Tipado estático end-to-end |
+
+### Módulos NestJS
+
+```
+src/modules/
+├── auth/           JWT register/login/refresh/logout + admin auth separado
+├── users/          Perfil de usuario + listado admin
+├── workspaces/     CRUD + gestión de miembros
+├── projects/       CRUD + slug único + lookup UUID/slug dual
+├── ideas/          Intake del wizard → modelo Idea en DB
+├── specifications/ Pipeline SDD — cola BullMQ → ai-service → DB
+├── artifacts/      Bundle ZIP + code generation + validación + push GitHub
+├── ai-service/     Cliente HTTP hacia FastAPI (AiServiceClient)
+├── llm-config/     Proxy GET/PATCH /llm-config → AI service (configuración LLM)
+├── health/         Health check con estado de DB
+└── admin/          Panel admin — usuarios + proyectos (guard AdminJwtGuard)
+```
+
+### Seguridad implementada
+
+- **Guard de ownership**: `ensureProjectAccess(projectId, userId)` en todos los métodos — acepta UUID o slug
+- **Admin auth aislada**: `AdminJwtGuard` verifica `payload.type === "admin"` y usa `ADMIN_JWT_SECRET` distinto
+- **CAPTCHA**: validación en register y login — soporta Turnstile (Cloudflare), hCaptcha y reCAPTCHA (Google)
+- **Rate limiting**: throttler en todos los endpoints públicos (300 req/min por IP)
+- **Secrets scanning**: en `validateBundle()` — detecta credenciales hardcodeadas en código generado antes de permitir descarga
+- **Refresh token rotation**: cada uso invalida el anterior (previene replay attacks)
+
+---
+
+## 6. Backend de IA — `apps/ai-service/`
+
+**Puerto:** 8003
+
+### Stack
+
+| Tecnología | Versión | Rol |
+|-----------|---------|-----|
+| **FastAPI** | 0.115 | Framework Python asíncrono — endpoints, validación automática |
+| **Uvicorn** | 0.35 | Servidor ASGI — `--reload` en desarrollo |
+| **Pydantic v2** | 2.11 | Modelos de datos + validación + `with_structured_output` |
+| **LangChain** | 0.3 | Orquestación de LLMs — chains, prompts, parsers |
+| **LangGraph** | 0.5 | Grafos de agentes — flujos con estado y condiciones |
+| **LangChain-Groq** | 1.1 | Proveedor LLM primario (llama-3.3-70b) |
+| **LangChain-OpenAI** | 0.3 | Proveedor LLM fallback (gpt-4o-mini) |
+| **LangChain-Google GenAI** | 2.0 | Proveedor LLM fallback secundario (gemini-2.0-flash) |
+| **LangChain-Ollama** | 0.3 | LLM local — sin coste, privacidad total, sin API key |
+| **Qdrant Client** | 1.9 | Búsqueda vectorial para RAG |
+| **Ruff** | 0.12 | Linter + formatter Python |
+| **pytest** | 8.4 | Testing |
+
+### Agentes implementados
+
+| Agente | Archivo | Tarea LLM | Descripción |
+|--------|---------|-----------|-------------|
+| `ProductAgent` | `product_agent.py` | general | Análisis inicial de idea |
+| `RequirementsAgent` | `requirements_agent.py` | reasoning | Requisitos funcionales, no funcionales y user stories |
+| `ArchitectureAgent` | `architecture_agent.py` | reasoning | Stack recomendado + learning path + upgrade signals |
+| `SupervisorAgent` | `supervisor_agent.py` | spec | Orquestador LangGraph del OpenSpec |
+| `OpenSpecAgent` | `openspec_agent.py` | spec | OpenSpec completo (JSON estructurado) |
+| `IssueGeneratorAgent` | `issue_generator_agent.py` | reasoning | Issues GitHub con milestones y labels |
+| `TutorialAgent` | `tutorial_agent.py` | general | Tutorial paso a paso por arquitectura |
+| `CodeGenerationAgent` | `codegen_agent.py` | code | Archivos de código generados |
+| `TechProposalAgent` | `tech_proposal_agent.py` | general | 3 propuestas de stack adaptadas al proyecto |
+| `RAGAgent` | `rag_agent.py` | general | Respuestas fundamentadas en documentos indexados |
+
+### Cadena de fallback LLM (por tipo de tarea)
+
+```
+Tipo "reasoning" (requisitos, arquitectura):
+  Groq (llama-3.3-70b) → OpenAI → Gemini → Ollama (llama3.1) → determinístico
+
+Tipo "spec" (OpenSpec):
+  OpenAI (gpt-4o-mini) → Gemini → Groq → Ollama (llama3.1) → determinístico
+
+Tipo "code" (generación de código):
+  Ollama (qwen2.5-coder) → Groq → OpenAI → Gemini → determinístico
+
+Tipo "general" (features, tutorial):
+  Groq → OpenAI → Gemini → Ollama (llama3.1) → determinístico
+```
+
+Si se configura un proveedor forzado desde `/ai-settings`, ese proveedor se intenta primero para todos los tipos.
+
+### Endpoints de configuración LLM
+
+```
+GET  /config/llm           → estado actual (proveedor activo, modelos, enrutamiento)
+PATCH /config/llm          → forzar proveedor / cambiar modelos en caliente
+GET  /ollama/models        → modelos instalados en Ollama local
+```
+
+### Patrón de resiliencia de agentes
+
+```python
+def generate(self, req):
+    llm = get_llm("task_type")          # selecciona Groq / OpenAI / Gemini / Ollama
+    if llm is not None:
+        try:
+            result = llm.with_structured_output(Schema).invoke(prompt)
+            return result                # LLM path (calidad máxima)
+        except Exception:
+            pass                         # fallback si el LLM falla
+    return self._deterministic(req)      # siempre produce un resultado válido
+```
+
+### OpenSpec — La fuente de verdad
+
+```json
+{
+  "project":        { "name", "sector", "target_users", "problem", "description" },
+  "architecture":   { "type", "name", "stack", "difficulty" },
+  "requirements":   [{ "id", "title", "description", "acceptance_criteria" }],
+  "user_stories":   [{ "id", "actor", "goal", "benefit" }],
+  "modules":        ["Auth", "Reservas", "Pagos"],
+  "data_entities":  [{ "name", "fields": [{ "name", "type", "required" }], "relations" }],
+  "api_endpoints":  [{ "method", "path", "description", "auth_required", "request_body", "response" }],
+  "business_rules": ["string"],
+  "dev_steps":      [{ "step", "title", "description", "commands" }],
+  "milestones":     ["string"],
+  "constraints":    { "delivery", "environments" }
+}
+```
+
+---
+
+## 7. Base de datos
+
+### PostgreSQL 16
+
+| Modelo | Campos clave | Descripción |
+|--------|-------------|-------------|
+| `User` | id, email, name, passwordHash, role | Usuarios del sistema |
+| `RefreshToken` | userId, tokenHash, expiresAt | Tokens de refresco activos |
+| `Workspace` | id, name, ownerId | Espacio de trabajo del equipo |
+| `WorkspaceMember` | workspaceId, userId, role | Membresías con rol |
+| `Project` | id, slug, name, sector, productType, status | Proyecto SDD |
+| `Idea` | problem, targetUsers, coreFeatures[], complexity, needsAi | Intake del wizard |
+| `Specification` | type (enum), status, content (JSON) | Artefactos del pipeline |
+| `ArtifactBundle` | manifest (JSON), generatedContent (JSON), status | Bundle final descargable |
+
+### Enums relevantes
+
+```
+SpecificationType:  REQUIREMENTS | ARCHITECTURE | OPENSPEC | ISSUES | TUTORIAL | CODE | TECH_PROPOSAL
+ProjectStatus:      DRAFT → REQUIREMENTS_READY → SPEC_READY → GENERATING → GENERATED → REVIEW → DEPLOYED
+Role:               ADMIN | OWNER | COLLABORATOR | REVIEWER
+```
+
+### Redis 7
+
+Usado como broker de colas por **BullMQ**. Cada job del pipeline (generar requisitos, arquitectura, OpenSpec, etc.) se encola en Redis y se procesa de forma asíncrona, permitiendo al frontend hacer polling sin bloquear la respuesta HTTP.
+
+---
+
+## 8. Infraestructura
+
+### Servicios Docker
+
+| Servicio | Imagen | Puerto | Uso |
+|---------|--------|--------|-----|
+| `postgres` | `postgres:16` | 5432 | DB principal |
+| `redis` | `redis:7` | 6380 | Cola BullMQ (6380 para evitar conflicto con Docker Desktop) |
+| `minio` | `minio/minio` | 9000/9001 | Object storage (ZIPs generados) |
+| `qdrant` | `qdrant/qdrant` | 6333 | Vectores para RAG |
+| `mailpit` | `axllent/mailpit` | 1025/8025 | SMTP local (dev) |
+
+### Variables de entorno — `apps/api/.env`
+
+```env
+NODE_ENV=development
+API_PORT=3000
+
+DATABASE_URL=postgresql://progresia:progresia@localhost:5432/progresia_studio
+
+JWT_SECRET=<string aleatorio seguro>
+JWT_EXPIRES_IN=1d
+
+REDIS_HOST=localhost
+REDIS_PORT=6380
+
+AI_SERVICE_URL=http://127.0.0.1:8003
+
+MINIO_ENDPOINT=localhost
+MINIO_PORT=9000
+MINIO_ACCESS_KEY=progresia
+MINIO_SECRET_KEY=progresia_secret
+MINIO_BUCKET=progresia-artifacts
+
+CORS_ORIGINS=http://localhost:5173
+
+CAPTCHA_ENABLED=true
+CAPTCHA_PROVIDER=turnstile
+CAPTCHA_SECRET_KEY=<Cloudflare Turnstile secret key>
+
+ADMIN_JWT_SECRET=<string aleatorio seguro>
+ADMIN_EMAIL=admin@progresia.local
+ADMIN_USERNAME=seurobman
+ADMIN_PASSWORD=<contraseña admin>
+```
+
+### Variables de entorno — `apps/ai-service/.env`
+
+```env
+LLM_PROVIDER=groq
+
+GROQ_API_KEY=<clave de https://console.groq.com>
+GROQ_MODEL=llama-3.3-70b-versatile
+
+OPENAI_API_KEY=<clave de https://platform.openai.com>
+OPENAI_MODEL=gpt-4o-mini
+
+GEMINI_API_KEY=<clave de https://aistudio.google.com>
+GEMINI_MODEL=gemini-2.0-flash
+
+OLLAMA_BASE_URL=http://localhost:11434
+
+QDRANT_URL=http://localhost:6333
+```
+
+### Variables de entorno — `apps/web/.env`
+
+```env
+VITE_API_URL=http://localhost:3000/api
+
+VITE_CAPTCHA_PROVIDER=turnstile
+VITE_CAPTCHA_SITE_KEY=<Cloudflare Turnstile site key>
+```
+
+---
+
+## 9. Seguridad
+
+- Las claves de API **nunca se commitean** — solo existen en archivos `.env` (gitignored)
+- El panel de administración usa un JWT secret distinto (`ADMIN_JWT_SECRET`) y tokens con `type: "admin"` — incompatibles con tokens de usuario normal
+- `validateBundle()` escanea el código generado con regex para detectar credenciales hardcodeadas antes de permitir la descarga
+- El registro crea la cuenta en estado activo sin verificación de email (flujo simplificado para MVP educativo)
+- CAPTCHA configurable: Cloudflare Turnstile, hCaptcha o reCAPTCHA
+
+---
+
+## 10. Testing
+
+| Capa | Framework | Cobertura actual |
+|------|-----------|-----------------|
+| AI Service | pytest 8.4 | Agentes principales — requirements, architecture, openspec |
+| API — unitario | Jest 30 + ts-jest | auth.service, artifacts.service, health.service, specifications.service |
+| API — integración | Supertest | workflow.integration (registro → proyecto → pipeline completo) |
+| Frontend | Vitest 4 + Testing Library | Pendiente |
+
+---
+
+## 11. Lo que está hecho ✅
+
+- [x] Wizard conversacional de 6 pasos con mensajes de IA en cola
+- [x] Pipeline SDD completo: requisitos → arquitectura → OpenSpec → issues → tutorial → código → ZIP
+- [x] 12 arquitecturas soportadas: 8 web + 2 mobile + 2 desktop
+- [x] Cadena de fallback LLM con 4 proveedores (Groq → OpenAI → Gemini → Ollama → determinístico)
+- [x] Enrutamiento de tarea: cada tipo de agente usa el proveedor óptimo
+- [x] **UI de configuración LLM** (`/ai-settings`) — cambio de proveedor y modelo en caliente sin reiniciar
+- [x] Auth JWT con refresh token rotation
+- [x] **CAPTCHA** en login y registro (widget estilo Cloudflare Turnstile — soporta Turnstile, hCaptcha, reCAPTCHA)
+- [x] Panel de administración aislado (`/gestion-usuarios`) con auth separada
+- [x] Bundle ZIP descargable con validación y secrets scanning
+- [x] Push a repositorio GitHub desde el panel de proyecto
+- [x] RAG pipeline (indexar documentos, búsqueda vectorial, respuestas fundamentadas)
+- [x] Propuestas de stack tecnológico antes de generar el MVP (`TechProposalAgent`)
+- [x] Routing mobile/desktop determinístico (bypasa LLM — sin alucinaciones de stack)
+- [x] Learning paths y upgrade signals por arquitectura
+- [x] Rate limiting en todos los endpoints públicos
+- [x] Documentación OpenAPI automática (`/api/docs`)
+- [x] NotFoundPage (404) con navegación de vuelta al dashboard
+
+---
+
+## 12. Lo que falta / Mejoras pendientes ⏳
+
+### Alta prioridad
+
+- [ ] **TutorialCard en el frontend** — `ProjectDetailPage.tsx` necesita la tarjeta de visualización del tutorial; el agente ya funciona pero el resultado no se muestra en la UI
+- [ ] **Fortalecer `code_generation_agent.py`** — debe leer `data_entities` y `api_endpoints` del OpenSpec para generar código coherente con el modelo de datos real
+- [ ] **Tests completos del AI service** — `TutorialAgent`, `CodeGenerationAgent`, `TechProposalAgent` e `IssueGeneratorAgent` no tienen tests
+
+### Media prioridad
+
+- [ ] **Extender el pipeline a 7 pasos visuales** — el paso `TECH_PROPOSAL` existe en DB pero no tiene tarjeta en `ProjectDetailPage`
+- [ ] **Visor de OpenSpec en el frontend** — el JSON se guarda pero no hay UI para inspeccionarlo ni editarlo
+- [ ] **Exportación de especificaciones** — `/export-pdf` y `/export-md` existen en el controlador pero la generación de contenido es básica
+- [ ] **Dependabot alerts** — revisar y actualizar dependencias con alertas de seguridad pendientes
+
+### Baja prioridad / Post-MVP
+
+- [ ] **Despliegue en producción** — Dockerfiles preparados pero sin CI/CD configurado
+- [ ] **Colaboradores en workspace** — el modelo de datos soporta `WorkspaceMember` con roles, pero la UI solo permite al owner trabajar
+- [ ] **MinIO activo** — el SDK está integrado pero el flujo de subida de ZIPs al object storage no está activo (se devuelve directamente como stream)
+- [ ] **CodeGenAgent multi-step** — plan → implementar módulo por módulo → revisar (mejor calidad que paso único)
+
+---
+
+## 13. Instalación desde cero
+
+### Prerrequisitos
+
+Instala las siguientes herramientas antes de continuar. Las versiones indicadas son las mínimas probadas.
+
+#### 1. Node.js 22 LTS
+
+```bash
+# Windows — descarga el instalador desde:
+# https://nodejs.org/en/download  (elige LTS)
+
+# Verificar instalación:
+node --version    # >= 22.0
+npm --version     # >= 10.0
+```
+
+#### 2. Python 3.12+
+
+```bash
+# Windows — descarga el instalador desde:
+# https://www.python.org/downloads/
+# IMPORTANTE: marcar "Add Python to PATH" durante la instalación
+
+# Verificar:
+python --version    # >= 3.12
+pip --version
+```
+
+#### 3. Docker Desktop
+
+```bash
+# Windows — descarga desde:
+# https://www.docker.com/products/docker-desktop/
+# Requiere WSL 2 en Windows 10/11
+
+# Verificar:
+docker --version           # >= 24.0
+docker compose version     # >= 2.20
+```
+
+#### 4. Git
+
+```bash
+# https://git-scm.com/download/win
+git --version    # >= 2.40
+```
+
+---
+
+### Paso 1 — Clonar el repositorio
+
+```bash
+git clone https://github.com/seurob/progresia.git progresia-studio
+cd progresia-studio
+```
+
+---
+
+### Paso 2 — Instalar dependencias
+
+#### API (NestJS)
+
+```bash
+cd apps/api
+npm install
+```
+
+#### Frontend (React + Vite)
+
+```bash
+cd apps/web
+npm install
+```
+
+#### AI Service (Python)
+
+```bash
+cd apps/ai-service
+
+# Crear entorno virtual (recomendado)
+python -m venv .venv
+
+# Activar entorno virtual
+# Windows PowerShell:
+.\.venv\Scripts\Activate.ps1
+# Windows CMD:
+.\.venv\Scripts\activate.bat
+# Linux/Mac:
+source .venv/bin/activate
+
+# Instalar dependencias
+pip install -e ".[dev]"
+```
+
+---
+
+### Paso 3 — Instalar Ollama (LLM local, requerido)
+
+Ollama ejecuta los modelos de lenguaje en tu ordenador. Es necesario para que el pipeline de generación de código funcione sin depender exclusivamente de APIs externas.
+
+```bash
+# 1. Descargar e instalar Ollama desde:
+# https://ollama.com
+
+# 2. Instalar los modelos necesarios (4-5 GB cada uno, descarga única):
+ollama pull llama3.1          # razonamiento, requisitos, arquitectura
+ollama pull qwen2.5-coder     # generación de código
+
+# 3. Verificar que los modelos están instalados:
+ollama list
+```
+
+> Ollama se arranca automáticamente como servicio en Windows después de instalarlo.
+> Si necesitas arrancarlo manualmente: `ollama serve`
+
+---
+
+### Paso 4 — Configurar variables de entorno
+
+#### API
+
+```bash
+# Crear apps/api/.env con este contenido:
+NODE_ENV=development
+API_PORT=3000
+
+DATABASE_URL=postgresql://progresia:progresia@localhost:5432/progresia_studio
+
+JWT_SECRET=cambia_esto_por_un_string_aleatorio_largo
+JWT_EXPIRES_IN=1d
+
+REDIS_HOST=localhost
+REDIS_PORT=6380
+
+AI_SERVICE_URL=http://127.0.0.1:8003
+
+MINIO_ENDPOINT=localhost
+MINIO_PORT=9000
+MINIO_ACCESS_KEY=progresia
+MINIO_SECRET_KEY=progresia_secret
+MINIO_BUCKET=progresia-artifacts
+
+CORS_ORIGINS=http://localhost:5173
+
+# CAPTCHA — usar test keys en desarrollo (no necesitan registro)
+CAPTCHA_ENABLED=true
+CAPTCHA_PROVIDER=turnstile
+CAPTCHA_SECRET_KEY=1x0000000000000000000000000000000AA
+
+ADMIN_JWT_SECRET=otro_string_aleatorio_para_admin
+ADMIN_EMAIL=admin@progresia.local
+ADMIN_USERNAME=seurobman
+ADMIN_PASSWORD=$eurobman2026
+```
+
+#### AI Service
+
+```bash
+# Crear apps/ai-service/.env con este contenido:
+LLM_PROVIDER=groq
+
+# Al menos una key es obligatoria para que el pipeline use LLM (sin key usa fallback determinístico)
+GROQ_API_KEY=tu_clave_de_groq         # https://console.groq.com  (gratis)
+OPENAI_API_KEY=tu_clave_de_openai     # https://platform.openai.com (de pago)
+GEMINI_API_KEY=tu_clave_de_gemini     # https://aistudio.google.com (gratis con límites)
+
+GROQ_MODEL=llama-3.3-70b-versatile
+OPENAI_MODEL=gpt-4o-mini
+GEMINI_MODEL=gemini-2.0-flash
+
+OLLAMA_BASE_URL=http://localhost:11434
+
+QDRANT_URL=http://localhost:6333
+```
+
+#### Frontend
+
+```bash
+# Crear apps/web/.env con este contenido:
+VITE_API_URL=http://localhost:3000/api
+
+# Test keys de Cloudflare Turnstile (funcionan en local, muestran widget de prueba)
+VITE_CAPTCHA_PROVIDER=turnstile
+VITE_CAPTCHA_SITE_KEY=1x00000000000000000000AA
+```
+
+---
+
+### Paso 5 — Arrancar la infraestructura (Docker)
+
+```bash
+# Desde la raíz del monorepo
+docker compose up -d
+
+# Verificar que todos los contenedores están en estado "running":
+docker compose ps
+```
+
+Esto levanta: PostgreSQL, Redis, MinIO, Qdrant y Mailpit.
+
+---
+
+### Paso 6 — Preparar la base de datos
+
+```bash
+cd apps/api
+
+# Aplicar todas las migraciones Prisma
+npx prisma migrate deploy
+
+# Generar el cliente Prisma (obligatorio tras migrate)
+npx prisma generate
+
+# Poblar con datos iniciales (crea el usuario admin)
+npx ts-node prisma/seed.ts
+```
+
+> **Windows:** Si aparece error de DLL lock, asegúrate de que el servidor API no está corriendo antes de ejecutar `prisma generate`.
+
+El seed crea:
+- **Admin**: `admin@progresia.local` / contraseña configurada en `ADMIN_PASSWORD`
+
+---
+
+### Paso 7 — Arrancar los servicios
+
+Abre **tres terminales separadas**:
+
+#### Terminal 1 — API (NestJS)
+
+```bash
+cd apps/api
+
+# Compilar TypeScript (obligatorio en Windows — no usar nest start --watch)
+npx tsc --project tsconfig.build.json
+
+# Arrancar el servidor
+node --enable-source-maps dist/main
+```
+
+Verás: `Nest application successfully started`
+
+> **Windows:** `nest start --watch` crea procesos zombi. Siempre compilar con `tsc` y arrancar con `node`.
+
+#### Terminal 2 — AI Service (FastAPI)
+
+```bash
+cd apps/ai-service
+
+# Activar el entorno virtual si no está activo
+.\.venv\Scripts\Activate.ps1   # Windows PowerShell
+
+# Arrancar con recarga automática
+python -m uvicorn app.main:app --port 8003 --reload
+```
+
+Verás: `Application startup complete.`
+
+#### Terminal 3 — Frontend (React + Vite)
+
+```bash
+cd apps/web
+npm run dev
+```
+
+Verás: `Local: http://localhost:5173/`
+
+---
+
+### Paso 8 — Verificar la instalación
+
+| URL | Descripción | Resultado esperado |
+|-----|-------------|-------------------|
+| `http://localhost:5173` | Frontend | Página de login |
+| `http://localhost:3000/api/health` | API health | `{"status":"ok"}` |
+| `http://localhost:8003/health` | AI Service health | `{"status":"ok"}` |
+| `http://localhost:3000/api/docs` | Swagger UI | Documentación interactiva |
+| `http://localhost:5173/gestion-usuarios` | Admin panel | Formulario de login admin |
+
+---
+
+### (Opcional) CAPTCHA real con Cloudflare Turnstile
+
+Las test keys incluidas en la configuración de desarrollo muestran un widget funcional. Para producción o para eliminar el indicador de "modo prueba":
+
+1. Crea una cuenta gratuita en [dash.cloudflare.com](https://dash.cloudflare.com)
+2. Ve a **Turnstile** → **Add site** → elige `localhost` como dominio
+3. Copia la **Site Key** y la **Secret Key**
+4. Reemplaza en `apps/web/.env`: `VITE_CAPTCHA_SITE_KEY=<tu site key>`
+5. Reemplaza en `apps/api/.env`: `CAPTCHA_SECRET_KEY=<tu secret key>`
+6. Reinicia ambos servicios
+
+---
+
+### Comandos útiles de mantenimiento
+
+```bash
+# Ver logs en tiempo real de cada servicio
+docker compose logs -f postgres
+docker compose logs -f redis
+
+# Resetear la base de datos completamente
+cd apps/api
+npx prisma migrate reset   # borra todos los datos y re-aplica migraciones
+
+# Ejecutar tests
+cd apps/api && npm test                    # tests unitarios NestJS
+cd apps/api && npm run test:e2e            # tests de integración
+cd apps/ai-service && pytest               # tests Python
+
+# Linting
+cd apps/ai-service && ruff check .         # linter Python
+cd apps/api && npm run lint                # linter TypeScript
+cd apps/web && npm run lint
+
+# Abrir Prisma Studio (GUI para inspeccionar la DB)
+cd apps/api && npx prisma studio
+```
+
+---
+
+## 14. URLs de referencia durante el desarrollo
+
+| Servicio | URL | Credenciales |
+|---------|-----|-------------|
+| Frontend | http://localhost:5173 | — |
+| API REST | http://localhost:3000/api | — |
+| Swagger UI | http://localhost:3000/api/docs | — |
+| AI Service | http://localhost:8003 | — |
+| AI Service docs | http://localhost:8003/docs | — |
+| Admin panel | http://localhost:5173/gestion-usuarios | `seurobman` / `$eurobman2026` |
+| Configuración IA | http://localhost:5173/ai-settings | requiere login |
+| MinIO console | http://localhost:9001 | `progresia` / `progresia_secret` |
+| Mailpit (SMTP) | http://localhost:8025 | — |
+| Qdrant dashboard | http://localhost:6333/dashboard | — |

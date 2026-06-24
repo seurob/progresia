@@ -14,3 +14,5 @@ class IdeaRequest(BaseModel):
     technical_level: str = "INTERMEDIATE"
     # Injected by NestJS when a stored architecture recommendation exists
     architecture_type: str | None = None
+    # web | mobile | desktop | api | saas | ai_tool — constrains stack selection
+    product_type: str = "web"

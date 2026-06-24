@@ -59,7 +59,8 @@ describe("SpecificationsService", () => {
       needs_admin_panel: true,
       needs_ai: false,
       technical_level: "INTERMEDIATE", // complexityToLevel(undefined) → INTERMEDIATE
-      architecture_type: undefined      // no architecture spec in this test scenario
+      architecture_type: undefined,     // no architecture spec in this test scenario
+      product_type: "web"               // project.productType ?? "web" (not set in mock → default)
     });
     expect(prisma.specification.create).toHaveBeenCalledWith({
       data: {
@@ -97,5 +98,40 @@ describe("SpecificationsService", () => {
     await expect(service.generateOpenSpec("user-1", "project-1")).rejects.toBeInstanceOf(
       ConflictException
     );
+  });
+
+  it("exports a generated specification as PDF", async () => {
+    const prisma = {
+      specification: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "spec-1",
+          projectId: "project-1",
+          type: SpecificationType.OPENSPEC,
+          createdAt: new Date("2026-06-23T00:00:00.000Z"),
+          project,
+          content: {
+            project: { description: "Sistema de reservas para profesores" },
+            architecture: { stack: ["React", "NestJS", "PostgreSQL"] },
+            modules: ["Reservas"],
+            requirements: [{ id: "RF-001", title: "Crear reserva", description: "Permite crear reservas" }],
+            user_stories: [{ actor: "profesor", goal: "reservar aula", benefit: "organizar clase" }]
+          }
+        })
+      }
+    };
+    const projectsService = {
+      ensureProjectAccess: jest.fn().mockResolvedValue(project)
+    };
+    const service = new SpecificationsService(
+      prisma as never,
+      projectsService as never,
+      {} as never
+    );
+
+    const result = await service.exportPdf("user-1", "spec-1");
+
+    expect(result.filename).toBe("reservas-openspec.pdf");
+    expect(result.buffer.subarray(0, 8).toString("latin1")).toBe("%PDF-1.4");
+    expect(projectsService.ensureProjectAccess).toHaveBeenCalledWith("project-1", "user-1");
   });
 });

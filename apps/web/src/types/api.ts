@@ -5,8 +5,6 @@ export interface User {
   email: string;
   name: string;
   role: Role;
-  emailVerified?: boolean;
-  accountStatus?: "PENDING_VERIFICATION" | "ACTIVE" | "SUSPENDED" | "DELETED";
   createdAt: string;
   updatedAt: string;
 }
@@ -15,12 +13,6 @@ export interface AuthResponse {
   accessToken: string;
   refreshToken: string;
   user: User;
-}
-
-export interface RegisterPendingResponse {
-  requiresEmailVerification: true;
-  email: string;
-  message: string;
 }
 
 export interface WorkspaceMember {
@@ -51,6 +43,7 @@ export interface Idea {
   needsAuth: boolean;
   needsAdminPanel: boolean;
   constraints?: string | null;
+  mandatoryTechs?: string | null;
 }
 
 export interface RequirementItem {
@@ -146,7 +139,7 @@ export interface Project {
   status: "DRAFT" | "REQUIREMENTS_READY" | "SPEC_READY" | "GENERATING" | "GENERATED" | "REVIEW" | "DEPLOYED";
   createdAt: string;
   updatedAt: string;
-  idea?: Idea | null;
+  idea?: Idea;
   specifications?: Specification[];
   artifactBundles?: ArtifactBundle[];
 }

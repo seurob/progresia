@@ -1,9 +1,10 @@
 import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import * as request from "supertest";
-import { AccountStatus, Role } from "@prisma/client";
+import { Role } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
 import { createHash } from "node:crypto";
+import { ThrottlerGuard } from "@nestjs/throttler";
 import { AppModule } from "../../src/modules/app.module";
 import { PrismaService } from "../../src/database/prisma.service";
 import { AiServiceClient } from "../../src/modules/ai-service/ai-service.client";
@@ -23,9 +24,6 @@ const dbUser = {
   name: "Integration User",
   passwordHash: bcrypt.hashSync(PASSWORD, 4),
   role: Role.OWNER,
-  emailVerified: true,
-  emailVerifiedAt: new Date("2026-01-01T00:00:00Z"),
-  accountStatus: AccountStatus.ACTIVE,
   createdAt: new Date("2026-01-01T00:00:00Z"),
   updatedAt: new Date("2026-01-01T00:00:00Z")
 };
@@ -79,6 +77,32 @@ const dbSpec = {
   updatedAt: new Date("2026-01-01T00:00:00Z")
 };
 
+const BUNDLE_ID = "00000000-0000-4000-8000-000000000005";
+
+const dbBundle = {
+  id: BUNDLE_ID,
+  projectId: PROJECT_ID,
+  specificationId: SPEC_ID,
+  status: "GENERATED",
+  manifest: { version: "0.1.0", project: "Test App", files: [] },
+  generatedContent: {
+    project_name: "Test App",
+    files: [
+      { path: "README.md", language: "markdown", content: "# Test" },
+      { path: "docker-compose.yml", language: "yaml", content: "services: {}" }
+    ]
+  },
+  createdAt: new Date("2026-01-01T00:00:00Z"),
+  updatedAt: new Date("2026-01-01T00:00:00Z"),
+  project: {
+    id: PROJECT_ID,
+    name: "Test App",
+    sector: "Tech",
+    workspaceId: WORKSPACE_ID,
+    workspace: { members: [{ userId: USER_ID, role: "OWNER" }] }
+  }
+};
+
 function buildPrismaMock(overrides: Record<string, unknown> = {}) {
   const refreshTokenHash = createHash("sha256").update("refresh-token").digest("hex");
 
@@ -86,7 +110,8 @@ function buildPrismaMock(overrides: Record<string, unknown> = {}) {
     user: {
       findUnique: jest.fn(),
       findUniqueOrThrow: jest.fn().mockResolvedValue(dbUser),
-      create: jest.fn().mockResolvedValue(dbUser)
+      create: jest.fn().mockResolvedValue(dbUser),
+      update: jest.fn().mockResolvedValue(dbUser)
     },
     workspace: {
       create: jest.fn().mockResolvedValue(dbWorkspace),
@@ -128,12 +153,6 @@ function buildPrismaMock(overrides: Record<string, unknown> = {}) {
       }),
       delete: jest.fn().mockResolvedValue({ id: "refresh-1" })
     },
-    emailVerificationCode: {
-      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
-      create: jest.fn().mockResolvedValue({ id: "verification-1" }),
-      findFirst: jest.fn().mockResolvedValue(null),
-      update: jest.fn().mockResolvedValue({ id: "verification-1" })
-    },
     $transaction: jest.fn().mockImplementation((input: unknown) => {
       if (Array.isArray(input)) {
         return Promise.all(input);
@@ -171,32 +190,6 @@ const githubServiceMock = {
   })
 };
 
-const BUNDLE_ID = "00000000-0000-4000-8000-000000000005";
-
-const dbBundle = {
-  id: BUNDLE_ID,
-  projectId: PROJECT_ID,
-  specificationId: SPEC_ID,
-  status: "GENERATED",
-  manifest: { version: "0.1.0", project: "Test App", files: [] },
-  generatedContent: {
-    project_name: "Test App",
-    files: [
-      { path: "README.md", language: "markdown", content: "# Test" },
-      { path: "docker-compose.yml", language: "yaml", content: "services: {}" }
-    ]
-  },
-  createdAt: new Date("2026-01-01T00:00:00Z"),
-  updatedAt: new Date("2026-01-01T00:00:00Z"),
-  project: {
-    id: PROJECT_ID,
-    name: "Test App",
-    sector: "Tech",
-    workspaceId: WORKSPACE_ID,
-    workspace: { members: [{ userId: USER_ID, role: "OWNER" }] }
-  }
-};
-
 describe("API workflow integration", () => {
   let app: INestApplication;
   let prismaMock: ReturnType<typeof buildPrismaMock>;
@@ -207,6 +200,8 @@ describe("API workflow integration", () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule]
     })
+      .overrideGuard(ThrottlerGuard)
+      .useValue({ canActivate: () => true })
       .overrideProvider(PrismaService)
       .useValue(prismaMock)
       .overrideProvider(AiServiceClient)
@@ -228,7 +223,7 @@ describe("API workflow integration", () => {
   // ── Auth ──────────────────────────────────────────────────────────────
 
   describe("POST /api/auth/register", () => {
-    it("creates a pending user and returns verification state", async () => {
+    it("creates an active user and returns auth tokens", async () => {
       prismaMock.user.findUnique.mockResolvedValue(null);
 
       const res = await request(app.getHttpServer())
@@ -236,8 +231,9 @@ describe("API workflow integration", () => {
         .send({ name: "Integration User", email: "integration@progresia.local", password: PASSWORD });
 
       expect(res.status).toBe(201);
-      expect(res.body.requiresEmailVerification).toBe(true);
-      expect(res.body.email).toBe("integration@progresia.local");
+      expect(res.body).toHaveProperty("accessToken");
+      expect(res.body).toHaveProperty("refreshToken");
+      expect(res.body.user).toHaveProperty("id");
     });
 
     it("rejects duplicate email with 409", async () => {

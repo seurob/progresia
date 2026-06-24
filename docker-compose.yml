@@ -29,6 +29,17 @@ services:
       timeout: 5s
       retries: 5
 
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: progresia-mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI → http://localhost:8025
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+
   qdrant:
     image: qdrant/qdrant:latest
     container_name: progresia-qdrant
@@ -94,6 +105,10 @@ services:
       REDIS_PORT: 6379
       MINIO_ENDPOINT: minio
       AI_SERVICE_URL: http://ai-service:8000
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_VERIFY_ON_SEND: "false"
+      SMTP_TLS_REJECT_UNAUTHORIZED: "false"
     ports:
       - "${API_PORT:-3000}:3000"
     depends_on:

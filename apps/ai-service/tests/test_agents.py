@@ -440,6 +440,58 @@ class TestCodeGenerationAgent:
         body = response.json()
         assert len(body["files"]) >= 5
 
+    # ── BEGINNER template tests ───────────────────────────────────────────────
+
+    def test_beginner_routes_to_express_template(self) -> None:
+        req = CODEGEN_REQUEST_NEUTRAL.model_copy(update={"technical_level": "BEGINNER"})
+        result = CodeGenerationAgent().generate(req, llm=None)
+
+        paths = [f.path for f in result.files]
+        assert "src/index.js" in paths
+        assert "client/src/App.jsx" in paths
+        assert "src/db.js" in paths
+
+    def test_beginner_bypasses_sector_templates(self) -> None:
+        req = CODEGEN_REQUEST.model_copy(update={"technical_level": "BEGINNER"})
+        result = CodeGenerationAgent().generate(req, llm=None)
+
+        paths = [f.path for f in result.files]
+        # Should use Express, not academia tRPC template
+        assert "src/index.js" in paths
+        assert not any("trpc" in p for p in paths)
+
+    def test_beginner_with_auth_includes_auth_routes(self) -> None:
+        req = CODEGEN_REQUEST_NEUTRAL.model_copy(update={"technical_level": "BEGINNER", "needs_auth": True})
+        result = CodeGenerationAgent().generate(req, llm=None)
+
+        paths = [f.path for f in result.files]
+        assert "src/routes/auth.js" in paths
+        assert "src/middleware/auth.js" in paths
+
+    def test_beginner_without_auth_excludes_auth_middleware(self) -> None:
+        req = CODEGEN_REQUEST_NEUTRAL.model_copy(update={"technical_level": "BEGINNER", "needs_auth": False})
+        result = CodeGenerationAgent().generate(req, llm=None)
+
+        paths = [f.path for f in result.files]
+        # auth middleware is the definitive signal — only added when needs_auth=True
+        assert "src/middleware/auth.js" not in paths
+
+    def test_intermediate_still_uses_ddd_scaffold(self) -> None:
+        req = CODEGEN_REQUEST_NEUTRAL.model_copy(update={"technical_level": "INTERMEDIATE"})
+        result = CodeGenerationAgent().generate(req, llm=None)
+
+        paths = [f.path for f in result.files]
+        # INTERMEDIATE uses tRPC generic scaffold
+        assert any("prisma" in p for p in paths)
+        assert "src/index.js" not in paths
+
+    def test_beginner_no_duplicate_paths(self) -> None:
+        req = CODEGEN_REQUEST_NEUTRAL.model_copy(update={"technical_level": "BEGINNER"})
+        result = CodeGenerationAgent().generate(req, llm=None)
+
+        paths = [f.path for f in result.files]
+        assert len(paths) == len(set(paths)), f"Duplicate paths: {[p for p in paths if paths.count(p) > 1]}"
+
 
 # ── TutorialAgent ─────────────────────────────────────────────────────────────
 
@@ -1405,6 +1457,26 @@ _TECH_REQ_INTERMEDIATE_SINGLE = _TECH_REQ_BEGINNER_SINGLE.model_copy(
     update={"level": "INTERMEDIATE", "architecture_style": "single"}
 )
 
+_TECH_REQ_BEGINNER_AI = _TECH_REQ_BEGINNER_SINGLE.model_copy(
+    update={"ai_needs": "chat_assistant"}
+)
+
+_TECH_REQ_BEGINNER_MOBILE = _TECH_REQ_BEGINNER_SINGLE.model_copy(
+    update={"product_type": "mobile", "architecture_style": "mobile_api"}
+)
+
+_TECH_REQ_BEGINNER_DESKTOP = _TECH_REQ_BEGINNER_SINGLE.model_copy(
+    update={"product_type": "desktop", "architecture_style": "desktop_api"}
+)
+
+_TECH_REQ_INTERMEDIATE_MOBILE = _TECH_REQ_BEGINNER_SINGLE.model_copy(
+    update={"level": "INTERMEDIATE", "product_type": "mobile", "architecture_style": "mobile_api"}
+)
+
+_TECH_REQ_INTERMEDIATE_DESKTOP = _TECH_REQ_BEGINNER_SINGLE.model_copy(
+    update={"level": "INTERMEDIATE", "product_type": "desktop", "architecture_style": "desktop_api"}
+)
+
 
 class TestCatalogKey:
     def test_beginner_single_key(self) -> None:
@@ -1412,6 +1484,15 @@ class TestCatalogKey:
 
     def test_beginner_frontend_api_key(self) -> None:
         assert _catalog_key(_TECH_REQ_BEGINNER_FRONTEND_API) == "BEGINNER_frontend_api"
+
+    def test_beginner_ai_overrides_to_ai_service(self) -> None:
+        assert _catalog_key(_TECH_REQ_BEGINNER_AI) == "BEGINNER_ai_service"
+
+    def test_beginner_mobile_key(self) -> None:
+        assert _catalog_key(_TECH_REQ_BEGINNER_MOBILE) == "BEGINNER_mobile"
+
+    def test_beginner_desktop_key(self) -> None:
+        assert _catalog_key(_TECH_REQ_BEGINNER_DESKTOP) == "BEGINNER_desktop"
 
     def test_intermediate_frontend_api_key(self) -> None:
         assert _catalog_key(_TECH_REQ_INTERMEDIATE_FRONTEND_API) == "INTERMEDIATE_frontend_api"
@@ -1422,6 +1503,12 @@ class TestCatalogKey:
     def test_intermediate_single_key(self) -> None:
         assert _catalog_key(_TECH_REQ_INTERMEDIATE_SINGLE) == "INTERMEDIATE_single"
 
+    def test_intermediate_mobile_key(self) -> None:
+        assert _catalog_key(_TECH_REQ_INTERMEDIATE_MOBILE) == "INTERMEDIATE_mobile"
+
+    def test_intermediate_desktop_key(self) -> None:
+        assert _catalog_key(_TECH_REQ_INTERMEDIATE_DESKTOP) == "INTERMEDIATE_desktop"
+
     def test_ai_none_does_not_trigger_ai_service(self) -> None:
         req = _TECH_REQ_INTERMEDIATE_FRONTEND_API.model_copy(update={"ai_needs": "none"})
         assert _catalog_key(req) != "INTERMEDIATE_ai_service"
@@ -1430,19 +1517,31 @@ class TestCatalogKey:
         req = _TECH_REQ_INTERMEDIATE_FRONTEND_API.model_copy(update={"ai_needs": "recommendation"})
         assert _catalog_key(req) != "INTERMEDIATE_ai_service"
 
-    def test_beginner_ai_does_not_produce_ai_service(self) -> None:
+    def test_beginner_ai_produces_beginner_ai_service(self) -> None:
         req = _TECH_REQ_BEGINNER_SINGLE.model_copy(update={"ai_needs": "chat_assistant"})
         key = _catalog_key(req)
+        assert key == "BEGINNER_ai_service"
         assert key != "INTERMEDIATE_ai_service"
-        assert key.startswith("BEGINNER_")
 
-    def test_mobile_api_normalized_to_frontend_api(self) -> None:
+    def test_mobile_api_normalized_to_mobile(self) -> None:
         req = _TECH_REQ_INTERMEDIATE_FRONTEND_API.model_copy(update={"architecture_style": "mobile_api"})
-        assert _catalog_key(req) == "INTERMEDIATE_frontend_api"
+        assert _catalog_key(req) == "INTERMEDIATE_mobile"
+
+    def test_desktop_api_normalized_to_desktop(self) -> None:
+        req = _TECH_REQ_INTERMEDIATE_FRONTEND_API.model_copy(update={"architecture_style": "desktop_api"})
+        assert _catalog_key(req) == "INTERMEDIATE_desktop"
 
     def test_unknown_arch_defaults_to_frontend_api(self) -> None:
         req = _TECH_REQ_INTERMEDIATE_FRONTEND_API.model_copy(update={"architecture_style": "unknown_xyz"})
         assert _catalog_key(req) == "INTERMEDIATE_frontend_api"
+
+    def test_mobile_with_ai_stays_mobile(self) -> None:
+        req = _TECH_REQ_INTERMEDIATE_MOBILE.model_copy(update={"ai_needs": "chat_assistant"})
+        assert _catalog_key(req) == "INTERMEDIATE_mobile"
+
+    def test_desktop_with_ai_stays_desktop(self) -> None:
+        req = _TECH_REQ_INTERMEDIATE_DESKTOP.model_copy(update={"ai_needs": "agents"})
+        assert _catalog_key(req) == "INTERMEDIATE_desktop"
 
 
 class TestTechProposalAgent:
@@ -1450,9 +1549,14 @@ class TestTechProposalAgent:
         for req in [
             _TECH_REQ_BEGINNER_SINGLE,
             _TECH_REQ_BEGINNER_FRONTEND_API,
+            _TECH_REQ_BEGINNER_AI,
+            _TECH_REQ_BEGINNER_MOBILE,
+            _TECH_REQ_BEGINNER_DESKTOP,
             _TECH_REQ_INTERMEDIATE_FRONTEND_API,
             _TECH_REQ_INTERMEDIATE_AI,
             _TECH_REQ_INTERMEDIATE_SINGLE,
+            _TECH_REQ_INTERMEDIATE_MOBILE,
+            _TECH_REQ_INTERMEDIATE_DESKTOP,
         ]:
             with patch("app.agents.tech_proposal_agent.get_llm", return_value=None):
                 result = TechProposalAgent().propose(req)

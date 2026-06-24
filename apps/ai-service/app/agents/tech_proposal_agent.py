@@ -17,7 +17,12 @@ Rules:
 - Tailor difficulty to the stated technical level
 - For BEGINNER: prefer frameworks with fewer moving parts, strong documentation, single language
 - For INTERMEDIATE: prefer modern architecture, TypeScript, containerization, production-ready
-- Consider architecture_style: single (monolith), frontend_api (SPA+API), ai_service (SPA+API+AI microservice)
+- Consider architecture_style strictly:
+  * single: monolith — Next.js, Laravel, Django (everything in one project)
+  * frontend_api: separate SPA + API — React/Vue + NestJS/FastAPI/Laravel
+  * ai_service: SPA + API + AI microservice — React + NestJS + FastAPI/LangChain
+  * mobile_api: NATIVE/CROSS-PLATFORM MOBILE client + API — Flutter, React Native, Expo, KMP. NEVER suggest Next.js, React, Vue or any web framework as the primary client for mobile_api.
+  * desktop_api: DESKTOP app + API — Tauri, Electron, CustomTkinter, native SDKs. NEVER suggest Next.js or web SPAs as the desktop client.
 - Consider ai_needs: if not "none", include the appropriate AI integration libraries
 - Consider deployment_target to include Docker, CI hints, etc.
 - advantages: 3 specific, technical, honest advantages
@@ -29,6 +34,7 @@ Rules:
 
 def _build_human_message(req: TechProposalRequest) -> str:
     features = "\n".join(f"  - {f}" for f in req.core_features[:5]) if req.core_features else "  - (not specified)"
+    mandatory_line = f"\nMandatory technologies (MUST appear in at least one proposal): {req.mandatory_techs}" if req.mandatory_techs else ""
     return f"""Project: {req.name}
 Sector: {req.sector}
 Level: {req.level}
@@ -39,13 +45,15 @@ Data needs: {', '.join(req.data_needs) if req.data_needs else 'none specified'}
 AI needs: {req.ai_needs}
 Deployment target: {req.deployment_target}
 Core features:
-{features}"""
+{features}{mandatory_line}"""
 
 
 # ── Deterministic stack catalog ───────────────────────────────────────────────
 
 _STACKS: dict[str, list[TechProposal]] = {
-    # BEGINNER ─────────────────────────────────────────────────────────────────
+
+    # ── BEGINNER — web / monolito ──────────────────────────────────────────────
+
     "BEGINNER_single": [
         TechProposal(
             id=1, name="Stack Clásico Full-stack", tagline="Laravel + MySQL + Tailwind CSS",
@@ -81,6 +89,7 @@ _STACKS: dict[str, list[TechProposal]] = {
             docker_ready=True, ai_ready=True, estimated_setup_minutes=25,
         ),
     ],
+
     "BEGINNER_frontend_api": [
         TechProposal(
             id=1, name="Stack React + Laravel API", tagline="React + Laravel API + MySQL",
@@ -116,7 +125,123 @@ _STACKS: dict[str, list[TechProposal]] = {
             docker_ready=True, ai_ready=True, estimated_setup_minutes=30,
         ),
     ],
-    # INTERMEDIATE ──────────────────────────────────────────────────────────────
+
+    # ── BEGINNER — IA ──────────────────────────────────────────────────────────
+
+    "BEGINNER_ai_service": [
+        TechProposal(
+            id=1, name="Stack IA Local (sin coste)", tagline="FastAPI + Ollama + React",
+            stack=["Python 3.12", "FastAPI", "Ollama", "React 18", "Vite 5", "TypeScript 5", "SQLite", "Docker Compose"],
+            difficulty="Principiante",
+            description="FastAPI como backend y Ollama para ejecutar modelos de IA en tu propia máquina. Sin coste de API. Ideal para aprender cómo funciona la IA realmente.",
+            advantages=["Sin coste de API — modelos locales gratuitos con Ollama (Llama, Mistral, Phi)", "FastAPI genera documentación Swagger automáticamente", "React con streaming de texto del modelo en tiempo real"],
+            limitations=["Necesitas al menos 8 GB RAM para modelos medianos", "Los modelos ocupan 4–20 GB de disco — descarga inicial lenta"],
+            recommended_for="Aprender IA desde cero sin gastar en APIs, o proyecto donde la privacidad importa",
+            learning_outcomes=["FastAPI y Python async", "Integración de LLM con Ollama", "Streaming de respuestas con Server-Sent Events"],
+            docker_ready=True, ai_ready=True, estimated_setup_minutes=30,
+        ),
+        TechProposal(
+            id=2, name="Stack IA Online Rápido", tagline="Next.js + Vercel AI SDK + Groq",
+            stack=["TypeScript 5", "Next.js 14 (App Router)", "Vercel AI SDK 3", "Groq API", "PostgreSQL 16 (Neon)", "Tailwind CSS 4"],
+            difficulty="Principiante",
+            description="Vercel AI SDK hace que integrar IA en Next.js sea trivial — streaming, hooks y providers con 3 líneas de código. Groq es gratuito y ultrarrápido.",
+            advantages=["Vercel AI SDK soporta OpenAI, Groq, Anthropic, Google — cambias con una línea", "Streaming de respuestas out of the box con el hook useChat", "Deploy gratuito en Vercel — la app de IA online en minutos"],
+            limitations=["Groq tiene límites de tokens gratuitos; OpenAI cobra por uso", "Las claves de API requieren .env cuidadoso para no exponerlas"],
+            recommended_for="Primera aplicación con IA que quieres publicar online rápidamente",
+            learning_outcomes=["Vercel AI SDK y streaming de LLM", "Server Actions de Next.js con IA", "Gestión segura de claves de API"],
+            docker_ready=True, ai_ready=True, estimated_setup_minutes=15,
+        ),
+        TechProposal(
+            id=3, name="Stack Python Full-stack IA", tagline="Django + LangChain + Groq",
+            stack=["Python 3.12", "Django 5", "LangChain 0.3", "Groq API", "PostgreSQL 16", "Tailwind CSS (CDN)", "Docker Compose"],
+            difficulty="Principiante",
+            description="Django con LangChain integrado directamente. Sin framework frontend separado. Groq ofrece inferencia gratuita muy rápida.",
+            advantages=["Un solo lenguaje Python para todo — backend, IA y plantillas HTML", "Groq es gratuito con modelos Llama muy rápidos", "Django genera el panel admin para gestionar conversaciones automáticamente"],
+            limitations=["Sin streaming nativo — el chat responde de golpe (requiere WebSockets para streaming)", "LangChain cambia la API frecuentemente — fijar versión exacta en requirements.txt"],
+            recommended_for="Desarrollador Python que quiere añadir un chatbot o asistente a una app Django",
+            learning_outcomes=["LangChain básico con modelos online", "Integración IA en vistas Django", "Historial de conversaciones con Django ORM"],
+            docker_ready=True, ai_ready=True, estimated_setup_minutes=25,
+        ),
+    ],
+
+    # ── BEGINNER — móvil ──────────────────────────────────────────────────────
+
+    "BEGINNER_mobile": [
+        TechProposal(
+            id=1, name="Flutter — Cross-platform nativo", tagline="Flutter + Dart + API REST",
+            stack=["Dart 3.3", "Flutter 3.22", "Riverpod 2", "Dio (HTTP)", "SQLite (Drift)", "Docker Compose (API)"],
+            difficulty="Principiante",
+            description="Flutter es el framework multiplataforma de Google. Un solo código corre en iOS y Android con rendimiento nativo. Dart es similar a Java/Kotlin.",
+            advantages=["Un solo código base para iOS y Android — sin configurar Xcode Y Android Studio", "Flutter DevTools integrado — depuración visual en tiempo real", "Comunidad enorme y documentación oficial excepcional en flutter.dev"],
+            limitations=["Dart es un lenguaje exclusivo de Flutter — no reutilizable en web o backend", "Las apps Flutter pesas más que una app nativa equivalente"],
+            recommended_for="Primera app móvil con diseño cuidado y soporte iOS + Android simultáneo",
+            learning_outcomes=["Dart y programación reactiva con widgets", "Gestión de estado con Riverpod", "Navegación y rutas con GoRouter"],
+            docker_ready=False, ai_ready=False, estimated_setup_minutes=45,
+        ),
+        TechProposal(
+            id=2, name="React Native + Expo", tagline="React Native + Expo SDK + TypeScript",
+            stack=["TypeScript 5", "React Native 0.74", "Expo SDK 51", "Expo Router", "NativeWind", "AsyncStorage", "Expo EAS"],
+            difficulty="Principiante",
+            description="React Native con Expo elimina la necesidad de configurar Xcode o Android Studio. Con la app Expo Go, ves cambios en tu móvil físico instantáneamente.",
+            advantages=["Si ya sabes React, React Native es casi idéntico — curva de aprendizaje mínima", "Expo Go — prueba en tu móvil real sin compilar nada", "Expo EAS Build compila y publica en App Store/Play Store desde la nube"],
+            limitations=["Las animaciones muy complejas pueden requerir código nativo adicional", "Expo managed workflow limita acceso a algunas APIs nativas específicas"],
+            recommended_for="Developer web que quiere publicar su primera app móvil sin aprender iOS/Android nativo",
+            learning_outcomes=["React Native y componentes nativos", "Expo Router para navegación", "Publicación en stores con Expo EAS"],
+            docker_ready=False, ai_ready=False, estimated_setup_minutes=20,
+        ),
+        TechProposal(
+            id=3, name="PWA — Web que parece app", tagline="Vue 3 + Vite + Workbox (PWA)",
+            stack=["TypeScript 5", "Vue 3 (Composition API)", "Vite 5", "Tailwind CSS 3", "Pinia", "Workbox (service worker)", "FastAPI o NestJS (API)"],
+            difficulty="Principiante",
+            description="Una Progressive Web App parece una app nativa pero es un sitio web. Se instala desde el navegador, funciona offline y no necesita App Store.",
+            advantages=["Sin publicar en App Store — los usuarios la instalan directamente desde el navegador", "Un solo código para web y móvil — mantenimiento mínimo", "Vue 3 tiene la curva de aprendizaje más suave del ecosistema frontend"],
+            limitations=["Sin acceso a algunas APIs nativas (Bluetooth, NFC, cámara avanzada)", "Experiencia de usuario levemente inferior a Flutter o React Native nativo"],
+            recommended_for="App con funcionalidades web + offline simple, o portfolio con versión móvil",
+            learning_outcomes=["Vue 3 con Composition API", "PWA y service workers con Workbox", "Estado global con Pinia"],
+            docker_ready=True, ai_ready=False, estimated_setup_minutes=15,
+        ),
+    ],
+
+    # ── BEGINNER — escritorio ─────────────────────────────────────────────────
+
+    "BEGINNER_desktop": [
+        TechProposal(
+            id=1, name="Tauri + React — Escritorio ligero", tagline="Tauri 2 + React + SQLite local",
+            stack=["Rust (runtime Tauri)", "TypeScript 5", "React 18", "Vite 5", "Tailwind CSS 3", "SQLite (local)"],
+            difficulty="Principiante",
+            description="Tauri usa el WebView del sistema operativo para renderizar React, con Rust como runtime. Apps de ~5 MB (vs 100 MB+ de Electron) que arrancan en milisegundos.",
+            advantages=["Apps 20× más pequeñas y rápidas que Electron", "SQLite local — datos del usuario en su máquina, sin servidor ni coste", "Acceso completo al sistema de archivos y al sistema operativo"],
+            limitations=["Para funcionalidades nativas avanzadas necesitas algo de Rust", "Los WebViews de Windows/macOS pueden renderizar ligeramente diferente"],
+            recommended_for="Herramienta de escritorio ligera — editor, gestor de archivos, herramienta de productividad",
+            learning_outcomes=["Arquitectura web+nativa con Tauri 2", "React para interfaces de escritorio", "Comunicación frontend-Rust mediante comandos Tauri"],
+            docker_ready=False, ai_ready=False, estimated_setup_minutes=30,
+        ),
+        TechProposal(
+            id=2, name="Electron + React — El estándar probado", tagline="Electron 30 + React + SQLite",
+            stack=["TypeScript 5", "Electron 30", "React 18", "Vite 5", "Electron Builder", "better-sqlite3"],
+            difficulty="Principiante",
+            description="Electron es el estándar en apps de escritorio web. VS Code, Figma y Slack lo usan. Node.js completo en el proceso principal, React en el renderer.",
+            advantages=["VS Code, Notion y Figma usan Electron — aprendes el mismo stack", "Acceso completo a Node.js y npm — sin restricciones de API", "IPC entre main y renderer process muy bien documentado"],
+            limitations=["Apps de 100 MB+ y consumo de memoria alto (un proceso Chromium por ventana)", "Solo compatible con x86/ARM — no con plataformas móviles"],
+            recommended_for="Herramienta de escritorio con acceso profundo al sistema o protocolo de red",
+            learning_outcomes=["Arquitectura main/renderer/preload de Electron", "IPC tipado entre procesos con TypeScript", "Empaquetado y distribución con Electron Builder"],
+            docker_ready=False, ai_ready=False, estimated_setup_minutes=20,
+        ),
+        TechProposal(
+            id=3, name="Python + CustomTkinter — Solo Python", tagline="Python + CustomTkinter + SQLite",
+            stack=["Python 3.12", "CustomTkinter 5", "SQLite3", "Poetry o pip", "PyInstaller"],
+            difficulty="Principiante",
+            description="Para desarrolladores Python, una app de escritorio con CustomTkinter tiene diseño moderno sin tocar JavaScript ni Rust. Un solo lenguaje para todo.",
+            advantages=["Solo Python — sin cambiar de lenguaje ni instalar Node.js ni Rust", "CustomTkinter tiene un diseño moderno out-of-the-box", "Acceso a todo el ecosistema pip: pandas, scikit-learn, matplotlib…"],
+            limitations=["Las interfaces gráficas Python no escalan bien para apps muy complejas", "La distribución con PyInstaller produce ejecutables grandes y lentos al arrancar"],
+            recommended_for="Desarrollador Python que necesita una interfaz gráfica simple para análisis o procesamiento",
+            learning_outcomes=["Programación orientada a eventos con tkinter", "SQLite con sqlite3 en Python", "Distribución de apps Python con PyInstaller"],
+            docker_ready=False, ai_ready=True, estimated_setup_minutes=10,
+        ),
+    ],
+
+    # ── INTERMEDIATE — web / frontend+API ─────────────────────────────────────
+
     "INTERMEDIATE_frontend_api": [
         TechProposal(
             id=1, name="Stack Producción Estándar", tagline="React + NestJS + PostgreSQL + Docker",
@@ -152,6 +277,9 @@ _STACKS: dict[str, list[TechProposal]] = {
             docker_ready=True, ai_ready=True, estimated_setup_minutes=35,
         ),
     ],
+
+    # ── INTERMEDIATE — IA ──────────────────────────────────────────────────────
+
     "INTERMEDIATE_ai_service": [
         TechProposal(
             id=1, name="Stack IA Estándar", tagline="React + NestJS + FastAPI + LangChain",
@@ -187,6 +315,9 @@ _STACKS: dict[str, list[TechProposal]] = {
             docker_ready=True, ai_ready=True, estimated_setup_minutes=45,
         ),
     ],
+
+    # ── INTERMEDIATE — monolito ────────────────────────────────────────────────
+
     "INTERMEDIATE_single": [
         TechProposal(
             id=1, name="Stack Django Moderno", tagline="Django 5 + HTMX + PostgreSQL + Tailwind",
@@ -222,14 +353,95 @@ _STACKS: dict[str, list[TechProposal]] = {
             docker_ready=True, ai_ready=False, estimated_setup_minutes=25,
         ),
     ],
+
+    # ── INTERMEDIATE — móvil ──────────────────────────────────────────────────
+
+    "INTERMEDIATE_mobile": [
+        TechProposal(
+            id=1, name="Flutter + NestJS Full-stack", tagline="Flutter + Dart + NestJS + PostgreSQL + Docker",
+            stack=["Dart 3.3", "Flutter 3.22", "Riverpod 2", "Dio (HTTP)", "TypeScript 5", "NestJS 11", "Prisma ORM", "PostgreSQL 16", "Redis 7", "Docker Compose"],
+            difficulty="Intermedio",
+            description="Flutter como cliente móvil y NestJS como API REST. Autenticación JWT, gestión de estado con Riverpod y backend type-safe con Prisma.",
+            advantages=["Flutter compila a código nativo — rendimiento superior a React Native en animaciones complejas", "NestJS genera módulos y auth JWT en minutos con CLI", "Arquitectura escalable: el backend es independiente del cliente"],
+            limitations=["Dos lenguajes (Dart + TypeScript) — más contexto de aprendizaje", "Publicar en App Store/Play Store requiere cuentas de desarrollador de pago (99 €/año Apple)"],
+            recommended_for="MVP con app móvil nativa + backend API estructurado para múltiples clientes (web + móvil)",
+            learning_outcomes=["Flutter y gestión de estado con Riverpod", "REST API con JWT en NestJS", "CI/CD para publicación en stores con GitHub Actions"],
+            docker_ready=True, ai_ready=False, estimated_setup_minutes=45,
+        ),
+        TechProposal(
+            id=2, name="React Native + Expo + NestJS", tagline="React Native + Expo + NestJS + PostgreSQL",
+            stack=["TypeScript 5", "React Native 0.74", "Expo SDK 51", "Expo Router v3", "NestJS 11", "Prisma ORM", "PostgreSQL 16", "Zustand", "Redis 7", "Docker Compose"],
+            difficulty="Intermedio",
+            description="React Native con Expo como cliente móvil, NestJS como API. Un único lenguaje (TypeScript) en mobile y backend. Ideal para equipos que ya conocen React.",
+            advantages=["TypeScript en todo el proyecto — mobile y backend comparten tipos e interfaces", "Expo EAS Build compila en la nube sin necesitar Mac para iOS", "NestJS + Prisma es la API más productiva del ecosistema TypeScript"],
+            limitations=["Las animaciones muy complejas pueden requerir Reanimated 3 con código nativo", "Expo managed workflow puede limitar algunos módulos nativos específicos"],
+            recommended_for="Equipo TypeScript que necesita app móvil + web con arquitectura compartida",
+            learning_outcomes=["React Native con Expo Router v3", "TypeScript compartido entre mobile y backend", "Autenticación móvil con tokens JWT y almacenamiento seguro"],
+            docker_ready=True, ai_ready=False, estimated_setup_minutes=35,
+        ),
+        TechProposal(
+            id=3, name="Kotlin Multiplatform + Ktor", tagline="KMP + Compose Multiplatform + Ktor",
+            stack=["Kotlin 2", "Kotlin Multiplatform (KMP)", "Compose Multiplatform", "Ktor (server)", "Exposed ORM", "PostgreSQL 16", "SQLDelight (local)", "Docker Compose"],
+            difficulty="Intermedio",
+            description="KMP comparte lógica de negocio entre iOS y Android en Kotlin. Compose Multiplatform añade UI compartida. Ktor como backend en el mismo lenguaje.",
+            advantages=["Un solo lenguaje Kotlin para iOS, Android y backend", "Compose Multiplatform extiende Jetpack Compose a iOS y desktop", "Kotlin moderno — el lenguaje oficial de Android con soporte JetBrains de primera clase"],
+            limitations=["Curva de aprendizaje alta — Kotlin, multiplatform y Compose simultáneamente", "Ecosystem más pequeño que Flutter o React Native — menos recursos para principiantes"],
+            recommended_for="Developer Android que quiere expandirse a iOS y backend sin cambiar de lenguaje",
+            learning_outcomes=["Kotlin Multiplatform y arquitectura shared", "Ktor para APIs REST en Kotlin", "Compose Multiplatform para UI cross-platform"],
+            docker_ready=True, ai_ready=False, estimated_setup_minutes=60,
+        ),
+    ],
+
+    # ── INTERMEDIATE — escritorio ─────────────────────────────────────────────
+
+    "INTERMEDIATE_desktop": [
+        TechProposal(
+            id=1, name="Tauri 2 + React + NestJS", tagline="Tauri 2 + React + NestJS + PostgreSQL",
+            stack=["Rust (runtime Tauri)", "TypeScript 5", "React 19", "Vite 5", "Tauri 2", "NestJS 11", "Prisma ORM", "PostgreSQL 16", "Docker Compose"],
+            difficulty="Intermedio",
+            description="App de escritorio Tauri con React para la UI y NestJS como API backend. Datos locales (SQLite) o en servidor (PostgreSQL). Arquitectura dual local/nube.",
+            advantages=["Tauri 2 con permisos granulares — más seguro que Electron por defecto", "Apps ultraligeras (5–10 MB) con rendimiento nativo", "NestJS permite escalar el backend independientemente"],
+            limitations=["La UI WebView puede comportarse diferente en Windows/macOS/Linux", "Tauri 2 requiere Rust toolchain instalado — setup inicial más largo"],
+            recommended_for="Herramienta profesional de escritorio que necesita sincronización con un servidor",
+            learning_outcomes=["Tauri 2 y comunicación IPC segura", "React para interfaces de escritorio", "Sincronización local/remota con estrategia offline-first"],
+            docker_ready=True, ai_ready=False, estimated_setup_minutes=45,
+        ),
+        TechProposal(
+            id=2, name="Electron Forge + React + NestJS", tagline="Electron 30 + React + NestJS + PostgreSQL",
+            stack=["TypeScript 5", "Electron 30 (Electron Forge)", "React 19", "Vite", "NestJS 11", "Prisma ORM", "PostgreSQL 16", "SQLite (local)", "Docker Compose"],
+            difficulty="Intermedio",
+            description="Electron Forge moderniza el desarrollo con Electron: auto-updates, firma de código y distribución automática. React en el renderer, NestJS en el backend cloud.",
+            advantages=["Ecosystem maduro — VS Code, Figma y Slack usan Electron en producción", "Auto-updates nativos con electron-updater", "Acceso completo a Node.js en el main process — sin restricciones"],
+            limitations=["Consumo de RAM alto — cada ventana es un proceso Chromium independiente", "Apps de 100 MB+ — requiere hosting de artefactos para distribución"],
+            recommended_for="Aplicación empresarial de escritorio con integración profunda del sistema operativo",
+            learning_outcomes=["Arquitectura multi-proceso de Electron (main + renderer + preload)", "IPC tipado con TypeScript", "Empaquetado y auto-updates con Electron Forge"],
+            docker_ready=True, ai_ready=False, estimated_setup_minutes=30,
+        ),
+        TechProposal(
+            id=3, name="Tauri + SvelteKit (autocontenido)", tagline="Tauri 2 + SvelteKit + SQLite",
+            stack=["Rust (runtime Tauri)", "TypeScript 5", "SvelteKit 2", "Tauri 2", "Tailwind CSS 4", "SQLite (tauri-plugin-sqlite)"],
+            difficulty="Intermedio",
+            description="SvelteKit como framework fullstack dentro de Tauri. Sin servidor externo — todo local con SQLite. El bundle es una app de escritorio autocontenida.",
+            advantages=["SvelteKit combina frontend y lógica en un solo proyecto — cero CORS", "Sin servidor externo — privacy-first, sin coste de infraestructura", "Bundle final pequeño (~10 MB) con rendimiento Rust nativo"],
+            limitations=["Sin sincronización cloud por defecto — requiere extensión manual", "SvelteKit dentro de Tauri tiene limitaciones en SSR (solo CSR/SSG recomendado)"],
+            recommended_for="Herramienta personal o de equipo pequeño, sin sync cloud, máxima privacidad",
+            learning_outcomes=["SvelteKit con renderizado estático (SSG)", "Tauri para distribución nativa multiplataforma", "SQLite con el plugin oficial de Tauri"],
+            docker_ready=False, ai_ready=False, estimated_setup_minutes=35,
+        ),
+    ],
 }
 
 _RECOMMENDATION_TEXTS: dict[str, str] = {
-    "BEGINNER_single":        "Para tu nivel, recomendamos el **Stack Clásico (Laravel)**. Máximo aprendizaje con mínima frustración — todo en un proyecto, con la mejor documentación para principiantes.",
-    "BEGINNER_frontend_api":  "Para tu nivel, recomendamos **React + Laravel API**. Laravel genera la API con comandos Artisan y React es el framework frontend más demandado en el mercado laboral.",
+    "BEGINNER_single":          "Para tu nivel, recomendamos el **Stack Clásico (Laravel)**. Máximo aprendizaje con mínima frustración — todo en un proyecto, con la mejor documentación para principiantes.",
+    "BEGINNER_frontend_api":    "Para tu nivel, recomendamos **React + Laravel API**. Laravel genera la API con comandos Artisan y React es el framework frontend más demandado en el mercado laboral.",
+    "BEGINNER_ai_service":      "Para empezar con IA, recomendamos **FastAPI + Ollama**. Sin coste de API, modelos locales gratuitos y la combinación más directa para aprender cómo funciona la IA realmente.",
+    "BEGINNER_mobile":          "Para tu primera app móvil, recomendamos **React Native + Expo**. Si ya conoces React, la curva es mínima y Expo Go te permite probar en tu móvil real sin compilar nada.",
+    "BEGINNER_desktop":         "Para tu primera app de escritorio, recomendamos **Tauri + React**. Apps ultraligeras, sin instalar Rust manualmente gracias al CLI de Tauri, con React que ya conoces.",
     "INTERMEDIATE_frontend_api": "Para un MVP productivo, recomendamos el **Stack Producción Estándar (React + NestJS)**. Arquitectura escalable, type-safety end-to-end y listo para Docker desde el primer commit.",
-    "INTERMEDIATE_ai_service": "Para un proyecto centrado en IA, recomendamos el **Stack IA Estándar**. La separación NestJS/FastAPI es la arquitectura correcta cuando la IA es el corazón del negocio.",
-    "INTERMEDIATE_single":    "Para máxima productividad individual, recomendamos **Django + HTMX**. Un solo lenguaje, sin frontend framework pesado, con el ecosistema IA de Python disponible.",
+    "INTERMEDIATE_ai_service":  "Para un proyecto centrado en IA, recomendamos el **Stack IA Estándar**. La separación NestJS/FastAPI es la arquitectura correcta cuando la IA es el corazón del negocio.",
+    "INTERMEDIATE_single":      "Para máxima productividad individual, recomendamos **Django + HTMX**. Un solo lenguaje, sin frontend framework pesado, con el ecosistema IA de Python disponible.",
+    "INTERMEDIATE_mobile":      "Para una app móvil intermedia, recomendamos **React Native + Expo + NestJS**. TypeScript en todo el proyecto — mobile y backend comparten tipos, reduciendo los bugs de integración.",
+    "INTERMEDIATE_desktop":     "Para una app de escritorio intermedia, recomendamos **Tauri 2 + React + NestJS**. La combinación más moderna: apps ligeras, seguras y con backend escalable cuando lo necesites.",
 }
 
 _ARCH_MAP: dict[str, str] = {
@@ -237,17 +449,44 @@ _ARCH_MAP: dict[str, str] = {
     "modular":      "frontend_api",
     "frontend_api": "frontend_api",
     "ai_service":   "ai_service",
-    "mobile_api":   "frontend_api",
-    "desktop_api":  "frontend_api",
+    "mobile_api":   "mobile",
+    "desktop_api":  "desktop",
 }
 
 
 def _catalog_key(req: TechProposalRequest) -> str:
     normalized_arch = _ARCH_MAP.get(req.architecture_style, "frontend_api")
     needs_ai = req.ai_needs not in ("none", "recommendation", "")
-    if needs_ai and req.level == "INTERMEDIATE":
-        return "INTERMEDIATE_ai_service"
+
+    # AI-specific catalogs take priority for web/API architectures;
+    # mobile and desktop architectures keep their own proposals regardless of AI.
+    if needs_ai and normalized_arch not in ("mobile", "desktop"):
+        if req.level == "INTERMEDIATE":
+            return "INTERMEDIATE_ai_service"
+        return "BEGINNER_ai_service"
+
     return f"{req.level}_{normalized_arch}"
+
+
+# Keywords that must appear in at least one stack entry for mobile/desktop proposals.
+_MOBILE_KEYWORDS = {"flutter", "react native", "expo", "kotlin multiplatform", "kmp", "swift", "ionic", "capacitor"}
+_DESKTOP_KEYWORDS = {"tauri", "electron", "customtkinter", "tkinter", "wxpython", "qt", "neutralino", "nwjs"}
+# Web frameworks that must NOT appear as the primary client in mobile/desktop proposals.
+_WEB_CLIENT_KEYWORDS = {"next.js", "nextjs", "nuxt", "sveltekit", "angular", "vue ", "react ", "vite "}
+
+
+def _validate_arch_proposals(proposals: list, arch: str) -> bool:
+    """Return False if the LLM ignored the mobile/desktop architecture constraint."""
+    if arch not in ("mobile_api", "desktop_api"):
+        return True
+    required = _MOBILE_KEYWORDS if arch == "mobile_api" else _DESKTOP_KEYWORDS
+    for p in proposals:
+        stack_lower = " ".join(p.stack).lower() + " " + p.tagline.lower()
+        has_required = any(kw in stack_lower for kw in required)
+        has_web_client = any(kw in stack_lower for kw in _WEB_CLIENT_KEYWORDS)
+        if not has_required or has_web_client:
+            return False
+    return True
 
 
 class TechProposalAgent:
@@ -257,6 +496,12 @@ class TechProposalAgent:
         llm: BaseChatModel | None = None,
         task: TaskType = "reasoning",
     ) -> TechProposalResponse:
+        # Mobile and desktop architectures have curated catalogs that are better than
+        # what any LLM produces — LLMs reliably ignore these constraints and suggest
+        # web frameworks. Skip the LLM entirely for these cases.
+        if req.architecture_style in ("mobile_api", "desktop_api"):
+            return self._catalog_fallback(req)
+
         resolved_llm = llm if llm is not None else get_llm(task)
 
         if resolved_llm is not None:
@@ -266,8 +511,17 @@ class TechProposalAgent:
                     SystemMessage(content=_SYSTEM_PROMPT),
                     HumanMessage(content=_build_human_message(req)),
                 ])
-                if isinstance(result, TechProposalResponse) and len(result.proposals) >= 2:
+                if (
+                    isinstance(result, TechProposalResponse)
+                    and len(result.proposals) >= 2
+                    and _validate_arch_proposals(result.proposals, req.architecture_style)
+                ):
                     return result
+                if isinstance(result, TechProposalResponse):
+                    logger.warning(
+                        "LLM proposal failed architecture validation for '%s' — using catalog",
+                        req.architecture_style,
+                    )
             except Exception as exc:
                 logger.warning("LLM tech proposal failed, using catalog fallback: %s", exc)
 
@@ -277,6 +531,8 @@ class TechProposalAgent:
         key = _catalog_key(req)
         proposals = _STACKS.get(key) or _STACKS["INTERMEDIATE_frontend_api"]
         reason = _RECOMMENDATION_TEXTS.get(key, _RECOMMENDATION_TEXTS["INTERMEDIATE_frontend_api"])
+        if req.mandatory_techs:
+            reason = f"{reason} Tus tecnologías requeridas (**{req.mandatory_techs}**) deberán integrarse en el stack elegido."
         return TechProposalResponse(
             proposals=proposals,
             recommended_id=1,

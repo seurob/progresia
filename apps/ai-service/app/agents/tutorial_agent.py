@@ -389,15 +389,257 @@ def _generic(req: TutorialRequest) -> list[TutorialPhase]:
     ]
 
 
+def _electron_nestjs(req: TutorialRequest) -> list[TutorialPhase]:
+    slug = req.project_name.lower().replace(" ", "-")
+    modules = req.modules or ["Core"]
+
+    phases: list[TutorialPhase] = [
+        _p("Fase 0: Configuración del entorno", "Instala Electron, Node.js y levanta el entorno de desarrollo.", [
+            _s("Instalar Node.js LTS (≥ 20) y npm", None, "Descarga desde https://nodejs.org/"),
+            _s("Clonar el repositorio", f"git clone <url> {slug} && cd {slug}"),
+            _s("Instalar dependencias del proyecto", "npm install"),
+            _s("Copiar variables de entorno", "cp .env.example .env"),
+            _s("Iniciar la app Electron en modo desarrollo", "npm run dev", "Abre la ventana de la app automáticamente"),
+        ]),
+        _p("Fase 1: Estructura Electron (main + renderer)", "Entiende la separación entre el proceso principal y el renderer.", [
+            _s("Abrir el proceso principal", "code src/main/index.ts", "Aquí vive la lógica de sistema: archivos, ventanas, IPC"),
+            _s("Abrir el proceso renderer (React)", "code src/renderer/src/App.tsx", "Aquí vive la UI — es una SPA React normal"),
+            _s("Revisar el puente IPC entre procesos", "code src/main/ipc/", "ipcMain.handle() expone funciones del SO al renderer"),
+            _s("Verificar que la ventana carga correctamente", "npm run dev"),
+        ]),
+        _p("Fase 2: Base de datos SQLite local", "Configura better-sqlite3 para persistencia local sin servidor.", [
+            _s("Verificar que better-sqlite3 está instalado", "npm list better-sqlite3"),
+            _s("Abrir la capa de base de datos", "code src/main/database/"),
+            _s("Crear las tablas iniciales con migraciones SQL", None, "Las migraciones corren automáticamente al iniciar la app"),
+            _s("Verificar que la BD se crea en el directorio de datos del usuario", None, "app.getPath('userData') — no se pierde al actualizar"),
+        ]),
+    ]
+
+    if req.needs_auth:
+        phases.append(_p("Fase 3: Autenticación local", "Implementa login local o integración con servicios externos.", [
+            _s("Revisar el módulo de autenticación en src/main/auth/"),
+            _s("Implementar login con credenciales locales (bcrypt)", None, "Las contraseñas se hashean y almacenan en SQLite"),
+            _s("Gestionar la sesión activa con electron-store"),
+            _s("Proteger rutas IPC con validación de sesión"),
+        ]))
+
+    for module in modules[:4]:
+        mod_lower = module.lower()
+        phases.append(_p(
+            f"Fase {len(phases)}: Módulo {module}",
+            f"Implementa la funcionalidad {module} con IPC + React.",
+            [
+                _s(f"Crear handler IPC para {module}", f"code src/main/ipc/{mod_lower}.ts", "ipcMain.handle('{mod_lower}:list', ...)"),
+                _s(f"Exponer el canal en el preload", "code src/preload/index.ts"),
+                _s(f"Crear componente React que consume el canal", f"code src/renderer/src/pages/{module}.tsx"),
+                _s("Probar la funcionalidad en la ventana de la app"),
+            ]
+        ))
+
+    phases.append(_p(f"Fase {len(phases)}: Build y empaquetado", "Genera instalables para Windows, macOS y Linux.", [
+        _s("Compilar TypeScript", "npm run build"),
+        _s("Generar instalable para la plataforma actual", "npm run dist", "electron-builder empaqueta todo en un .exe / .dmg / .AppImage"),
+        _s("Revisar la carpeta dist/ con el instalable generado"),
+        _s("Probar el instalable en una máquina limpia"),
+        _s("Configurar electron-updater si necesitas actualizaciones automáticas", "code package.json", "Añade la URL del servidor de actualización en 'build.publish'"),
+    ]))
+
+    return phases
+
+
+def _tauri_fastapi(req: TutorialRequest) -> list[TutorialPhase]:
+    slug = req.project_name.lower().replace(" ", "-")
+    modules = req.modules or ["Core"]
+
+    phases: list[TutorialPhase] = [
+        _p("Fase 0: Configuración del entorno", "Instala Rust, Node.js y las dependencias del proyecto.", [
+            _s("Instalar Rust (necesario para compilar Tauri)", "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh", "En Windows: descarga rustup-init.exe desde https://rustup.rs/"),
+            _s("Instalar las dependencias de sistema para Tauri", None, "Linux: sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev"),
+            _s("Clonar el repositorio", f"git clone <url> {slug} && cd {slug}"),
+            _s("Instalar dependencias Node.js (UI React)", "npm install"),
+            _s("Instalar dependencias Rust (core Tauri)", "cd src-tauri && cargo fetch"),
+            _s("Iniciar la app en modo desarrollo", "npm run tauri dev", "Abre la ventana nativa con Hot Module Replacement en la UI"),
+        ]),
+        _p("Fase 1: Estructura Tauri (commands + frontend)", "Entiende la separación entre Rust y React.", [
+            _s("Abrir la configuración de Tauri", "code src-tauri/tauri.conf.json", "Aquí se configuran permisos, ventana, íconos y bundle ID"),
+            _s("Abrir el core Rust", "code src-tauri/src/lib.rs", "Los #[tauri::command] exponen funciones Rust al frontend"),
+            _s("Abrir la UI React", "code src/App.tsx", "La UI usa invoke() para llamar a comandos Tauri"),
+            _s("Revisar los permisos declarados en capabilities/", "code src-tauri/capabilities/", "Tauri 2 requiere permisos explícitos para filesystem, shell, http..."),
+        ]),
+        _p("Fase 2: Base de datos SQLite embebida", "Configura SQLite local para persistencia offline-first.", [
+            _s("Verificar la dependencia de SQLite en Cargo.toml", "code src-tauri/Cargo.toml", "Busca rusqlite o sqlx con feature sqlite"),
+            _s("Revisar la capa de base de datos en Rust", "code src-tauri/src/database/"),
+            _s("Probar que la BD se crea correctamente al iniciar", "npm run tauri dev"),
+        ]),
+    ]
+
+    if req.needs_auth:
+        phases.append(_p("Fase 3: Autenticación con FastAPI backend", "Conecta la app de escritorio con el backend cloud.", [
+            _s("Levantar el backend FastAPI", "cd api && uvicorn app.main:app --reload"),
+            _s("Verificar que el comando Tauri para auth existe", "code src-tauri/src/commands/auth.rs"),
+            _s("Probar el login desde la UI", None, "La app envía las credenciales a la API y almacena el token localmente"),
+        ]))
+
+    for module in modules[:3]:
+        phases.append(_p(
+            f"Fase {len(phases)}: Módulo {module}",
+            f"Implementa la funcionalidad {module} con Tauri commands.",
+            [
+                _s(f"Crear el command Rust para {module}", f"code src-tauri/src/commands/{module.lower()}.rs"),
+                _s("Registrar el command en lib.rs", "code src-tauri/src/lib.rs", ".invoke_handler(tauri::generate_handler![...])"),
+                _s(f"Crear componente React que invoca el command", f"code src/{module}Page.tsx", "import {{ invoke }} from '@tauri-apps/api/core'; invoke('{module.lower()}:list')"),
+                _s("Probar en la app", "npm run tauri dev"),
+            ]
+        ))
+
+    phases.append(_p(f"Fase {len(phases)}: Build y distribución", "Genera instalables nativos multiplataforma.", [
+        _s("Compilar para producción", "npm run tauri build"),
+        _s("Encontrar el instalable en src-tauri/target/release/bundle/"),
+        _s("Probar el instalable en una máquina limpia", None, "El instalable pesa ~5MB — órdenes de magnitud menos que Electron"),
+        _s("Configurar actualizaciones automáticas con Tauri Updater si es necesario"),
+    ]))
+
+    return phases
+
+
+def _flutter_fastapi(req: TutorialRequest) -> list[TutorialPhase]:
+    slug = req.project_name.lower().replace(" ", "-")
+    modules = req.modules or ["Core"]
+
+    phases: list[TutorialPhase] = [
+        _p("Fase 0: Configuración del entorno", "Instala Flutter SDK y levanta el backend FastAPI.", [
+            _s("Instalar Flutter SDK", None, "Descarga desde https://docs.flutter.dev/get-started/install · Añade flutter/bin al PATH"),
+            _s("Verificar la instalación", "flutter doctor", "Resuelve los problemas indicados por flutter doctor antes de continuar"),
+            _s("Clonar el repositorio", f"git clone <url> {slug} && cd {slug}"),
+            _s("Instalar dependencias Flutter", "flutter pub get"),
+            _s("Levantar el backend FastAPI", "cd api && pip install -r requirements.txt && uvicorn app.main:app --reload"),
+            _s("Iniciar la app en un emulador o dispositivo", "flutter run", "Elige el dispositivo cuando se te pregunte"),
+        ]),
+        _p("Fase 1: Estructura del proyecto Flutter", "Entiende la arquitectura de la app móvil.", [
+            _s("Abrir el punto de entrada", "code lib/main.dart"),
+            _s("Revisar la estructura de carpetas", None, "lib/screens/ → páginas · lib/widgets/ → componentes · lib/services/ → llamadas a la API"),
+            _s("Abrir el cliente HTTP (dio o http)", "code lib/services/api_client.dart"),
+            _s("Actualizar la URL base de la API en api_client.dart", None, "En desarrollo: http://10.0.2.2:8000 (Android emulator) o http://localhost:8000 (iOS simulator)"),
+        ]),
+        _p("Fase 2: Modelos Dart y serialización", "Define los modelos de datos del dominio.", [
+            _s("Crear los modelos Dart en lib/models/"),
+            _s("Añadir fromJson/toJson (o usar json_serializable)", "flutter pub add json_serializable build_runner"),
+            _s("Generar el código de serialización", "dart run build_runner build"),
+        ]),
+    ]
+
+    if req.needs_auth:
+        phases.append(_p("Fase 3: Autenticación JWT", "Implementa login y persistencia del token.", [
+            _s("Crear la pantalla de login en lib/screens/login_screen.dart"),
+            _s("Implementar el método login en lib/services/auth_service.dart"),
+            _s("Almacenar el token JWT con flutter_secure_storage", "flutter pub add flutter_secure_storage"),
+            _s("Añadir el token a las cabeceras HTTP en api_client.dart"),
+            _s("Redirigir al dashboard si ya hay sesión activa al iniciar"),
+        ]))
+
+    for module in modules[:3]:
+        mod_lower = module.lower()
+        phases.append(_p(
+            f"Fase {len(phases)}: Módulo {module}",
+            f"Implementa la pantalla y el servicio para {module}.",
+            [
+                _s(f"Crear el servicio de API para {module}", f"code lib/services/{mod_lower}_service.dart"),
+                _s(f"Crear la pantalla de listado", f"code lib/screens/{mod_lower}_list_screen.dart"),
+                _s(f"Crear la pantalla de detalle/formulario", f"code lib/screens/{mod_lower}_form_screen.dart"),
+                _s("Añadir la ruta en lib/main.dart", None, "MaterialApp(routes: {'/modulo': (ctx) => ModuloScreen()})"),
+                _s("Probar en el emulador", "flutter run"),
+            ]
+        ))
+
+    phases.append(_p(f"Fase {len(phases)}: Build y distribución", "Genera los APK/IPA para las tiendas.", [
+        _s("Build Android (APK de debug)", "flutter build apk --debug"),
+        _s("Build Android (APK de release)", "flutter build apk --release", "Requiere configurar una keystore de firma"),
+        _s("Build iOS (requiere Mac con Xcode)", "flutter build ios --release"),
+        _s("Alternativa: Expo EAS Build en la nube (si usas Expo)", "eas build --platform all"),
+        _s("Probar la APK en un dispositivo real", "flutter install"),
+    ]))
+
+    return phases
+
+
+def _react_native_nestjs(req: TutorialRequest) -> list[TutorialPhase]:
+    slug = req.project_name.lower().replace(" ", "-")
+    modules = req.modules or ["Core"]
+
+    phases: list[TutorialPhase] = [
+        _p("Fase 0: Configuración del entorno", "Instala Expo CLI y levanta el backend NestJS.", [
+            _s("Instalar Expo CLI globalmente", "npm install -g expo-cli"),
+            _s("Clonar el repositorio", f"git clone <url> {slug} && cd {slug}"),
+            _s("Instalar dependencias de la app móvil", f"cd {slug}-mobile && npm install"),
+            _s("Instalar dependencias del backend", f"cd {slug}-api && npm install"),
+            _s("Levantar PostgreSQL y Redis", f"cd {slug}-api && docker compose up -d postgres redis"),
+            _s("Levantar el backend NestJS", f"cd {slug}-api && npm run start:dev"),
+            _s("Levantar la app Expo", f"cd {slug}-mobile && npx expo start", "Escanea el QR con Expo Go en tu móvil o usa un emulador"),
+        ]),
+        _p("Fase 1: Estructura React Native + Expo", "Entiende la organización del proyecto móvil.", [
+            _s("Abrir el punto de entrada", "code app/_layout.tsx", "Expo Router usa file-based routing — igual que Next.js"),
+            _s("Revisar la carpeta app/ con las pantallas", "code app/", "Cada archivo .tsx en app/ es una ruta/pantalla"),
+            _s("Abrir el cliente API", "code src/lib/api.ts", "Configura la URL base: http://TU_IP:3000 (no localhost en el dispositivo real)"),
+            _s("Verificar que el backend responde", f"curl http://localhost:3000/health"),
+        ]),
+        _p("Fase 2: Schema Prisma y backend NestJS", "Define los módulos del backend.", [
+            _s(f"cd {slug}-api && abrir el schema de Prisma", f"code {slug}-api/prisma/schema.prisma"),
+            _s("Crear migración inicial", f"cd {slug}-api && npx prisma migrate dev --name init"),
+            _s("Explorar los datos con Prisma Studio", f"cd {slug}-api && npx prisma studio"),
+            _s("Verificar los módulos NestJS generados en src/modules/"),
+        ]),
+    ]
+
+    if req.needs_auth:
+        phases.append(_p("Fase 3: Autenticación JWT (móvil + backend)", "Implementa login con persistencia segura del token.", [
+            _s("Probar el endpoint de login en el backend", f"curl -X POST http://localhost:3000/auth/login -d '{{...}}'"),
+            _s("Instalar expo-secure-store para guardar el token", "npx expo install expo-secure-store"),
+            _s("Implementar el AuthContext en src/contexts/AuthContext.tsx"),
+            _s("Proteger las rutas con un guard de autenticación"),
+            _s("Probar login y logout en el emulador"),
+        ]))
+
+    for module in modules[:4]:
+        mod_lower = module.lower()
+        phases.append(_p(
+            f"Fase {len(phases)}: Módulo {module}",
+            f"Implementa la pantalla y el hook de React Query para {module}.",
+            [
+                _s(f"Crear el hook useQuery para {module}", f"code src/hooks/use{module}.ts"),
+                _s(f"Crear la pantalla de listado", f"code app/{mod_lower}.tsx"),
+                _s(f"Crear la pantalla de detalle", f"code app/{mod_lower}/[id].tsx"),
+                _s("Añadir FlatList con pull-to-refresh y estados de carga"),
+                _s("Probar en el emulador o dispositivo real"),
+            ]
+        ))
+
+    phases.append(_p(f"Fase {len(phases)}: Build y distribución con EAS", "Compila la app para las tiendas sin necesitar Mac.", [
+        _s("Instalar EAS CLI", "npm install -g eas-cli && eas login"),
+        _s("Inicializar el proyecto en EAS", "eas init"),
+        _s("Configurar el perfil de build", "code eas.json"),
+        _s("Build para Android en la nube", "eas build --platform android"),
+        _s("Build para iOS en la nube (sin Mac)", "eas build --platform ios", "Requiere cuenta Apple Developer — EAS compila en servidores Mac"),
+        _s("Publicar actualización OTA (sin nueva build)", "eas update --branch production"),
+    ]))
+
+    return phases
+
+
 _ARCH_BUILDERS = {
-    "DJANGO_REST":           _django_rest,
-    "NEXTJS_APP":            _nextjs_app,
-    "LARAVEL_MONOLITH":      lambda req: _laravel(req, has_frontend=False),
-    "LARAVEL_INERTIA_REACT": lambda req: _laravel(req, has_frontend=True),
-    "LARAVEL_INERTIA_VUE":   lambda req: _laravel(req, has_frontend=True),
-    "NESTJS_REACT":          _nestjs_react,
-    "FASTAPI_AI":            _fastapi_ai,
-    "REACT_EXPRESS":         _nestjs_react,   # close enough — both use npm/prisma
+    "DJANGO_REST":             _django_rest,
+    "NEXTJS_APP":              _nextjs_app,
+    "LARAVEL_MONOLITH":        lambda req: _laravel(req, has_frontend=False),
+    "LARAVEL_INERTIA_REACT":   lambda req: _laravel(req, has_frontend=True),
+    "LARAVEL_INERTIA_VUE":     lambda req: _laravel(req, has_frontend=True),
+    "NESTJS_REACT":            _nestjs_react,
+    "FASTAPI_AI":              _fastapi_ai,
+    "REACT_EXPRESS":           _nestjs_react,      # close enough — both use npm/prisma
+    # Mobile
+    "FLUTTER_FASTAPI":         _flutter_fastapi,
+    "REACT_NATIVE_NESTJS":     _react_native_nestjs,
+    # Desktop
+    "ELECTRON_NESTJS":         _electron_nestjs,
+    "TAURI_FASTAPI":           _tauri_fastapi,
 }
 
 # ── LLM prompt ─────────────────────────────────────────────────────────────────

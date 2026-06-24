@@ -1,6 +1,7 @@
 import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
+import { ThrottlerModule } from "@nestjs/throttler";
 import { PrismaModule } from "../database/prisma.module";
 import { AuthModule } from "./auth/auth.module";
 import { HealthModule } from "./health/health.module";
@@ -13,10 +14,13 @@ import { ProjectsModule } from "./projects/projects.module";
 import { SpecificationsModule } from "./specifications/specifications.module";
 import { UsersModule } from "./users/users.module";
 import { WorkspacesModule } from "./workspaces/workspaces.module";
+import { AdminModule } from "./admin/admin.module";
+import { LlmConfigModule } from "./llm-config/llm-config.module";
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 300 }]),
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
@@ -37,7 +41,9 @@ import { WorkspacesModule } from "./workspaces/workspaces.module";
     SpecificationsModule,
     ArtifactsModule,
     JobsModule,
-    StorageModule
+    StorageModule,
+    AdminModule,
+    LlmConfigModule
   ]
 })
 export class AppModule {}

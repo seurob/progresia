@@ -274,3 +274,58 @@ button, input, select, textarea {
   outline: 2px solid var(--c-focus-ring);
   outline-offset: 2px;
 }
+
+/* ── Scrollbar ─────────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--c-border-med); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--c-border-strong); }
+
+/* ── Text selection ────────────────────────────────────────────────────── */
+
+::selection { background: rgb(212 168 67 / 0.22); }
+
+/* ── Textarea and select variants ──────────────────────────────────────── */
+
+textarea.input { min-height: 5rem; resize: vertical; }
+select.input   { cursor: pointer; }
+
+/* ── Alert blocks ──────────────────────────────────────────────────────── */
+
+.alert {
+  border-radius: 0.4rem;
+  border: 1px solid;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.alert-error   { background: rgb(239 68 68 / 0.08);  border-color: rgb(239 68 68 / 0.3);   color: #fca5a5; }
+.alert-success { background: rgb(52 211 153 / 0.08); border-color: rgb(52 211 153 / 0.3);  color: #6ee7b7; }
+.alert-warning { background: rgb(251 191 36 / 0.08); border-color: rgb(251 191 36 / 0.3);  color: #fcd34d; }
+
+/* ── Empty state ───────────────────────────────────────────────────────── */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px dashed var(--c-border-med);
+  padding: 3.5rem 2rem;
+  text-align: center;
+  color: var(--c-text-muted);
+}
+
+/* ── Page-label eyebrow ────────────────────────────────────────────────── */
+
+.page-label {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--c-accent);
+}

@@ -14,6 +14,8 @@ export interface AiIdeaRequest {
   technical_level?: string;
   /** Forwarded from a stored ARCHITECTURE spec so OpenSpecAgent can embed the chosen stack. */
   architecture_type?: string;
+  /** web | mobile | desktop | api | saas | ai_tool — constrains stack selection in all agents */
+  product_type?: string;
 }
 
 export interface AiOpenSpecResponse {
@@ -44,6 +46,10 @@ export interface AiCodeGenRequest {
   needs_ai: boolean;
   stack: string[];
   architecture_type?: string;
+  /** BEGINNER | INTERMEDIATE | ADVANCED — routes to Express scaffold for BEGINNER */
+  technical_level?: string;
+  data_entities?: Array<{ name: string; description?: string; fields?: string[]; relations?: string[] }>;
+  api_endpoints?: Array<{ method: string; path: string; description: string; auth_required?: boolean }>;
 }
 
 export interface AiIssueGenerationRequest {
@@ -79,6 +85,8 @@ export interface AiArchitectureRequest {
   preferred_stack: string;
   /** BEGINNER | INTERMEDIATE | ADVANCED — constrains which architectures to recommend */
   technical_level?: string;
+  /** web | mobile | desktop | api | saas | ai_tool — bypasses LLM for mobile/desktop */
+  product_type?: string;
 }
 
 export interface AiTechStackItem {
@@ -167,6 +175,7 @@ export interface AiTechProposalRequest {
   ai_needs: string;
   deployment_target: string;
   core_features: string[];
+  mandatory_techs?: string;
 }
 
 export interface AiTechProposal {
@@ -196,14 +205,14 @@ export class AiServiceClient {
   constructor(private readonly configService: ConfigService) {}
 
   private get baseUrl(): string {
-    return this.configService.get<string>("AI_SERVICE_URL", "http://127.0.0.1:8001");
+    return this.configService.get<string>("AI_SERVICE_URL", "http://127.0.0.1:8003");
   }
 
-  private async post<T>(path: string, payload: unknown): Promise<T> {
+  private async request<T>(method: string, path: string, payload?: unknown): Promise<T> {
     const response = await fetch(`${this.baseUrl}${path}`, {
-      method: "POST",
+      method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      ...(payload !== undefined ? { body: JSON.stringify(payload) } : {})
     });
 
     if (!response.ok) {
@@ -212,6 +221,18 @@ export class AiServiceClient {
     }
 
     return response.json() as Promise<T>;
+  }
+
+  private async post<T>(path: string, payload: unknown): Promise<T> {
+    return this.request<T>("POST", path, payload);
+  }
+
+  private async get<T>(path: string): Promise<T> {
+    return this.request<T>("GET", path);
+  }
+
+  private async patch<T>(path: string, payload: unknown): Promise<T> {
+    return this.request<T>("PATCH", path, payload);
   }
 
   async generateRequirements(payload: AiIdeaRequest): Promise<AiRequirementsResponse> {
@@ -249,4 +270,66 @@ export class AiServiceClient {
   async proposeTech(payload: AiTechProposalRequest): Promise<AiTechProposalResponse> {
     return this.post<AiTechProposalResponse>("/propose-tech", payload);
   }
+
+  async getLlmConfig(): Promise<AiLlmConfigResponse> {
+    return this.get<AiLlmConfigResponse>("/config/llm");
+  }
+
+  async updateLlmConfig(payload: AiLlmConfigUpdate): Promise<AiLlmConfigResponse> {
+    return this.patch<AiLlmConfigResponse>("/config/llm", payload);
+  }
+
+  async getOllamaModels(): Promise<AiOllamaModelsResponse> {
+    return this.get<AiOllamaModelsResponse>("/ollama/models");
+  }
+}
+
+// ── LLM config types ──────────────────────────────────────────────────────────
+
+export interface AiProviderInfo {
+  name: string;
+  has_key: boolean;
+  model: string;
+  default_model: string;
+  code_model?: string | null;
+  default_code_model?: string | null;
+}
+
+export interface AiTaskRouting {
+  reasoning: string;
+  code: string;
+  spec: string;
+  general: string;
+}
+
+export interface AiLlmConfigResponse {
+  override_provider: string | null;
+  providers: AiProviderInfo[];
+  task_routing: AiTaskRouting;
+  ollama_base_url: string;
+}
+
+export interface AiLlmConfigUpdate {
+  override_provider?: string | null;
+  groq_model?: string | null;
+  openai_model?: string | null;
+  gemini_model?: string | null;
+  ollama_reasoning_model?: string | null;
+  ollama_code_model?: string | null;
+  reset_models?: boolean;
+}
+
+export interface AiOllamaModel {
+  name: string;
+  size?: number | null;
+  modified_at?: string | null;
+  parameter_size?: string | null;
+  quantization_level?: string | null;
+}
+
+export interface AiOllamaModelsResponse {
+  available: boolean;
+  base_url: string;
+  models: AiOllamaModel[];
+  error?: string | null;
 }

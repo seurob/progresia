@@ -38,7 +38,7 @@ El **OpenSpec** es el documento central: un JSON estructurado con entidades de d
 apps/
 ├── web/          React 19 + Vite + Tailwind CSS 4  (puerto 5173)
 ├── api/          NestJS 11 + Prisma + PostgreSQL    (puerto 3000)
-└── ai-service/   FastAPI + LangChain + LangGraph    (puerto 8001)
+└── ai-service/   FastAPI + LangChain + LangGraph    (puerto 8003)
 
 packages/
 └── shared-types/ Tipos TypeScript compartidos
@@ -83,7 +83,7 @@ infra/
 
 ```bash
 cp .env.example .env
-# Editar .env: DATABASE_URL, JWT_SECRET, SMTP_*, CAPTCHA_*, GROQ_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, GITHUB_TOKEN
+# Editar .env: DATABASE_URL, JWT_SECRET, CAPTCHA_*, GROQ_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, GITHUB_TOKEN
 ```
 
 Para el ai-service:
@@ -124,7 +124,7 @@ node --enable-source-maps dist/main
 ```bash
 cd apps/ai-service
 pip install -e ".[dev]"
-uvicorn app.main:app --port 8001 --reload
+uvicorn app.main:app --port 8003 --reload
 ```
 
 ### 6. Frontend (React)
@@ -195,18 +195,9 @@ El `OpenSpecDoc` es la fuente de verdad para todos los agentes downstream:
 | `CAPTCHA_ENABLED` | api | Activa validacion CAPTCHA en backend (`true`/`false`) |
 | `CAPTCHA_PROVIDER` | api | `turnstile`, `hcaptcha` o `recaptcha` |
 | `CAPTCHA_SECRET_KEY` | api | Secreto del proveedor CAPTCHA |
-| `SMTP_HOST` | api | Servidor SMTP para enviar codigos de verificacion |
-| `SMTP_PORT` | api | Puerto SMTP (`587` STARTTLS, `465` TLS) |
-| `SMTP_SECURE` | api | `true` para TLS directo, normalmente puerto `465` |
-| `SMTP_USER` / `SMTP_PASSWORD` | api | Credenciales SMTP si el proveedor requiere autenticacion |
-| `SMTP_REQUIRE_AUTH` | api | Hace fallar el envio si faltan credenciales SMTP |
-| `SMTP_VERIFY_ON_SEND` | api | Verifica conexion SMTP antes de enviar |
-| `SMTP_TLS_REJECT_UNAUTHORIZED` | api | Mantener `true` en produccion |
-| `EMAIL_FROM` | api | Remitente de los correos de verificacion |
-| `EMAIL_REPLY_TO` | api | Respuesta opcional para correos transaccionales |
 | `VITE_CAPTCHA_PROVIDER` | web | Proveedor del widget: `turnstile`, `hcaptcha` o `recaptcha` |
 | `VITE_CAPTCHA_SITE_KEY` | web | Clave publica del widget CAPTCHA |
-| `AI_SERVICE_URL` | api | URL del ai-service (default: `http://127.0.0.1:8001`) |
+| `AI_SERVICE_URL` | api | URL del ai-service (default: `http://127.0.0.1:8003`) |
 | `GROQ_API_KEY` | ai-service | Clave Groq (LLM primario) |
 | `OPENAI_API_KEY` | ai-service | Clave OpenAI (fallback) |
 | `GEMINI_API_KEY` | ai-service | Clave Google Gemini (fallback) |
@@ -214,9 +205,62 @@ El `OpenSpecDoc` es la fuente de verdad para todos los agentes downstream:
 
 > Las claves de API nunca se commitean. Solo existen en `.env` (gitignored).
 
-## Registro seguro
+## Panel de administración
 
-El registro crea cuentas en estado pendiente. El usuario debe verificar un codigo de 6 digitos enviado por correo antes de iniciar sesion. En local, CAPTCHA queda desactivado si `CAPTCHA_ENABLED=false`; en produccion debe configurarse un proveedor CAPTCHA real y SMTP transaccional.
+Disponible en `http://localhost:5173/gestion-usuarios` (web) o a través del proxy de Docker.
+
+La ruta no aparece en ningún menú ni navegación normal. Solo usuarios con rol `ADMIN` pueden acceder.
+
+### Credenciales de desarrollo
+
+> **⚠ SOLO PARA DESARROLLO LOCAL** — cambiar antes de desplegar en producción.
+
+| Campo    | Valor                |
+|----------|----------------------|
+| Usuario  | `seurobman`          |
+| Email    | `admin@progresia.local` |
+| Password | `$eurobman2026`      |
+
+```bash
+# Crear el usuario administrador (o recrear si ya existe):
+cd apps/api && npx ts-node prisma/seed.ts
+```
+
+Variables de entorno para personalizar las credenciales de desarrollo:
+```env
+ADMIN_JWT_SECRET=admin_change_me   # Cambiar en producción
+ADMIN_EMAIL=admin@progresia.local
+ADMIN_USERNAME=seurobman
+ADMIN_PASSWORD=$eurobman2026
+```
+
+### Endpoints de administración
+
+Todos requieren `Authorization: Bearer <admin_token>` (el token se obtiene en `/api/admin/auth/login`).
+
+```text
+POST   /api/admin/auth/login        ← acepta email o nombre de usuario
+GET    /api/admin/auth/me
+POST   /api/admin/auth/logout
+
+GET    /api/admin/users?search=
+POST   /api/admin/users
+PATCH  /api/admin/users/:id
+DELETE /api/admin/users/:id
+
+GET    /api/admin/projects?search=
+POST   /api/admin/projects
+PATCH  /api/admin/projects/:id
+DELETE /api/admin/projects/:id
+```
+
+---
+
+## Autenticación y registro
+
+El registro crea la cuenta inmediatamente en estado activo y devuelve tokens de acceso — no hay pasos adicionales de verificacion. El usuario queda logueado al instante.
+
+En local, CAPTCHA queda desactivado si `CAPTCHA_ENABLED=false`. En produccion debe configurarse un proveedor CAPTCHA real.
 
 Configuracion minima de produccion:
 
@@ -226,23 +270,14 @@ CAPTCHA_PROVIDER=turnstile
 CAPTCHA_SECRET_KEY=...
 VITE_CAPTCHA_PROVIDER=turnstile
 VITE_CAPTCHA_SITE_KEY=...
-
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_SECURE=false
-SMTP_USER=...
-SMTP_PASSWORD=...
-SMTP_REQUIRE_AUTH=true
-EMAIL_FROM="ProgresIA Studio <no-reply@example.com>"
 ```
 
-Endpoints principales:
+Endpoints de autenticacion:
 
-- `POST /api/auth/register`
-- `POST /api/auth/verify-email`
-- `POST /api/auth/resend-verification-code`
-- `POST /api/auth/change-pending-email`
-- `POST /api/auth/login`
+- `POST /api/auth/register` — crea cuenta y devuelve `{ accessToken, refreshToken, user }`
+- `POST /api/auth/login` — devuelve `{ accessToken, refreshToken, user }`
+- `POST /api/auth/refresh` — rota el refresh token
+- `POST /api/auth/logout` — invalida el refresh token
 
 ---
 
