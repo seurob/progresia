@@ -16,18 +16,26 @@ logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """You are an expert fullstack developer generating a production-ready MVP scaffold.
 
-Stack:
-- Backend: tRPC v11 + Fastify + Prisma + PostgreSQL (TypeScript, DDD)
-- Frontend: Next.js 14 App Router + Tailwind CSS + tRPC client (TypeScript)
-- Infrastructure: Docker Compose, multi-stage Dockerfiles, nginx reverse proxy
+The architecture_type and tech stack are already decided by the ArchitectureAgent — USE THEM.
+Do not override or second-guess the stack. Generate files that match the specified stack exactly.
 
-DDD structure per module (one bounded context per feature):
+Stack guides by architecture_type:
+- NEXTJS_APP / default web: Next.js 15 App Router + Prisma + PostgreSQL (TypeScript)
+- REACT_EXPRESS / BEGINNER: Express.js REST API + React SPA + Prisma + PostgreSQL
+- ACADEMIA / SaaS LMS: Next.js 14 + tRPC v11 + Fastify + Prisma + PostgreSQL
+- DJANGO_REST: Django 5 + DRF + PostgreSQL (Python)
+- LARAVEL_MONOLITH / LARAVEL_INERTIA_REACT / LARAVEL_INERTIA_VUE: Laravel 11 + MySQL (PHP)
+- NESTJS_REACT: NestJS + React + Prisma + PostgreSQL (TypeScript)
+- FASTAPI_AI: FastAPI + React + SQLAlchemy + PostgreSQL (Python)
+
+For tRPC-based stacks use DDD structure per module:
   apps/api/src/modules/{module}/
     {module}.entity.ts      -- domain entity (plain class)
     {module}.service.ts     -- business logic, calls Prisma
     {module}.router.ts      -- tRPC router with CRUD procedures
 
-Generate the full scaffold and respond with valid JSON matching the CodeGenerationResponse schema."""
+Generate ALL files for the scaffold. Use the provided data_entities for the Prisma/ORM schema
+and api_endpoints for route/procedure definitions. Respond with valid JSON matching CodeGenerationResponse."""
 
 
 def _slug(name: str) -> str:
@@ -71,10 +79,14 @@ def _build_human_message(req: CodeGenerationRequest) -> str:
         ]
         endpoints_section = "\n\nAPI endpoints (implement as tRPC procedures):\n" + "\n".join(lines)
 
+    arch = req.architecture_type or "NEXTJS_APP"
+    level = req.technical_level or "INTERMEDIATE"
+
     return f"""Project: {req.project_name}
 Sector: {req.sector}
-Modules / bounded contexts: {modules}
+Architecture: {arch} (technical level: {level})
 Tech stack: {stack}
+Modules / bounded contexts: {modules}
 Needs auth: {req.needs_auth}
 Needs admin panel: {req.needs_admin_panel}
 Needs AI service: {req.needs_ai}
@@ -93,10 +105,8 @@ class CodeGenerationAgent:
         llm: BaseChatModel | None = None,
         task: TaskType = "code",
     ) -> CodeGenerationResponse:
-        # Architecture templates take priority for deterministic stack selection.
-        if self._has_architecture_template(req):
-            return self._scaffold_fallback(req)
-
+        # LLM first: uses the full OpenSpec (data_entities, api_endpoints, architecture_type)
+        # to generate code tailored to the actual project. Template is fallback only.
         resolved_llm = llm if llm is not None else get_llm(task)
 
         if resolved_llm is not None:
@@ -112,19 +122,6 @@ class CodeGenerationAgent:
                 logger.warning("LLM code generation failed, using scaffold fallback: %s", exc)
 
         return self._scaffold_fallback(req)
-
-    def _has_architecture_template(self, req: CodeGenerationRequest) -> bool:
-        if req.architecture_type and req.architecture_type in self._ARCHITECTURE_TEMPLATES:
-            return True
-        if req.technical_level == "BEGINNER":
-            return True
-        text = f"{req.sector.lower()} {' '.join(req.stack).lower()}"
-        return (
-            any(k in text for k in self._ACADEMIA_KEYWORDS)
-            or any(k in text for k in self._LARAVEL_KEYWORDS)
-            or any(k in text for k in self._NEXTJS_KEYWORDS)
-            or any(k in text for k in self._DJANGO_KEYWORDS)
-        )
 
     @staticmethod
     def _is_valid_output(result: CodeGenerationResponse) -> bool:
