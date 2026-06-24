@@ -28,6 +28,8 @@ TaskType = Literal["reasoning", "code", "spec", "general"]
 _lock = threading.Lock()
 _override_provider: str | None = None
 _model_overrides: dict[str, str] = {}
+_DEFAULT_CLOUD_ORDER = ("groq", "openai", "gemini")
+_cloud_order: list[str] = list(_DEFAULT_CLOUD_ORDER)
 
 
 def _eff(key: str, default: str) -> str:
@@ -97,32 +99,28 @@ def _ollama(model: str) -> BaseChatModel | None:
 
 # ── Task-aware routing ────────────────────────────────────────────────────────
 
-_TASK_CHAINS: dict[str, list[Callable[[], BaseChatModel | None]]] = {
-    "reasoning": [
-        lambda: _groq(),
-        lambda: _openai(),
-        lambda: _gemini(),
-        lambda: _ollama(_eff("ollama_reasoning_model", settings.ollama_reasoning_model)),
-    ],
-    "code": [
-        lambda: _ollama(_eff("ollama_code_model", settings.ollama_code_model)),
-        lambda: _groq(),
-        lambda: _openai(),
-        lambda: _gemini(),
-    ],
-    "spec": [
-        lambda: _openai(),
-        lambda: _gemini(),
-        lambda: _groq(),
-        lambda: _ollama(_eff("ollama_reasoning_model", settings.ollama_reasoning_model)),
-    ],
-    "general": [
-        lambda: _groq(),
-        lambda: _openai(),
-        lambda: _gemini(),
-        lambda: _ollama(_eff("ollama_reasoning_model", settings.ollama_reasoning_model)),
-    ],
+_CLOUD_FACTORIES: dict[str, Callable[[], BaseChatModel | None]] = {
+    "groq": _groq,
+    "openai": _openai,
+    "gemini": _gemini,
 }
+
+
+def _get_task_chain(task: TaskType) -> list[Callable[[], BaseChatModel | None]]:
+    """Build the provider chain for a task using the current _cloud_order."""
+    with _lock:
+        cloud_order = tuple(_cloud_order)
+    cloud = [_CLOUD_FACTORIES[provider] for provider in cloud_order]
+
+    def ollama_reasoning() -> BaseChatModel | None:
+        return _ollama(_eff("ollama_reasoning_model", settings.ollama_reasoning_model))
+
+    def ollama_code() -> BaseChatModel | None:
+        return _ollama(_eff("ollama_code_model", settings.ollama_code_model))
+
+    if task == "code":
+        return [ollama_code, *cloud]
+    return [*cloud, ollama_reasoning]
 
 
 def get_llm(task: TaskType = "general") -> BaseChatModel | None:
@@ -151,7 +149,7 @@ def get_llm(task: TaskType = "general") -> BaseChatModel | None:
             return llm
         logger.warning("Override provider %s failed, falling back to task routing", _override_provider)
 
-    for factory in _TASK_CHAINS.get(task, _TASK_CHAINS["general"]):
+    for factory in _get_task_chain(task):
         llm = factory()
         if llm is not None:
             logger.debug("LLM resolved for task=%s: %s", task, type(llm).__name__)
@@ -165,73 +163,81 @@ def get_llm(task: TaskType = "general") -> BaseChatModel | None:
 
 def get_config_state() -> dict:
     """Snapshot of the current LLM configuration — no LLM instances created."""
+    with _lock:
+        override_provider = _override_provider
+        cloud_order = list(_cloud_order)
+        model_overrides = dict(_model_overrides)
+
     has_groq = bool(settings.groq_api_key)
     has_openai = bool(settings.openai_api_key)
     has_gemini = bool(settings.gemini_api_key)
 
-    def resolve(chain: list[tuple[str, bool]]) -> str:
-        if _override_provider:
-            return _override_provider
-        for name, available in chain:
-            if available:
+    availability = {"groq": has_groq, "openai": has_openai, "gemini": has_gemini, "ollama": True}
+
+    def resolve(chain: list[str]) -> str:
+        if override_provider:
+            return override_provider
+        for name in chain:
+            if availability.get(name, False):
                 return name
         return "none"
 
+    def effective(key: str, default: str) -> str:
+        return model_overrides.get(key, default)
+
+    cloud = cloud_order
     return {
-        "override_provider": _override_provider,
+        "override_provider": override_provider,
+        "cloud_order": cloud_order,
         "ollama_base_url": settings.ollama_base_url,
         "providers": [
             {
                 "name": "groq",
                 "has_key": has_groq,
-                "model": _eff("groq_model", settings.groq_model),
+                "model": effective("groq_model", settings.groq_model),
                 "default_model": settings.groq_model,
             },
             {
                 "name": "openai",
                 "has_key": has_openai,
-                "model": _eff("openai_model", settings.openai_model),
+                "model": effective("openai_model", settings.openai_model),
                 "default_model": settings.openai_model,
             },
             {
                 "name": "gemini",
                 "has_key": has_gemini,
-                "model": _eff("gemini_model", settings.gemini_model),
+                "model": effective("gemini_model", settings.gemini_model),
                 "default_model": settings.gemini_model,
             },
             {
                 "name": "ollama",
                 "has_key": True,
-                "model": _eff("ollama_reasoning_model", settings.ollama_reasoning_model),
+                "model": effective("ollama_reasoning_model", settings.ollama_reasoning_model),
                 "default_model": settings.ollama_reasoning_model,
-                "code_model": _eff("ollama_code_model", settings.ollama_code_model),
+                "code_model": effective("ollama_code_model", settings.ollama_code_model),
                 "default_code_model": settings.ollama_code_model,
             },
         ],
         "task_routing": {
-            "reasoning": resolve([
-                ("groq", has_groq), ("openai", has_openai), ("gemini", has_gemini), ("ollama", True),
-            ]),
-            "code": resolve([
-                ("ollama", True), ("groq", has_groq), ("openai", has_openai), ("gemini", has_gemini),
-            ]),
-            "spec": resolve([
-                ("openai", has_openai), ("gemini", has_gemini), ("groq", has_groq), ("ollama", True),
-            ]),
-            "general": resolve([
-                ("groq", has_groq), ("openai", has_openai), ("gemini", has_gemini), ("ollama", True),
-            ]),
+            "reasoning": resolve(cloud + ["ollama"]),
+            "code": resolve(["ollama"] + cloud),
+            "spec": resolve(cloud + ["ollama"]),
+            "general": resolve(cloud + ["ollama"]),
         },
     }
 
 
 def apply_config_update(update: object) -> None:
     """Thread-safe apply of a LLMConfigUpdate payload to the runtime state."""
-    global _override_provider, _model_overrides
+    global _override_provider, _model_overrides, _cloud_order
 
     with _lock:
         if "override_provider" in getattr(update, "model_fields_set", set()):
             _override_provider = update.override_provider  # type: ignore[attr-defined]
+
+        new_order = getattr(update, "cloud_order", None)
+        if new_order is not None:
+            _cloud_order = list(new_order)
 
         if getattr(update, "reset_models", False):
             _model_overrides.clear()

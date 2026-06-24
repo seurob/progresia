@@ -10,7 +10,6 @@ def build_flask(req: CodeGenerationRequest) -> list[GeneratedFile]:
     project_slug = slug(req.project_name)
     primary = get_primary_entity(req)
     entity_pascal_name = pascal(primary.get("name", "Item"))
-    entity_camel_name = camel(primary.get("name", "Item"))
     entity_slug_name = slug(primary.get("name", "Item"))
     entity_plural = pluralize(entity_slug_name)
     module_name = project_slug.replace("-", "_")
@@ -235,7 +234,7 @@ def _api_init() -> GeneratedFile:
 
 
 def _entity_blueprint(entity_slug_name: str, entity_pascal_name: str, entity_plural: str, needs_auth: bool) -> GeneratedFile:
-    jwt_decorator = "@jwt_required()\n    " if needs_auth else ""
+    jwt_decorator = "@jwt_required()\n" if needs_auth else ""
     jwt_import = "from flask_jwt_extended import jwt_required\n" if needs_auth else ""
     content = f"""\
 from flask import Blueprint, request, jsonify
@@ -247,13 +246,13 @@ from app.schemas.{entity_slug_name} import {camel(entity_slug_name)}_schema, {en
 
 
 @{entity_slug_name}_bp.get('/')
-def list_{entity_plural}():
+{jwt_decorator}def list_{entity_plural}():
     items = {entity_pascal_name}.query.order_by({entity_pascal_name}.created_at.desc()).all()
     return jsonify({entity_plural}_schema.dump(items))
 
 
 @{entity_slug_name}_bp.post('/')
-def create_{entity_slug_name}():
+{jwt_decorator}def create_{entity_slug_name}():
     body = request.get_json(silent=True) or {{}}
     errors = {camel(entity_slug_name)}_schema.validate(body)
     if errors:
@@ -270,13 +269,13 @@ def create_{entity_slug_name}():
 
 
 @{entity_slug_name}_bp.get('/<string:item_id>')
-def get_{entity_slug_name}(item_id: str):
+{jwt_decorator}def get_{entity_slug_name}(item_id: str):
     item = {entity_pascal_name}.query.get_or_404(item_id)
     return jsonify({camel(entity_slug_name)}_schema.dump(item))
 
 
 @{entity_slug_name}_bp.patch('/<string:item_id>')
-def update_{entity_slug_name}(item_id: str):
+{jwt_decorator}def update_{entity_slug_name}(item_id: str):
     item = {entity_pascal_name}.query.get_or_404(item_id)
     body = request.get_json(silent=True) or {{}}
     if 'name' in body:
@@ -290,7 +289,7 @@ def update_{entity_slug_name}(item_id: str):
 
 
 @{entity_slug_name}_bp.delete('/<string:item_id>')
-def delete_{entity_slug_name}(item_id: str):
+{jwt_decorator}def delete_{entity_slug_name}(item_id: str):
     item = {entity_pascal_name}.query.get_or_404(item_id)
     db.session.delete(item)
     db.session.commit()

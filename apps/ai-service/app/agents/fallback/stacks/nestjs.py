@@ -20,13 +20,16 @@ def build_nestjs(req: CodeGenerationRequest) -> list[GeneratedFile]:
         _tsconfig(),
         _tsconfig_build(),
         _main_ts(project_slug),
-        _app_module(entity_slug, entity_pascal),
+        _app_module(entity_slug, entity_pascal, req.needs_auth),
+        _prisma_module(),
+        _prisma_service(),
         _entity_module(entity_slug, entity_pascal, entity_camel),
         _entity_controller(entity_slug, entity_pascal, entity_camel, entity_plural),
         _entity_service(entity_slug, entity_pascal, entity_camel),
         _create_dto(entity_slug, entity_pascal),
         _update_dto(entity_slug, entity_pascal),
         _health_controller(),
+        _health_module(),
         generate_prisma_schema(
             req.modules, req.needs_auth, req.data_entities or None,
             schema_path="prisma/schema.prisma"
@@ -88,14 +91,17 @@ def _package_json(project_slug: str) -> GeneratedFile:
     "@nestjs/platform-fastify": "^11.0.0",
     "@nestjs/swagger": "^8.0.0",
     "@prisma/client": "^5.22.0",
+    "bcryptjs": "^2.4.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "@nestjs/jwt": "^11.0.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   }},
   "devDependencies": {{
     "@nestjs/cli": "^11.0.0",
     "@types/node": "^22.0.0",
+    "@types/bcryptjs": "^2.4.6",
     "prisma": "^5.22.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.0"
@@ -194,19 +200,69 @@ bootstrap();
     return GeneratedFile(path="src/main.ts", language="typescript", content=content)
 
 
-def _app_module(entity_slug: str, entity_pascal: str) -> GeneratedFile:
+def _app_module(
+    entity_slug: str,
+    entity_pascal: str,
+    needs_auth: bool,
+) -> GeneratedFile:
+    auth_import = 'import { AuthModule } from "./auth/auth.module";\n' if needs_auth else ""
+    auth_module = ", AuthModule" if needs_auth else ""
     content = f"""\
 import {{ Module }} from "@nestjs/common";
 import {{ PrismaModule }} from "./prisma/prisma.module";
 import {{ {entity_pascal}Module }} from "./{entity_slug}/{entity_slug}.module";
 import {{ HealthModule }} from "./health/health.module";
+{auth_import}
 
 @Module({{
-  imports: [PrismaModule, {entity_pascal}Module, HealthModule],
+  imports: [PrismaModule, {entity_pascal}Module, HealthModule{auth_module}],
 }})
 export class AppModule {{}}
 """
     return GeneratedFile(path="src/app.module.ts", language="typescript", content=content)
+
+
+def _prisma_module() -> GeneratedFile:
+    return GeneratedFile(
+        path="src/prisma/prisma.module.ts",
+        language="typescript",
+        content="""\
+import { Global, Module } from "@nestjs/common";
+import { PrismaService } from "./prisma.service";
+
+@Global()
+@Module({
+  providers: [PrismaService],
+  exports: [PrismaService],
+})
+export class PrismaModule {}
+""",
+    )
+
+
+def _prisma_service() -> GeneratedFile:
+    return GeneratedFile(
+        path="src/prisma/prisma.service.ts",
+        language="typescript",
+        content="""\
+import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import { PrismaClient } from "@prisma/client";
+
+@Injectable()
+export class PrismaService
+  extends PrismaClient
+  implements OnModuleInit, OnModuleDestroy
+{
+  async onModuleInit() {
+    await this.$connect();
+  }
+
+  async onModuleDestroy() {
+    await this.$disconnect();
+  }
+}
+""",
+    )
 
 
 def _entity_module(entity_slug: str, entity_pascal: str, entity_camel: str) -> GeneratedFile:
@@ -365,7 +421,6 @@ export class Update{entity_pascal}Dto extends PartialType(Create{entity_pascal}D
 
 
 def _health_controller() -> GeneratedFile:
-    # Also need the health module
     return GeneratedFile(
         path="src/health/health.controller.ts",
         language="typescript",
@@ -385,6 +440,22 @@ export class HealthController {
     };
   }
 }
+""",
+    )
+
+
+def _health_module() -> GeneratedFile:
+    return GeneratedFile(
+        path="src/health/health.module.ts",
+        language="typescript",
+        content="""\
+import { Module } from "@nestjs/common";
+import { HealthController } from "./health.controller";
+
+@Module({
+  controllers: [HealthController],
+})
+export class HealthModule {}
 """,
     )
 

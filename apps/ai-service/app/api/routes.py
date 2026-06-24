@@ -17,7 +17,7 @@ from app.schemas.architecture import ArchitectureRecommendation, ArchitectureReq
 from app.schemas.issues import IssueGenerationRequest, IssueGenerationResponse
 from app.schemas.codegen import CodeGenerationRequest, CodeGenerationResponse
 from app.schemas.idea import IdeaRequest
-from app.schemas.llm_config import LLMConfigResponse, LLMConfigUpdate, OllamaModel, OllamaModelsResponse
+from app.schemas.llm_config import LLMConfigResponse, LLMConfigUpdate, OllamaModelsResponse
 from app.schemas.openspec import OpenSpecResponse
 from app.schemas.rag import IndexRequest, IndexResponse, RAGQueryRequest, RAGQueryResponse, SearchRequest, SearchResponse
 from app.schemas.requirements import RequirementsResponse
@@ -25,6 +25,7 @@ from app.schemas.suggestion import FeatureSuggestionRequest, FeatureSuggestionRe
 from app.schemas.tech_proposal import TechProposalRequest, TechProposalResponse
 from app.schemas.tutorial import TutorialRequest, TutorialResponse
 from app.services.rag_service import RAGService
+from app.services.model_catalog_service import ModelCatalogService
 
 logger = logging.getLogger(__name__)
 
@@ -197,32 +198,13 @@ def update_llm_config(payload: LLMConfigUpdate) -> LLMConfigResponse:
     return LLMConfigResponse(**get_config_state())
 
 
+@router.get("/config/llm/provider-models")
+def list_provider_models() -> dict[str, list[str]]:
+    """Fetch available chat models from each configured provider's API."""
+    return ModelCatalogService().list_cloud_models()
+
+
 @router.get("/ollama/models", response_model=OllamaModelsResponse)
 def list_ollama_models() -> OllamaModelsResponse:
     """List models available in the local Ollama instance."""
-    import json as _json
-    import urllib.request
-    from app.core.settings import settings as _s
-
-    base_url = _s.ollama_base_url
-    try:
-        req = urllib.request.Request(
-            f"{base_url}/api/tags",
-            headers={"Accept": "application/json"},
-        )
-        with urllib.request.urlopen(req, timeout=3) as resp:
-            data = _json.loads(resp.read().decode())
-        models = [
-            OllamaModel(
-                name=m["name"],
-                size=m.get("size"),
-                modified_at=m.get("modified_at"),
-                parameter_size=m.get("details", {}).get("parameter_size"),
-                quantization_level=m.get("details", {}).get("quantization_level"),
-            )
-            for m in data.get("models", [])
-        ]
-        return OllamaModelsResponse(available=True, base_url=base_url, models=models)
-    except Exception as exc:
-        logger.debug("Ollama not reachable at %s: %s", base_url, exc)
-        return OllamaModelsResponse(available=False, base_url=base_url, models=[], error=str(exc))
+    return ModelCatalogService().list_ollama_models()

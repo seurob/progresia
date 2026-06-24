@@ -282,6 +282,10 @@ export class AiServiceClient {
   async getOllamaModels(): Promise<AiOllamaModelsResponse> {
     return this.get<AiOllamaModelsResponse>("/ollama/models");
   }
+
+  async getProviderModels(): Promise<Record<string, string[]>> {
+    return this.get<Record<string, string[]>>("/config/llm/provider-models");
+  }
 }
 
 // ── LLM config types ──────────────────────────────────────────────────────────
@@ -307,6 +311,7 @@ export interface AiLlmConfigResponse {
   providers: AiProviderInfo[];
   task_routing: AiTaskRouting;
   ollama_base_url: string;
+  cloud_order: string[];
 }
 
 export interface AiLlmConfigUpdate {
@@ -316,6 +321,7 @@ export interface AiLlmConfigUpdate {
   gemini_model?: string | null;
   ollama_reasoning_model?: string | null;
   ollama_code_model?: string | null;
+  cloud_order?: string[] | null;
   reset_models?: boolean;
 }
 

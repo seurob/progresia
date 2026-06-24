@@ -59,6 +59,10 @@ export class AdminUsersService {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException("Usuario no encontrado");
 
+    if (id === adminId && dto.role && dto.role !== Role.ADMIN) {
+      throw new BadRequestException("No puedes retirar tu propio rol de administrador");
+    }
+
     if (dto.role && dto.role !== Role.ADMIN && user.role === Role.ADMIN) {
       const adminCount = await this.prisma.user.count({ where: { role: Role.ADMIN } });
       if (adminCount <= 1) {

@@ -338,3 +338,9 @@ apps/web/
     features/auth/
     lib/api.ts
 ```
+
+## License
+
+Copyright © 2026 Roberto Manca. All rights reserved.
+This project is proprietary and confidential. Unauthorized copying,
+modification, distribution, or reuse is prohibited.

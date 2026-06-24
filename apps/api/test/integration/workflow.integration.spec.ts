@@ -9,6 +9,7 @@ import { AppModule } from "../../src/modules/app.module";
 import { PrismaService } from "../../src/database/prisma.service";
 import { AiServiceClient } from "../../src/modules/ai-service/ai-service.client";
 import { GithubService } from "../../src/modules/github/github.service";
+import { CaptchaService } from "../../src/modules/auth/captcha.service";
 
 // Stable fixture data
 const USER_ID      = "00000000-0000-4000-8000-000000000001";
@@ -208,6 +209,8 @@ describe("API workflow integration", () => {
       .useValue(aiClientMock)
       .overrideProvider(GithubService)
       .useValue(githubServiceMock)
+      .overrideProvider(CaptchaService)
+      .useValue({ verify: jest.fn().mockResolvedValue(undefined) })
       .compile();
 
     app = moduleRef.createNestApplication();

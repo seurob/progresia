@@ -19,6 +19,7 @@ _REASON_MISSING_FILES = "LLM_MISSING_REQUIRED_FILES"
 _REASON_UNAVAILABLE = "LLM_UNAVAILABLE"
 
 _fallback = FallbackGenerator()
+_AUTO_LLM = object()
 
 SYSTEM_PROMPT = """You are an expert fullstack developer generating a production-ready MVP scaffold.
 
@@ -107,15 +108,15 @@ class CodeGenerationAgent:
     def generate(
         self,
         req: CodeGenerationRequest,
-        llm: BaseChatModel | None = None,
+        llm: BaseChatModel | None | object = _AUTO_LLM,
         task: TaskType = "code",
     ) -> CodeGenerationResponse:
         # LLM first: uses the full OpenSpec (architecture_type, data_entities,
         # api_endpoints, requirements) to generate code tailored to the project.
-        resolved_llm = llm if llm is not None else get_llm(task)
+        resolved_llm = get_llm(task) if llm is _AUTO_LLM else llm
         reason = _REASON_UNAVAILABLE
 
-        if resolved_llm is not None:
+        if resolved_llm is not None and resolved_llm is not _AUTO_LLM:
             try:
                 structured = resolved_llm.with_structured_output(CodeGenerationResponse)
                 result = structured.invoke([

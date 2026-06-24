@@ -3,7 +3,7 @@
 Used when no specific stack can be detected. Includes clear README explaining how to add a backend.
 """
 from app.schemas.codegen import CodeGenerationRequest, GeneratedFile
-from app.agents.fallback.shared.entities import slug, pascal, camel, pluralize, get_primary_entity
+from app.agents.fallback.shared.entities import slug, pascal, camel, get_primary_entity
 from app.agents.fallback.shared.readme import generate_readme
 
 
@@ -222,8 +222,8 @@ createRoot(document.getElementById("root")!).render(
 
 
 def _app_tsx(modules: list[str], entity_pascal: str) -> GeneratedFile:
-    content = f"""\
-import {{ BrowserRouter, Routes, Route }} from "react-router-dom";
+    content = """\
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Layout from "@/components/Layout";
 import HomePage from "@/pages/HomePage";
 import ItemListPage from "@/pages/ItemListPage";
@@ -231,19 +231,19 @@ import ItemDetailPage from "@/pages/ItemDetailPage";
 
 // Configuración de rutas de la aplicación
 // Usa datos mock hasta que conectes un backend real
-function App() {{
+function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route element={{<Layout />}}>
-          <Route path="/" element={{<HomePage />}} />
-          <Route path="/items" element={{<ItemListPage />}} />
-          <Route path="/items/:id" element={{<ItemDetailPage />}} />
+        <Route element={<Layout />}>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/items" element={<ItemListPage />} />
+          <Route path="/items/:id" element={<ItemDetailPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
   );
-}}
+}
 
 export default App;
 """
@@ -281,44 +281,44 @@ export default function HomePage() {{
 
 
 def _item_list_page(entity_pascal: str, entity_camel: str) -> GeneratedFile:
-    content = f"""\
-import {{ useState }} from "react";
-import {{ Link }} from "react-router-dom";
-import {{ mockItems }} from "@/data/mockData";
-import type {{ Item }} from "@/types";
+    content = """\
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { mockItems } from "@/data/mockData";
+import type { Item } from "@/types";
 
 // Página de listado con datos mock
 // TODO: reemplazar mockItems con llamadas reales a la API
-export default function ItemListPage() {{
+export default function ItemListPage() {
   const [items, setItems] = useState<Item[]>(mockItems);
   const [newName, setNewName] = useState("");
 
-  function handleCreate(e: React.FormEvent) {{
+  function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!newName.trim()) return;
-    const newItem: Item = {{
+    const newItem: Item = {
       id: crypto.randomUUID(),
       name: newName.trim(),
       description: null,
       status: "active",
       createdAt: new Date().toISOString(),
-    }};
+    };
     setItems((prev) => [newItem, ...prev]);
     setNewName("");
-  }}
+  }
 
-  function handleDelete(id: string) {{
+  function handleDelete(id: string) {
     setItems((prev) => prev.filter((item) => item.id !== id));
-  }}
+  }
 
   return (
     <div className="max-w-2xl">
       <h1 className="mb-6 text-2xl font-bold">Items</h1>
 
-      <form onSubmit={{handleCreate}} className="mb-6 flex gap-2">
+      <form onSubmit={handleCreate} className="mb-6 flex gap-2">
         <input
-          value={{newName}}
-          onChange={{(e) => setNewName(e.target.value)}}
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
           placeholder="Nombre del nuevo elemento..."
           className="flex-1 rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
         />
@@ -331,49 +331,49 @@ export default function ItemListPage() {{
       </form>
 
       <ul className="grid gap-2">
-        {{items.map((item) => (
+        {items.map((item) => (
           <li
-            key={{item.id}}
+            key={item.id}
             className="flex items-center justify-between rounded-xl border bg-white px-4 py-3"
           >
             <div>
               <Link
-                to={{`/items/${{item.id}}`}}
+                to={`/items/${item.id}`}
                 className="font-medium hover:text-brand hover:underline"
               >
-                {{item.name}}
+                {item.name}
               </Link>
-              {{item.description && (
-                <p className="text-sm text-gray-500">{{item.description}}</p>
-              )}}
+              {item.description && (
+                <p className="text-sm text-gray-500">{item.description}</p>
+              )}
             </div>
             <button
-              onClick={{() => handleDelete(item.id)}}
+              onClick={() => handleDelete(item.id)}
               className="text-sm text-red-500 hover:underline"
             >
               Eliminar
             </button>
           </li>
-        ))}}
+        ))}
       </ul>
     </div>
   );
-}}
+}
 """
     return GeneratedFile(path="src/pages/ItemListPage.tsx", language="typescript", content=content)
 
 
 def _item_detail_page(entity_pascal: str) -> GeneratedFile:
-    content = f"""\
-import {{ useParams, Link }} from "react-router-dom";
-import {{ mockItems }} from "@/data/mockData";
+    content = """\
+import { useParams, Link } from "react-router-dom";
+import { mockItems } from "@/data/mockData";
 
 // Página de detalle con datos mock
-export default function ItemDetailPage() {{
-  const {{ id }} = useParams<{{ id: string }}>();
+export default function ItemDetailPage() {
+  const { id } = useParams<{ id: string }>();
   const item = mockItems.find((i) => i.id === id);
 
-  if (!item) {{
+  if (!item) {
     return (
       <div className="text-center py-12">
         <p className="text-gray-500">Elemento no encontrado</p>
@@ -382,7 +382,7 @@ export default function ItemDetailPage() {{
         </Link>
       </div>
     );
-  }}
+  }
 
   return (
     <div className="max-w-lg">
@@ -390,19 +390,19 @@ export default function ItemDetailPage() {{
         ← Volver a la lista
       </Link>
       <div className="rounded-xl border bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-bold mb-4">{{item.name}}</h1>
-        {{item.description && (
-          <p className="text-gray-600 mb-4">{{item.description}}</p>
-        )}}
+        <h1 className="text-2xl font-bold mb-4">{item.name}</h1>
+        {item.description && (
+          <p className="text-gray-600 mb-4">{item.description}</p>
+        )}
         <div className="text-sm text-gray-400 space-y-1">
-          <p>ID: {{item.id}}</p>
-          <p>Estado: {{item.status}}</p>
-          <p>Creado: {{new Date(item.createdAt).toLocaleDateString("es")}}</p>
+          <p>ID: {item.id}</p>
+          <p>Estado: {item.status}</p>
+          <p>Creado: {new Date(item.createdAt).toLocaleDateString("es")}</p>
         </div>
       </div>
     </div>
   );
-}}
+}
 """
     return GeneratedFile(path="src/pages/ItemDetailPage.tsx", language="typescript", content=content)
 

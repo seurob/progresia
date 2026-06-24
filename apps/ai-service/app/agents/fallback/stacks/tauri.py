@@ -125,26 +125,26 @@ def _tsconfig() -> GeneratedFile:
 
 
 def _vite_config(project_id: str) -> GeneratedFile:
-    content = f"""\
-import {{ defineConfig }} from "vite";
+    content = """\
+import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 // Tauri espera un puerto fijo en desarrollo
 const host = process.env.TAURI_DEV_HOST;
 
-export default defineConfig(async () => ({{
+export default defineConfig(async () => ({
   plugins: [react()],
   clearScreen: false,
-  server: {{
+  server: {
     port: 1420,
     strictPort: true,
     host: host || false,
     hmr: host
-      ? {{ protocol: "ws", host, port: 1421 }}
+      ? { protocol: "ws", host, port: 1421 }
       : undefined,
-    watch: {{ ignored: ["**/src-tauri/**"] }},
-  }},
-}}));
+    watch: { ignored: ["**/src-tauri/**"] },
+  },
+}));
 """
     return GeneratedFile(path="vite.config.ts", language="typescript", content=content)
 

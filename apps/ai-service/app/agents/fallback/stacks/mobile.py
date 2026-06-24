@@ -144,21 +144,21 @@ def _app_json(project_slug: str, project_name: str) -> GeneratedFile:
 
 
 def _root_layout(project_name: str) -> GeneratedFile:
-    content = f"""\
-import {{ Stack }} from "expo-router";
-import {{ StatusBar }} from "expo-status-bar";
+    content = """\
+import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 
 // Layout raíz de la aplicación
-export default function RootLayout() {{
+export default function RootLayout() {
   return (
     <>
       <Stack>
-        <Stack.Screen name="(tabs)" options={{{{ headerShown: false }}}} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style="auto" />
     </>
   );
-}}
+}
 """
     return GeneratedFile(path="app/_layout.tsx", language="typescript", content=content)
 

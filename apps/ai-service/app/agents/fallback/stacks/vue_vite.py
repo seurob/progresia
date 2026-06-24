@@ -188,11 +188,11 @@ def _index_html(project_name: str) -> GeneratedFile:
 
 
 def _main_ts(entity_slug_name: str) -> GeneratedFile:
-    content = f"""\
-import {{ createApp }} from 'vue';
-import {{ createPinia }} from 'pinia';
+    content = """\
+import { createApp } from 'vue';
+import { createPinia } from 'pinia';
 import App from './App.vue';
-import {{ router }} from './router';
+import { router } from './router';
 import './style.css';
 
 const app = createApp(App);

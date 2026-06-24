@@ -4,6 +4,7 @@ coverage/
 .turbo/
 .vite/
 .vscode/
+.claude/
 *.tsbuildinfo
 .env
 .env.local

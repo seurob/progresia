@@ -127,34 +127,34 @@ def _tsconfig() -> GeneratedFile:
 
 
 def _index_ts(project_slug: str) -> GeneratedFile:
-    content = f"""\
+    content = """\
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import {{ errorHandler }} from "./middleware/errorHandler";
-import {{ itemRoutes }} from "./routes/item.routes";
+import { errorHandler } from "./middleware/errorHandler";
+import { itemRoutes } from "./routes/item.routes";
 
 // Punto de entrada de la API Express
 const app = express();
 const PORT = Number(process.env.PORT ?? 3000);
 
 // Middleware
-app.use(cors({{ origin: process.env.CORS_ORIGIN ?? "http://localhost:5173" }}));
+app.use(cors({ origin: process.env.CORS_ORIGIN ?? "http://localhost:5173" }));
 app.use(express.json());
-app.use(express.urlencoded({{ extended: true }}));
+app.use(express.urlencoded({ extended: true }));
 
 // Rutas
-app.get("/health", (_req, res) => {{
-  res.json({{ status: "ok", timestamp: new Date().toISOString() }});
-}});
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
 app.use("/api/items", itemRoutes);
 
 // Manejo de errores (debe ir al final)
 app.use(errorHandler);
 
-app.listen(PORT, "0.0.0.0", () => {{
-  console.log(`Servidor activo en http://0.0.0.0:${{PORT}}`);
-}});
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Servidor activo en http://0.0.0.0:${PORT}`);
+});
 
 export default app;
 """

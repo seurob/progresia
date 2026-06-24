@@ -64,6 +64,11 @@ def detect_stack(req: CodeGenerationRequest) -> ScaffoldStack:
         for r in req.requirements[:10]
     ).lower()
 
+    if req.technical_level == "BEGINNER" and not any(
+        keyword in arch for keyword in ("MOBILE", "FLUTTER", "REACT_NATIVE", "DESKTOP", "ELECTRON", "TAURI")
+    ):
+        return ScaffoldStack.EXPRESS
+
     for stack_val, arch_keys, stack_keys, text_keys in _RULES:
         if (
             any(k in arch for k in arch_keys)

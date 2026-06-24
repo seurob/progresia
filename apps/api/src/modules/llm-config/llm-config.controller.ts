@@ -32,4 +32,10 @@ export class LlmConfigController {
   getOllamaModels(): Promise<AiOllamaModelsResponse> {
     return this.aiService.getOllamaModels();
   }
+
+  @Get("provider-models")
+  @ApiOkResponse({ description: "Available chat models for each configured provider." })
+  getProviderModels(): Promise<Record<string, string[]>> {
+    return this.aiService.getProviderModels();
+  }
 }

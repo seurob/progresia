@@ -430,8 +430,8 @@ def _electron_nestjs(req: TutorialRequest) -> list[TutorialPhase]:
             f"Implementa la funcionalidad {module} con IPC + React.",
             [
                 _s(f"Crear handler IPC para {module}", f"code src/main/ipc/{mod_lower}.ts", "ipcMain.handle('{mod_lower}:list', ...)"),
-                _s(f"Exponer el canal en el preload", "code src/preload/index.ts"),
-                _s(f"Crear componente React que consume el canal", f"code src/renderer/src/pages/{module}.tsx"),
+                _s("Exponer el canal en el preload", "code src/preload/index.ts"),
+                _s("Crear componente React que consume el canal", f"code src/renderer/src/pages/{module}.tsx"),
                 _s("Probar la funcionalidad en la ventana de la app"),
             ]
         ))
@@ -487,7 +487,7 @@ def _tauri_fastapi(req: TutorialRequest) -> list[TutorialPhase]:
             [
                 _s(f"Crear el command Rust para {module}", f"code src-tauri/src/commands/{module.lower()}.rs"),
                 _s("Registrar el command en lib.rs", "code src-tauri/src/lib.rs", ".invoke_handler(tauri::generate_handler![...])"),
-                _s(f"Crear componente React que invoca el command", f"code src/{module}Page.tsx", "import {{ invoke }} from '@tauri-apps/api/core'; invoke('{module.lower()}:list')"),
+                _s("Crear componente React que invoca el command", f"code src/{module}Page.tsx", "import {{ invoke }} from '@tauri-apps/api/core'; invoke('{module.lower()}:list')"),
                 _s("Probar en la app", "npm run tauri dev"),
             ]
         ))
@@ -544,8 +544,8 @@ def _flutter_fastapi(req: TutorialRequest) -> list[TutorialPhase]:
             f"Implementa la pantalla y el servicio para {module}.",
             [
                 _s(f"Crear el servicio de API para {module}", f"code lib/services/{mod_lower}_service.dart"),
-                _s(f"Crear la pantalla de listado", f"code lib/screens/{mod_lower}_list_screen.dart"),
-                _s(f"Crear la pantalla de detalle/formulario", f"code lib/screens/{mod_lower}_form_screen.dart"),
+                _s("Crear la pantalla de listado", f"code lib/screens/{mod_lower}_list_screen.dart"),
+                _s("Crear la pantalla de detalle/formulario", f"code lib/screens/{mod_lower}_form_screen.dart"),
                 _s("Añadir la ruta en lib/main.dart", None, "MaterialApp(routes: {'/modulo': (ctx) => ModuloScreen()})"),
                 _s("Probar en el emulador", "flutter run"),
             ]
@@ -580,7 +580,7 @@ def _react_native_nestjs(req: TutorialRequest) -> list[TutorialPhase]:
             _s("Abrir el punto de entrada", "code app/_layout.tsx", "Expo Router usa file-based routing — igual que Next.js"),
             _s("Revisar la carpeta app/ con las pantallas", "code app/", "Cada archivo .tsx en app/ es una ruta/pantalla"),
             _s("Abrir el cliente API", "code src/lib/api.ts", "Configura la URL base: http://TU_IP:3000 (no localhost en el dispositivo real)"),
-            _s("Verificar que el backend responde", f"curl http://localhost:3000/health"),
+            _s("Verificar que el backend responde", "curl http://localhost:3000/health"),
         ]),
         _p("Fase 2: Schema Prisma y backend NestJS", "Define los módulos del backend.", [
             _s(f"cd {slug}-api && abrir el schema de Prisma", f"code {slug}-api/prisma/schema.prisma"),
@@ -592,7 +592,7 @@ def _react_native_nestjs(req: TutorialRequest) -> list[TutorialPhase]:
 
     if req.needs_auth:
         phases.append(_p("Fase 3: Autenticación JWT (móvil + backend)", "Implementa login con persistencia segura del token.", [
-            _s("Probar el endpoint de login en el backend", f"curl -X POST http://localhost:3000/auth/login -d '{{...}}'"),
+            _s("Probar el endpoint de login en el backend", "curl -X POST http://localhost:3000/auth/login -d '{...}'"),
             _s("Instalar expo-secure-store para guardar el token", "npx expo install expo-secure-store"),
             _s("Implementar el AuthContext en src/contexts/AuthContext.tsx"),
             _s("Proteger las rutas con un guard de autenticación"),
@@ -606,8 +606,8 @@ def _react_native_nestjs(req: TutorialRequest) -> list[TutorialPhase]:
             f"Implementa la pantalla y el hook de React Query para {module}.",
             [
                 _s(f"Crear el hook useQuery para {module}", f"code src/hooks/use{module}.ts"),
-                _s(f"Crear la pantalla de listado", f"code app/{mod_lower}.tsx"),
-                _s(f"Crear la pantalla de detalle", f"code app/{mod_lower}/[id].tsx"),
+                _s("Crear la pantalla de listado", f"code app/{mod_lower}.tsx"),
+                _s("Crear la pantalla de detalle", f"code app/{mod_lower}/[id].tsx"),
                 _s("Añadir FlatList con pull-to-refresh y estados de carga"),
                 _s("Probar en el emulador o dispositivo real"),
             ]

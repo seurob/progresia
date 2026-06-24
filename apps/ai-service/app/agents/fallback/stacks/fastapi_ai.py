@@ -177,7 +177,7 @@ def _core_init() -> GeneratedFile:
 
 
 def _core_config(project_slug: str) -> GeneratedFile:
-    content = f"""\
+    content = """\
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 

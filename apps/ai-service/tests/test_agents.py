@@ -1,6 +1,7 @@
 """Tests for LLM agents — LLM client is always mocked so no real API calls are made."""
 from unittest.mock import MagicMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.agents.architecture_agent import ArchitectureAgent
@@ -375,7 +376,13 @@ class TestCodeGenerationAgent:
 
         mock_llm.with_structured_output.assert_called_once_with(CodeGenerationResponse)
         assert result.project_name == "Reservas de clases"
-        assert len(result.files) == 3
+        paths = {file.path for file in result.files}
+        assert {
+            "docker-compose.yml",
+            "README.md",
+            "apps/api/src/app.module.ts",
+        } <= paths
+        assert "sdd/constitution.md" in paths
 
     def test_falls_back_when_llm_raises(self) -> None:
         mock_llm = MagicMock()
@@ -397,15 +404,15 @@ class TestCodeGenerationAgent:
         assert result.project_name == CODEGEN_REQUEST_NEUTRAL.project_name
         paths = [f.path for f in result.files]
         assert "docker-compose.yml" in paths
-        assert "apps/api/package.json" in paths
-        assert "apps/api/src/modules/auth/auth.entity.ts" in paths
-        assert "apps/api/prisma/schema.prisma" in paths
+        assert "package.json" in paths
+        assert "src/auth/auth.module.ts" in paths
+        assert "prisma/schema.prisma" in paths
 
     def test_fallback_includes_auth_model_when_needed(self) -> None:
         with patch("app.agents.codegen_agent.get_llm", return_value=None):
             result = CodeGenerationAgent().generate(CODEGEN_REQUEST)
 
-        schema_file = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        schema_file = next(f for f in result.files if f.path == "prisma/schema.prisma")
         assert "model User" in schema_file.content
 
     def test_fallback_skips_auth_model_when_not_needed(self) -> None:
@@ -413,7 +420,7 @@ class TestCodeGenerationAgent:
         with patch("app.agents.codegen_agent.get_llm", return_value=None):
             result = CodeGenerationAgent().generate(req_no_auth)
 
-        schema_file = next(f for f in result.files if f.path == "apps/api/prisma/schema.prisma")
+        schema_file = next(f for f in result.files if f.path == "prisma/schema.prisma")
         assert "model User" not in schema_file.content
 
     def test_endpoint_returns_generated_files(self) -> None:
@@ -429,7 +436,13 @@ class TestCodeGenerationAgent:
         assert response.status_code == 200
         body = response.json()
         assert body["project_name"] == "Reservas de clases"
-        assert len(body["files"]) == 3
+        paths = {file["path"] for file in body["files"]}
+        assert {
+            "docker-compose.yml",
+            "README.md",
+            "apps/api/src/app.module.ts",
+        } <= paths
+        assert "sdd/constitution.md" in paths
         assert all("path" in f and "content" in f for f in body["files"])
 
     def test_endpoint_fallback_without_llm(self) -> None:
@@ -447,9 +460,9 @@ class TestCodeGenerationAgent:
         result = CodeGenerationAgent().generate(req, llm=None)
 
         paths = [f.path for f in result.files]
-        assert "src/index.js" in paths
-        assert "client/src/App.jsx" in paths
-        assert "src/db.js" in paths
+        assert "src/index.ts" in paths
+        assert "src/services/prisma.service.ts" in paths
+        assert "prisma/schema.prisma" in paths
 
     def test_beginner_bypasses_sector_templates(self) -> None:
         req = CODEGEN_REQUEST.model_copy(update={"technical_level": "BEGINNER"})
@@ -457,7 +470,7 @@ class TestCodeGenerationAgent:
 
         paths = [f.path for f in result.files]
         # Should use Express, not academia tRPC template
-        assert "src/index.js" in paths
+        assert "src/index.ts" in paths
         assert not any("trpc" in p for p in paths)
 
     def test_beginner_with_auth_includes_auth_routes(self) -> None:
@@ -465,8 +478,8 @@ class TestCodeGenerationAgent:
         result = CodeGenerationAgent().generate(req, llm=None)
 
         paths = [f.path for f in result.files]
-        assert "src/routes/auth.js" in paths
-        assert "src/middleware/auth.js" in paths
+        assert "src/routes/auth.routes.ts" in paths
+        assert "src/middleware/auth.ts" in paths
 
     def test_beginner_without_auth_excludes_auth_middleware(self) -> None:
         req = CODEGEN_REQUEST_NEUTRAL.model_copy(update={"technical_level": "BEGINNER", "needs_auth": False})
@@ -474,7 +487,7 @@ class TestCodeGenerationAgent:
 
         paths = [f.path for f in result.files]
         # auth middleware is the definitive signal — only added when needs_auth=True
-        assert "src/middleware/auth.js" not in paths
+        assert "src/middleware/auth.ts" not in paths
 
     def test_intermediate_still_uses_ddd_scaffold(self) -> None:
         req = CODEGEN_REQUEST_NEUTRAL.model_copy(update={"technical_level": "INTERMEDIATE"})
@@ -483,7 +496,7 @@ class TestCodeGenerationAgent:
         paths = [f.path for f in result.files]
         # INTERMEDIATE uses tRPC generic scaffold
         assert any("prisma" in p for p in paths)
-        assert "src/index.js" not in paths
+        assert "src/index.ts" not in paths
 
     def test_beginner_no_duplicate_paths(self) -> None:
         req = CODEGEN_REQUEST_NEUTRAL.model_copy(update={"technical_level": "BEGINNER"})
@@ -791,6 +804,7 @@ CODEGEN_LOGISTICA = CodeGenerationRequest(
 )
 
 
+@pytest.mark.skip(reason="Sector templates were replaced by stack-based fallback scaffolds in 1e9ce17")
 class TestSectorTemplates:
     def test_rrhh_template_generates_files(self) -> None:
         result = CodeGenerationAgent().generate(CODEGEN_RRHH, llm=None)
@@ -1082,6 +1096,7 @@ CODEGEN_EVENTOS = CodeGenerationRequest(
 )
 
 
+@pytest.mark.skip(reason="Sector templates were replaced by stack-based fallback scaffolds in 1e9ce17")
 class TestFintechTemplate:
     def test_fintech_template_generates_files(self) -> None:
         result = CodeGenerationAgent().generate(CODEGEN_FINTECH, llm=None)
@@ -1131,6 +1146,7 @@ class TestFintechTemplate:
         assert len(paths) == len(set(paths)), "Duplicate file paths in FINTECH template"
 
 
+@pytest.mark.skip(reason="Sector templates were replaced by stack-based fallback scaffolds in 1e9ce17")
 class TestEventosTemplate:
     def test_eventos_template_generates_files(self) -> None:
         result = CodeGenerationAgent().generate(CODEGEN_EVENTOS, llm=None)
@@ -1202,6 +1218,7 @@ CODEGEN_GYM = CodeGenerationRequest(
 )
 
 
+@pytest.mark.skip(reason="Sector templates were replaced by stack-based fallback scaffolds in 1e9ce17")
 class TestVeterinariaTemplate:
     def test_veterinaria_template_generates_files(self) -> None:
         result = CodeGenerationAgent().generate(CODEGEN_VETERINARIA, llm=None)
@@ -1251,6 +1268,7 @@ class TestVeterinariaTemplate:
         assert len(paths) == len(set(paths)), "Duplicate file paths in VETERINARIA template"
 
 
+@pytest.mark.skip(reason="Sector templates were replaced by stack-based fallback scaffolds in 1e9ce17")
 class TestGymTemplate:
     def test_gym_template_generates_files(self) -> None:
         result = CodeGenerationAgent().generate(CODEGEN_GYM, llm=None)
@@ -1324,6 +1342,7 @@ CODEGEN_ABOGADOS = CodeGenerationRequest(
 )
 
 
+@pytest.mark.skip(reason="Sector templates were replaced by stack-based fallback scaffolds in 1e9ce17")
 class TestFarmaciaTemplate:
     def test_farmacia_template_generates_files(self) -> None:
         result = CodeGenerationAgent().generate(CODEGEN_FARMACIA, llm=None)
@@ -1373,6 +1392,7 @@ class TestFarmaciaTemplate:
         assert len(paths) == len(set(paths)), "Duplicate file paths in FARMACIA template"
 
 
+@pytest.mark.skip(reason="Sector templates were replaced by stack-based fallback scaffolds in 1e9ce17")
 class TestAbogadosTemplate:
     def test_abogados_template_generates_files(self) -> None:
         result = CodeGenerationAgent().generate(CODEGEN_ABOGADOS, llm=None)

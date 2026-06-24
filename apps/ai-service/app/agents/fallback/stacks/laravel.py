@@ -1,8 +1,7 @@
 """Laravel 11 + PHP 8.3 + MySQL/PostgreSQL + API REST scaffold generator."""
 from datetime import datetime
 from app.schemas.codegen import CodeGenerationRequest, GeneratedFile
-from app.agents.fallback.shared.entities import slug, pascal, camel, pluralize, get_primary_entity
-from app.agents.fallback.shared.docker import generate_docker_compose
+from app.agents.fallback.shared.entities import slug, pascal, pluralize, get_primary_entity
 from app.agents.fallback.shared.readme import generate_readme
 
 

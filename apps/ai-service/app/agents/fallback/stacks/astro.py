@@ -170,20 +170,20 @@ const {{ title, description = '{project_name}' }} = Astro.props;
 
 
 def _main_layout(project_name: str, entity_slug_name: str, entity_pascal_name: str, entity_plural: str) -> GeneratedFile:
-    content = f"""\
+    content = """\
 ---
 import BaseLayout from './BaseLayout.astro';
 import Navigation from '../components/Navigation.astro';
 import Footer from '../components/Footer.astro';
 
-interface Props {{
+interface Props {
   title: string;
   description?: string;
-}}
-const {{ title, description }} = Astro.props;
+}
+const { title, description } = Astro.props;
 ---
 
-<BaseLayout title={{title}} description={{description}}>
+<BaseLayout title={title} description={description}>
   <div class="min-h-screen flex flex-col">
     <Navigation />
     <main class="flex-1">
@@ -366,35 +366,35 @@ const year = new Date().getFullYear();
 
 
 def _entity_card(entity_pascal_name: str) -> GeneratedFile:
-    content = f"""\
+    content = """\
 ---
-interface Props {{
-  item: {{
+interface Props {
+  item: {
     id: string;
     name: string;
     description?: string;
     status?: string;
-  }};
-}}
-const {{ item }} = Astro.props;
+  };
+}
+const { item } = Astro.props;
 ---
 
 <article class="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition group">
   <div class="flex justify-between items-start mb-3">
     <h3 class="font-semibold text-gray-900 group-hover:text-brand-600 transition">
-      {{item.name}}
+      {item.name}
     </h3>
-    {{item.status && (
-      <span class={{`text-xs px-2 py-0.5 rounded-full ${{
+    {item.status && (
+      <span class={`text-xs px-2 py-0.5 rounded-full ${
         item.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-      }}`}}>
-        {{item.status}}
+      }`}>
+        {item.status}
       </span>
-    )}}
+    )}
   </div>
-  {{item.description && (
-    <p class="text-sm text-gray-500 leading-relaxed">{{item.description}}</p>
-  )}}
+  {item.description && (
+    <p class="text-sm text-gray-500 leading-relaxed">{item.description}</p>
+  )}
 </article>
 """
     return GeneratedFile(path=f"src/components/{entity_pascal_name}Card.astro", language="astro", content=content)

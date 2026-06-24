@@ -206,7 +206,7 @@ def _app_tsx(entity_slug_name: str, entity_pascal_name: str, entity_plural: str,
     auth_import = "import { AuthProvider } from './contexts/AuthContext';\n" if needs_auth else ""
     auth_wrap_open = "<AuthProvider>\n      " if needs_auth else ""
     auth_wrap_close = "\n      </AuthProvider>" if needs_auth else ""
-    login_route = f"<Route path='/login' element={{<LoginPage />}} />\n          " if needs_auth else ""
+    login_route = "<Route path='/login' element={<LoginPage />} />\n          " if needs_auth else ""
     login_import = "import LoginPage from './pages/LoginPage';\n" if needs_auth else ""
 
     content = f"""\
@@ -437,47 +437,47 @@ export function useAuth() {
 
 
 def _login_page(project_name: str) -> GeneratedFile:
-    content = f"""\
-import {{ useState }} from 'react';
-import {{ useNavigate }} from 'react-router-dom';
-import {{ useAuth }} from '../contexts/AuthContext';
+    content = """\
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
-export default function LoginPage() {{
-  const {{ login }} = useAuth();
+export default function LoginPage() {
+  const { login } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {{
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    try {{
+    try {
       await login(email, password);
       navigate('/');
-    }} catch {{
+    } catch {
       setError('Credenciales incorrectas. Verifica tu email y contraseña.');
-    }}
-  }}
+    }
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <form onSubmit={{handleSubmit}} className="bg-white p-8 rounded-lg shadow-md w-full max-w-sm space-y-4">
+      <form onSubmit={handleSubmit} className="bg-white p-8 rounded-lg shadow-md w-full max-w-sm space-y-4">
         <h2 className="text-2xl font-bold text-center text-gray-800">Iniciar sesión</h2>
-        {{error && <p className="text-red-600 text-sm">{{error}}</p>}}
+        {error && <p className="text-red-600 text-sm">{error}</p>}
         <input
           type="email"
           placeholder="Email"
-          value={{email}}
-          onChange={{e => setEmail(e.target.value)}}
+          value={email}
+          onChange={e => setEmail(e.target.value)}
           required
           className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-orange-400 outline-none"
         />
         <input
           type="password"
           placeholder="Contraseña"
-          value={{password}}
-          onChange={{e => setPassword(e.target.value)}}
+          value={password}
+          onChange={e => setPassword(e.target.value)}
           required
           className="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-orange-400 outline-none"
         />
@@ -490,7 +490,7 @@ export default function LoginPage() {{
       </form>
     </div>
   );
-}}
+}
 """
     return GeneratedFile(path="src/pages/LoginPage.tsx", language="tsx", content=content)
 
@@ -525,33 +525,33 @@ service cloud.firestore {{
 
 
 def _firebase_json(project_slug: str) -> GeneratedFile:
-    content = f"""\
-{{
-  "hosting": {{
+    content = """\
+{
+  "hosting": {
     "public": "dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
-      {{
+      {
         "source": "**",
         "destination": "/index.html"
-      }}
+      }
     ]
-  }},
-  "firestore": {{
+  },
+  "firestore": {
     "rules": "firestore.rules"
-  }}
-}}
+  }
+}
 """
     return GeneratedFile(path="firebase.json", language="json", content=content)
 
 
 def _firebaserc(project_slug: str) -> GeneratedFile:
-    content = f"""\
-{{
-  "projects": {{
+    content = """\
+{
+  "projects": {
     "default": "TU_PROYECTO_FIREBASE"
-  }}
-}}
+  }
+}
 """
     return GeneratedFile(path=".firebaserc", language="json", content=content)
 

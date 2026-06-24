@@ -3,6 +3,8 @@ import re
 
 from app.schemas.codegen import CodeGenerationRequest
 
+_TECHNICAL_MODULES = {"auth", "authentication", "admin", "security"}
+
 
 def slug(name: str) -> str:
     """Convierte un nombre a kebab-case."""
@@ -30,11 +32,21 @@ def entity_fields_summary(entity: dict) -> str:
 
 
 def get_primary_entity(req: CodeGenerationRequest) -> dict:
-    """Devuelve la primera entidad de datos o crea un placeholder."""
+    """Return the first business entity, avoiding infrastructure-only modules."""
     if req.data_entities:
-        return req.data_entities[0]
-    # Fallback placeholder using the first module name
-    name = req.modules[0] if req.modules else "Item"
+        return next(
+            (
+                entity
+                for entity in req.data_entities
+                if slug(entity.get("name", "")) not in _TECHNICAL_MODULES
+            ),
+            req.data_entities[0],
+        )
+
+    name = next(
+        (module for module in req.modules if slug(module) not in _TECHNICAL_MODULES),
+        "Item",
+    )
     return {
         "name": name,
         "fields": ["id: UUID PK", "name: VARCHAR NOT NULL", "description: TEXT", "status: VARCHAR", "createdAt: TIMESTAMP", "updatedAt: TIMESTAMP"],

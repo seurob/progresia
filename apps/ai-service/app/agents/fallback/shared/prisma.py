@@ -1,6 +1,6 @@
 """Prisma schema generation helpers for fallback scaffold generators."""
-from app.schemas.codegen import CodeGenerationRequest, GeneratedFile
-from app.agents.fallback.shared.entities import pascal, camel, slug
+from app.schemas.codegen import GeneratedFile
+from app.agents.fallback.shared.entities import pascal, camel
 
 
 def sql_type_to_prisma(type_str: str) -> str:
@@ -138,8 +138,6 @@ def generate_seed_ts(
     seed_path: str = "prisma/seed.ts",
 ) -> GeneratedFile:
     """Genera un archivo prisma/seed.ts con 3 registros de ejemplo por entidad."""
-    p_slug = slug(project_name)
-
     seed_blocks = []
     for entity in entities[:5]:
         entity_pascal = pascal(entity.get("name", "Item"))
