@@ -32,8 +32,10 @@ jobs:
         run: |
           npm ci
           # npm can omit native optional packages when package-lock.json was
-          # generated on another OS. Reify bindings for the Linux runner.
-          npm install --include=optional --no-save
+          # generated on Windows. Install the Linux test/build bindings explicitly.
+          npm install --no-save --package-lock=false \
+            @rolldown/binding-linux-x64-gnu@1.0.3 \
+            lightningcss-linux-x64-gnu@1.32.0
 
       - name: Validate OpenSpec
         run: npm run openspec:check
