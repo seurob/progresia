@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 
@@ -6,12 +7,23 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.core.llm import TaskType, get_llm
 from app.schemas.codegen import CodeGenerationRequest, CodeGenerationResponse, GeneratedFile
+from app.agents.fallback.generator import FallbackGenerator
+
 logger = logging.getLogger(__name__)
+
+# Failure reasons — logged so operators know why the fallback was triggered
+_REASON_TIMEOUT = "LLM_TIMEOUT"
+_REASON_INVALID_JSON = "LLM_INVALID_JSON"
+_REASON_EMPTY_RESPONSE = "LLM_EMPTY_RESPONSE"
+_REASON_MISSING_FILES = "LLM_MISSING_REQUIRED_FILES"
+_REASON_UNAVAILABLE = "LLM_UNAVAILABLE"
+
+_fallback = FallbackGenerator()
 
 SYSTEM_PROMPT = """You are an expert fullstack developer generating a production-ready MVP scaffold.
 
-The architecture_type and tech stack are already decided by the ArchitectureAgent — USE THEM.
-Do not override or second-guess the stack. Generate files that match the specified stack exactly.
+The architecture_type and tech stack are already decided by the ArchitectureAgent — USE THEM EXACTLY.
+Do not override or second-guess the stack. Generate files that match the specified stack.
 
 Stack guides by architecture_type:
 - NEXTJS_APP / default web: Next.js 15 App Router + Prisma + PostgreSQL (TypeScript)
@@ -19,17 +31,16 @@ Stack guides by architecture_type:
 - ACADEMIA / SaaS LMS: Next.js 14 + tRPC v11 + Fastify + Prisma + PostgreSQL
 - DJANGO_REST: Django 5 + DRF + PostgreSQL (Python)
 - LARAVEL_MONOLITH / LARAVEL_INERTIA_REACT / LARAVEL_INERTIA_VUE: Laravel 11 + MySQL (PHP)
-- NESTJS_REACT: NestJS + React + Prisma + PostgreSQL (TypeScript)
+- NESTJS_REACT: NestJS 11 + React + Prisma + PostgreSQL (TypeScript)
 - FASTAPI_AI: FastAPI + React + SQLAlchemy + PostgreSQL (Python)
+- FLUTTER_FASTAPI: Flutter + FastAPI (Dart + Python)
+- REACT_NATIVE_NESTJS: React Native + NestJS (TypeScript)
+- ELECTRON_NESTJS: Electron + React + NestJS (TypeScript)
+- TAURI_FASTAPI: Tauri + React + FastAPI (Rust + Python)
 
-For tRPC-based stacks use DDD structure per module:
-  apps/api/src/modules/{module}/
-    {module}.entity.ts      -- domain entity (plain class)
-    {module}.service.ts     -- business logic, calls Prisma
-    {module}.router.ts      -- tRPC router with CRUD procedures
-
-Generate ALL files for the scaffold. Use the provided data_entities for the Prisma/ORM schema
-and api_endpoints for route/procedure definitions. Respond with valid JSON matching CodeGenerationResponse."""
+Use data_entities to generate the ORM schema (Prisma, SQLAlchemy, Eloquent, etc.).
+Use api_endpoints to generate route/procedure/controller definitions.
+Generate ALL files for the scaffold. Respond with valid JSON matching CodeGenerationResponse."""
 
 
 def _slug(name: str) -> str:
@@ -99,9 +110,10 @@ class CodeGenerationAgent:
         llm: BaseChatModel | None = None,
         task: TaskType = "code",
     ) -> CodeGenerationResponse:
-        # LLM first: uses the full OpenSpec (data_entities, api_endpoints, architecture_type)
-        # to generate code tailored to the actual project. Template is fallback only.
+        # LLM first: uses the full OpenSpec (architecture_type, data_entities,
+        # api_endpoints, requirements) to generate code tailored to the project.
         resolved_llm = llm if llm is not None else get_llm(task)
+        reason = _REASON_UNAVAILABLE
 
         if resolved_llm is not None:
             try:
@@ -110,59 +122,31 @@ class CodeGenerationAgent:
                     SystemMessage(content=SYSTEM_PROMPT),
                     HumanMessage(content=_build_human_message(req)),
                 ])
-                if isinstance(result, CodeGenerationResponse) and self._is_valid_output(result):
-                    return result
+                if isinstance(result, CodeGenerationResponse):
+                    if self._is_valid_output(result):
+                        return self._extend_with_sdd(result, req)
+                    reason = _REASON_MISSING_FILES
+                else:
+                    reason = _REASON_INVALID_JSON
+            except TimeoutError:
+                reason = _REASON_TIMEOUT
+                logger.warning("LLM code generation timed out")
+            except (json.JSONDecodeError, ValueError) as exc:
+                reason = _REASON_INVALID_JSON
+                logger.warning("LLM invalid JSON (%s): %s", reason, exc)
             except Exception as exc:
-                logger.warning("LLM code generation failed, using scaffold fallback: %s", exc)
+                reason = _REASON_TIMEOUT if "timeout" in str(exc).lower() else _REASON_INVALID_JSON
+                logger.warning("LLM code generation failed (%s): %s", reason, exc)
 
-        return self._scaffold_fallback(req)
+        fallback_result = _fallback.generate(req, reason=reason)
+        return self._extend_with_sdd(fallback_result, req)
 
     @staticmethod
     def _is_valid_output(result: CodeGenerationResponse) -> bool:
         if not result.files:
             return False
         paths = [f.path for f in result.files]
-        # Reject if more than 60 files (LLM hallucination) or duplicate paths
         return len(paths) <= 60 and len(paths) == len(set(paths))
-
-    def _scaffold_fallback(self, req: CodeGenerationRequest) -> CodeGenerationResponse:
-        # Generic fallback used only when the LLM is unavailable or returns invalid output.
-        # Generates a minimal but runnable tRPC+Next.js scaffold from OpenSpec data_entities.
-        # Stack-specific generation is the LLM's responsibility.
-        slug = _slug(req.project_name)
-        modules = req.modules if req.modules else ["Item"]
-        first_mod = modules[0]
-        first_slug = _slug(first_mod)
-        first_pascal = _pascal(first_mod)
-        first_camel = _camel(first_mod)
-
-        files: list[GeneratedFile] = [
-            self._api_package_json(slug),
-            self._api_tsconfig(),
-            self._api_index(slug),
-            self._api_trpc(req),
-            self._api_router(modules),
-            self._prisma_schema(modules, req.needs_auth, req.data_entities or None),
-            self._module_entity(first_slug, first_pascal),
-            self._module_service(first_slug, first_pascal, first_camel),
-            self._module_router(first_slug, first_pascal, first_camel),
-            self._web_package_json(slug),
-            self._web_tsconfig(),
-            self._web_tailwind(),
-            self._web_layout(req.project_name),
-            self._web_home_page(req.project_name, modules),
-            self._web_module_page(first_pascal, first_camel),
-            self._web_trpc_client(),
-            self._web_provider(),
-            self._api_dockerfile(),
-            self._web_dockerfile(),
-            self._nginx_conf(),
-            self._docker_compose(slug, req.needs_ai),
-            self._env_example(slug),
-        ]
-        files += self._sdd_and_docs_files(req)
-
-        return CodeGenerationResponse(project_name=req.project_name, files=files)
 
     def _extend_with_sdd(
         self, base: CodeGenerationResponse, req: CodeGenerationRequest
