@@ -256,29 +256,19 @@ src/modules/
 | `TechProposalAgent` | `tech_proposal_agent.py` | general | 3 propuestas de stack con ventajas, limitaciones y learning outcomes |
 | `RAGAgent` | `rag_agent.py` | general | Respuestas fundamentadas en documentos indexados — retrieval sobre Qdrant + citas de fuente |
 
-### Templates de sector (17)
+### Templates de arquitectura (5)
 
-Los templates generan scaffolds deterministas (sin LLM) adaptados a cada sector. El `CodeGenerationAgent` selecciona el template por keywords del sector + stack, o por `architecture_type` explícito del `ArchitectureAgent`.
+Los templates definen el **stack tecnológico** del scaffold — no el dominio. El dominio (modelos Prisma, rutas, páginas) lo genera el LLM usando el OpenSpec (`data_entities` + `api_endpoints`), o el scaffold genérico si el LLM falla.
 
-| Template | Arquitectura base | Sectores cubiertos |
-|----------|------------------|--------------------|
-| `academia.py` | Next.js 14 + tRPC + Fastify | Formación, cursos, escuelas |
-| `django_rest.py` | Django 5 + DRF + PostgreSQL | APIs REST con panel admin Django |
-| `express_beginner.py` | Express.js + React + Prisma | Proyectos sencillos Node.js (nivel principiante) |
-| `laravel_monolith.py` | Laravel 11 + Blade | Monolitos PHP tradicionales |
-| `nextjs_app.py` | Next.js 15 App Router + Prisma | Apps fullstack modernas |
-| `ecommerce.py` | tRPC + Next.js + Prisma | Tiendas online, marketplaces |
-| `horeca.py` | tRPC + Next.js + Prisma | Restaurantes, hostelería |
-| `salud.py` | tRPC + Next.js + Prisma | Clínicas, pacientes, citas |
-| `veterinaria.py` | tRPC + Next.js + Prisma | Clínicas veterinarias |
-| `inmobiliaria.py` | tRPC + Next.js + Prisma | Agencias inmobiliarias, CRM |
-| `rrhh.py` | tRPC + Next.js + Prisma | Recursos humanos, nóminas |
-| `logistica.py` | tRPC + Next.js + Prisma | Logística, flota, tracking |
-| `fintech.py` | tRPC + Next.js + Prisma | Finanzas, presupuesto, inversión |
-| `eventos.py` | tRPC + Next.js + Prisma | Eventos, ticketing, check-in |
-| `gym.py` | tRPC + Next.js + Prisma | Gimnasios, membresías, clases |
-| `farmacia.py` | tRPC + Next.js + Prisma | Farmacias, stock, recetas |
-| `abogados.py` | tRPC + Next.js + Prisma | Bufetes, expedientes, horas facturables |
+La selección se basa en `architecture_type` (del `ArchitectureAgent`), `technical_level`, o keywords en el sector/stack.
+
+| Template | Arquitectura | Cuándo se usa |
+|----------|-------------|---------------|
+| `nextjs_app.py` | Next.js 15 App Router + Prisma + PostgreSQL | Default para apps web modernas |
+| `express_beginner.py` | Express.js + React + Prisma | Nivel BEGINNER o `REACT_EXPRESS` |
+| `academia.py` | Next.js 14 + tRPC + Fastify + PostgreSQL | Sector educativo / SaaS de formación |
+| `django_rest.py` | Django 5 + DRF + PostgreSQL | Stack Python / `DJANGO_REST` |
+| `laravel_monolith.py` | Laravel 11 + Blade + MySQL | Stack PHP / `LARAVEL_*` |
 
 ### Cadena de fallback LLM (por tipo de tarea)
 
@@ -502,7 +492,7 @@ VITE_CAPTCHA_SITE_KEY=<Cloudflare Turnstile site key>
 - [x] Wizard conversacional de 6 pasos con mensajes de IA en cola
 - [x] Pipeline SDD completo: requisitos → arquitectura → OpenSpec → issues → tutorial → código → ZIP
 - [x] 12 arquitecturas soportadas: 8 web + 2 mobile + 2 desktop
-- [x] **17 templates de sector** — scaffolds deterministas adaptados por palabras clave (horeca, salud, fintech, rrhh, ecommerce, logística, eventos, veterinaria, gym, farmacia, abogados, academia, django, laravel, nextjs, express, inmobiliaria)
+- [x] **5 templates de arquitectura** — scaffolds por stack tecnológico (nextjs, express-beginner, academia, django, laravel); el dominio lo generan el LLM + OpenSpec data_entities
 - [x] Cadena de fallback LLM con 4 proveedores (Groq → OpenAI → Gemini → Ollama → determinístico)
 - [x] Enrutamiento de tarea: cada tipo de agente usa el proveedor óptimo
 - [x] **UI de configuración LLM** (`/ai-settings`) — cambio de proveedor y modelo en caliente sin reiniciar

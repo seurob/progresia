@@ -8,20 +8,9 @@ from app.core.llm import TaskType, get_llm
 from app.schemas.codegen import CodeGenerationRequest, CodeGenerationResponse, GeneratedFile
 from app.agents.templates import academia as academia_template
 from app.agents.templates import django_rest as django_template
+from app.agents.templates import express_beginner as express_template
 from app.agents.templates import laravel_monolith as laravel_template
 from app.agents.templates import nextjs_app as nextjs_template
-from app.agents.templates import rrhh as rrhh_template
-from app.agents.templates import salud as salud_template
-from app.agents.templates import horeca as horeca_template
-from app.agents.templates import inmobiliaria as inmobiliaria_template
-from app.agents.templates import ecommerce as ecommerce_template
-from app.agents.templates import logistica as logistica_template
-from app.agents.templates import fintech as fintech_template
-from app.agents.templates import eventos as eventos_template
-from app.agents.templates import veterinaria as veterinaria_template
-from app.agents.templates import gym as gym_template
-from app.agents.templates import farmacia as farmacia_template
-from app.agents.templates import abogados as abogados_template
 
 logger = logging.getLogger(__name__)
 
@@ -104,9 +93,8 @@ class CodeGenerationAgent:
         llm: BaseChatModel | None = None,
         task: TaskType = "code",
     ) -> CodeGenerationResponse:
-        # Sector-specific templates always take priority — they produce
-        # deterministic, high-quality output that an LLM cannot match.
-        if self._has_sector_template(req):
+        # Architecture templates take priority for deterministic stack selection.
+        if self._has_architecture_template(req):
             return self._scaffold_fallback(req)
 
         resolved_llm = llm if llm is not None else get_llm(task)
@@ -125,29 +113,17 @@ class CodeGenerationAgent:
 
         return self._scaffold_fallback(req)
 
-    def _has_sector_template(self, req: CodeGenerationRequest) -> bool:
+    def _has_architecture_template(self, req: CodeGenerationRequest) -> bool:
         if req.architecture_type and req.architecture_type in self._ARCHITECTURE_TEMPLATES:
             return True
-        sector = req.sector.lower()
-        stack  = " ".join(req.stack).lower()
-        text   = f"{sector} {stack}"
+        if req.technical_level == "BEGINNER":
+            return True
+        text = f"{req.sector.lower()} {' '.join(req.stack).lower()}"
         return (
             any(k in text for k in self._ACADEMIA_KEYWORDS)
             or any(k in text for k in self._LARAVEL_KEYWORDS)
             or any(k in text for k in self._NEXTJS_KEYWORDS)
             or any(k in text for k in self._DJANGO_KEYWORDS)
-            or any(k in text for k in self._RRHH_KEYWORDS)
-            or any(k in text for k in self._SALUD_KEYWORDS)
-            or any(k in text for k in self._HORECA_KEYWORDS)
-            or any(k in text for k in self._INMOBILIARIA_KEYWORDS)
-            or any(k in text for k in self._ECOMMERCE_KEYWORDS)
-            or any(k in text for k in self._LOGISTICA_KEYWORDS)
-            or any(k in text for k in self._FINTECH_KEYWORDS)
-            or any(k in text for k in self._EVENTOS_KEYWORDS)
-            or any(k in text for k in self._VETERINARIA_KEYWORDS)
-            or any(k in text for k in self._GYM_KEYWORDS)
-            or any(k in text for k in self._FARMACIA_KEYWORDS)
-            or any(k in text for k in self._ABOGADOS_KEYWORDS)
         )
 
     @staticmethod
@@ -158,24 +134,14 @@ class CodeGenerationAgent:
         # Reject if more than 60 files (LLM hallucination) or duplicate paths
         return len(paths) <= 60 and len(paths) == len(set(paths))
 
-    # ── Scaffold fallback: sector-specific or generic DDD ─────────────────
+    # ── Architecture keyword hints ─────────────────────────────────────────
+    # Used only to pick the RIGHT TECH STACK — not to inject hardcoded domain models.
+    # Domain models come from OpenSpec data_entities.
 
     _ACADEMIA_KEYWORDS = {"educac", "formac", "ensena", "academia", "curso", "escuela", "capacitac"}
     _LARAVEL_KEYWORDS  = {"laravel", "php", "blade", "eloquent", "artisan"}
     _NEXTJS_KEYWORDS   = {"nextjs", "next.js", "next js", "vercel", "app router"}
     _DJANGO_KEYWORDS   = {"django", "drf", "django rest", "python web"}
-    _RRHH_KEYWORDS          = {"rrhh", "recursos humanos", "empleados", "nomina", "nómina", "payroll", "hr ", "human resources"}
-    _SALUD_KEYWORDS         = {"salud", "clinica", "clínica", "medic", "paciente", "doctor", "hospital", "cita medica", "consulta"}
-    _HORECA_KEYWORDS        = {"restaurante", "hosteleria", "hostelería", "hotel", "bar ", "cafeteria", "cafetería", "horeca", "comanda", "carta restaurante", "menu restaurante"}
-    _INMOBILIARIA_KEYWORDS  = {"inmobiliaria", "inmueble", "propiedad", "piso", "alquiler piso", "venta piso", "agencia inmobiliaria", "real estate", "crm inmobiliario"}
-    _ECOMMERCE_KEYWORDS     = {"ecommerce", "e-commerce", "tienda online", "tienda virtual", "shop online", "carrito", "catalogo", "catálogo", "marketplace", "venta online"}
-    _LOGISTICA_KEYWORDS     = {"logistica", "logística", "envio", "envío", "mensajeria", "mensajería", "reparto", "transporte", "tracking", "flota", "almacen", "almacén"}
-    _FINTECH_KEYWORDS       = {"fintech", "finanzas", "banco", "banca", "presupuesto", "ahorro", "inversion", "inversión", "contabilidad", "tesoreria", "tesorería", "billetera", "wallet"}
-    _EVENTOS_KEYWORDS       = {"evento", "concierto", "conferencia", "festival", "ticketing", "entrada", "ticket", "asistente evento", "venta entradas", "check-in evento"}
-    _VETERINARIA_KEYWORDS   = {"veterinaria", "veterinario", "mascota", "clinica veterinaria", "clínica veterinaria", "animales domésticos", "animales domesticos", "perros gatos", "clinica animal", "hospital veterinario"}
-    _GYM_KEYWORDS           = {"gimnasio", "gym", "fitness", "membresía", "membresia", "crossfit", "pilates", "yoga gym", "spinning", "entrenamiento personal", "clases grupales", "sala fitness"}
-    _FARMACIA_KEYWORDS      = {"farmacia", "botica", "medicamento", "dispensario", "farmaceutico", "farmacéutico", "medicacion", "medicación", "receta medica", "receta médica", "stock farmacia"}
-    _ABOGADOS_KEYWORDS      = {"abogado", "bufete", "despacho juridico", "despacho jurídico", "expediente juridico", "expediente jurídico", "caso legal", "vista judicial", "horas facturables", "juridico", "jurídico"}
 
     _ARCHITECTURE_TEMPLATES: dict[str, object] = {
         "LARAVEL_MONOLITH":       laravel_template,
@@ -184,6 +150,7 @@ class CodeGenerationAgent:
         "NEXTJS_APP":             nextjs_template,
         "ACADEMIA":               academia_template,
         "DJANGO_REST":            django_template,
+        "REACT_EXPRESS":          express_template,
     }
 
     def _scaffold_fallback(self, req: CodeGenerationRequest) -> CodeGenerationResponse:
@@ -194,38 +161,12 @@ class CodeGenerationAgent:
                 base = tmpl.build(req)  # type: ignore[union-attr]
                 return self._extend_with_sdd(base, req)
 
-        sector_lower = req.sector.lower()
-        stack_lower  = " ".join(req.stack).lower()
-        text         = f"{sector_lower} {stack_lower}"
+        # BEGINNER level → simpler Express+React scaffold
+        if req.technical_level == "BEGINNER":
+            return self._extend_with_sdd(express_template.build(req), req)
 
-        # Check specific sector templates before ACADEMIA to avoid false positives
-        # ("recursos" contains "curso" as a substring, which would incorrectly match ACADEMIA)
-        if any(k in text for k in self._RRHH_KEYWORDS):
-            return self._extend_with_sdd(rrhh_template.build(req), req)
-        # VETERINARIA before SALUD: "clínica veterinaria" contains "clínica" from _SALUD_KEYWORDS
-        if any(k in text for k in self._VETERINARIA_KEYWORDS):
-            return self._extend_with_sdd(veterinaria_template.build(req), req)
-        if any(k in text for k in self._SALUD_KEYWORDS):
-            return self._extend_with_sdd(salud_template.build(req), req)
-        if any(k in text for k in self._HORECA_KEYWORDS):
-            return self._extend_with_sdd(horeca_template.build(req), req)
-        if any(k in text for k in self._INMOBILIARIA_KEYWORDS):
-            return self._extend_with_sdd(inmobiliaria_template.build(req), req)
-        if any(k in text for k in self._ECOMMERCE_KEYWORDS):
-            return self._extend_with_sdd(ecommerce_template.build(req), req)
-        if any(k in text for k in self._LOGISTICA_KEYWORDS):
-            return self._extend_with_sdd(logistica_template.build(req), req)
-        if any(k in text for k in self._FINTECH_KEYWORDS):
-            return self._extend_with_sdd(fintech_template.build(req), req)
-        if any(k in text for k in self._EVENTOS_KEYWORDS):
-            return self._extend_with_sdd(eventos_template.build(req), req)
-        if any(k in text for k in self._GYM_KEYWORDS):
-            return self._extend_with_sdd(gym_template.build(req), req)
-        if any(k in text for k in self._FARMACIA_KEYWORDS):
-            return self._extend_with_sdd(farmacia_template.build(req), req)
-        if any(k in text for k in self._ABOGADOS_KEYWORDS):
-            return self._extend_with_sdd(abogados_template.build(req), req)
-        if any(k in sector_lower for k in self._ACADEMIA_KEYWORDS):
+        text = f"{req.sector.lower()} {' '.join(req.stack).lower()}"
+        if any(k in text for k in self._ACADEMIA_KEYWORDS):
             return self._extend_with_sdd(academia_template.build(req), req)
         if any(k in text for k in self._LARAVEL_KEYWORDS):
             return self._extend_with_sdd(laravel_template.build(req), req)
