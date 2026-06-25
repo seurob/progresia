@@ -10,6 +10,11 @@ const PROVIDER_LABELS: Record<CloudProvider, string> = {
   gemini: "Google Gemini",
 };
 
+export const OLLAMA_RECOMMENDED_MODELS = [
+  "gemma4:26b-a4b",
+  "gemma4:31b",
+] as const;
+
 interface ModelControlsProps {
   readonly cloudOrder: CloudProvider[];
   readonly providers: ProviderInfo[];
@@ -72,14 +77,12 @@ export function ModelControls({
         })}
       </div>
 
-      {ollamaModels.length > 0 && (
-        <OllamaModelSlots
-          providers={providers}
-          ollamaModels={ollamaModels}
-          modelDrafts={modelDrafts}
-          onChange={onModelChange}
-        />
-      )}
+      <OllamaModelSlots
+        providers={providers}
+        ollamaModels={ollamaModels}
+        modelDrafts={modelDrafts}
+        onChange={onModelChange}
+      />
     </div>
   );
 }
@@ -152,6 +155,9 @@ function OllamaModelSlots({
       other: reasoningModel,
     },
   ];
+  const availableModels = Array.from(
+    new Set([...OLLAMA_RECOMMENDED_MODELS, ...ollamaModels]),
+  );
 
   return (
     <div className="space-y-2 border-t border-zinc-800 pt-4">
@@ -160,7 +166,7 @@ function OllamaModelSlots({
           <span className="w-36 shrink-0 text-xs text-zinc-500">{label}</span>
           <ModelSelect
             value={current}
-            options={ollamaModels.filter(model => model !== other)}
+            options={availableModels.filter(model => model !== other)}
             fallback=""
             onChange={value => onChange(key, value)}
           />

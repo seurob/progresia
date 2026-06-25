@@ -58,7 +58,7 @@ DIAPOSITIVAS 12 Y 13 - MODELOS Y RAG (3:28-3:55)
 
 DIAPOSITIVAS 14 A 16 - ENTREGA, SEGURIDAD, OBSERVABILIDAD Y CALIDAD (3:55-4:35)
 
-"La entrega incluye README, documentacion, SDD, codigo, Docker y GitHub Actions. Antes de descargar se comprueba la estructura, la coherencia y la presencia de secretos. La plataforma incluye JWT, autorizacion, CAPTCHA y administracion aislada. Sentry aporta observabilidad opcional en React, NestJS y FastAPI sin enviar usuarios, cookies, cuerpos ni credenciales. La base ha superado 210 pruebas junto con lint, tipos, build y validacion OpenSpec."
+"La entrega incluye README, documentacion, SDD, codigo, Docker y GitHub Actions. Antes de descargar se comprueba la estructura, la coherencia y la presencia de secretos. La plataforma incluye JWT, autorizacion, CAPTCHA y administracion aislada. Sentry aporta observabilidad opcional en React, NestJS y FastAPI sin enviar usuarios, cookies, cuerpos ni credenciales. La base ha superado 211 pruebas junto con lint, tipos, build y validacion OpenSpec."
 
 
 DIAPOSITIVA 17 - DEMOSTRACION (4:35-8:50)

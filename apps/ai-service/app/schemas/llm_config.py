@@ -19,6 +19,7 @@ class ProviderInfo(BaseModel):
 
 
 class TaskRouting(BaseModel):
+    technology: str
     reasoning: str
     code: str
     spec: str

@@ -508,10 +508,10 @@ python -m ruff check app tests
 
 Estado verificado el 25 de junio de 2026:
 
-- Frontend: **10 pruebas superadas**
+- Frontend: **11 pruebas superadas**
 - API: **50 pruebas superadas**
 - AI Service: **150 pruebas superadas y 70 omitidas condicionalmente**
-- Total ejecutado correctamente: **210 pruebas**
+- Total ejecutado correctamente: **211 pruebas**
 - Lint, typecheck, build y validación OpenSpec: **correctos**
 
 La CI ejecuta los controles principales en cada push y pull request.

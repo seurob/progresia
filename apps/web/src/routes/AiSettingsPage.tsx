@@ -15,7 +15,10 @@ import {
   fetchProviderModels,
   updateLlmConfig,
 } from "../features/llm-config/api";
-import { ModelControls } from "../features/llm-config/ModelControls";
+import {
+  ModelControls,
+  OLLAMA_RECOMMENDED_MODELS,
+} from "../features/llm-config/ModelControls";
 import type {
   CloudProvider,
   LlmConfig,
@@ -38,6 +41,7 @@ const PROVIDER_COLORS: Record<string, string> = {
 };
 
 const TASK_LABELS: Record<string, string> = {
+  technology: "Decision tecnologica",
   reasoning: "Razonamiento",
   code: "Codigo",
   spec: "Especificacion",
@@ -180,6 +184,16 @@ export function AiSettingsPage() {
             setModelDrafts(previous => ({ ...previous, [key]: value }))
           }
         />
+        <OllamaProfiles
+          installedModels={ollamaModels}
+          onSelect={model =>
+            setModelDrafts(previous => ({
+              ...previous,
+              ollama_reasoning_model: model,
+              ollama_code_model: model,
+            }))
+          }
+        />
       </section>
 
       <OllamaStatus
@@ -218,6 +232,75 @@ export function AiSettingsPage() {
             </>
           )}
         </button>
+      </div>
+    </div>
+  );
+}
+
+function OllamaProfiles({
+  installedModels,
+  onSelect,
+}: {
+  readonly installedModels: string[];
+  readonly onSelect: (model: string) => void;
+}) {
+  const profiles = [
+    {
+      model: OLLAMA_RECOMMENDED_MODELS[0],
+      title: "Equipo normal",
+      description:
+        "Razonamiento, agentes, planificacion y codigo con activacion eficiente.",
+    },
+    {
+      model: OLLAMA_RECOMMENDED_MODELS[1],
+      title: "GPU potente o mucha RAM",
+      description:
+        "Mayor calidad para arquitectura, refactorizacion y codigo largo.",
+    },
+  ];
+
+  return (
+    <div className="mt-5 border-t border-zinc-800 pt-5">
+      <h3 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">
+        Perfiles Gemma 4 recomendados
+      </h3>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        {profiles.map(profile => {
+          const installed = installedModels.includes(profile.model);
+          return (
+            <div
+              key={profile.model}
+              className="rounded-md border border-zinc-800 bg-zinc-950/60 p-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-zinc-200">{profile.title}</p>
+                  <p className="mt-1 font-mono text-xs text-violet-300">
+                    {profile.model}
+                  </p>
+                </div>
+                <span
+                  className={`text-xs ${installed ? "text-emerald-400" : "text-amber-400"}`}
+                >
+                  {installed ? "Instalado" : "Pendiente"}
+                </span>
+              </div>
+              <p className="mt-3 text-xs leading-5 text-zinc-500">
+                {profile.description}
+              </p>
+              <code className="mt-3 block rounded bg-zinc-900 px-2 py-1.5 text-xs text-zinc-400">
+                ollama pull {profile.model}
+              </code>
+              <button
+                type="button"
+                onClick={() => onSelect(profile.model)}
+                className="mt-3 text-xs font-medium text-violet-400 hover:text-violet-300"
+              >
+                Usar para razonamiento y codigo
+              </button>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -411,6 +494,11 @@ function OllamaStatus({ config, ollama, isFetching, onRefresh }: OllamaStatusPro
               ))}
             </tbody>
           </table>
+          <p className="mt-4 text-xs text-zinc-500">
+            Para instalar los perfiles recomendados usa{" "}
+            <code>ollama pull gemma4:26b-a4b</code> o{" "}
+            <code>ollama pull gemma4:31b</code> y pulsa Actualizar.
+          </p>
         </>
       ) : (
         <div className="space-y-3">
@@ -440,11 +528,11 @@ function OllamaStatus({ config, ollama, isFetching, onRefresh }: OllamaStatusPro
               </li>
               <li className="flex gap-2">
                 <ChevronRight size={13} />
-                <code>ollama pull llama3.1</code>
+                <code>ollama pull gemma4:26b-a4b</code>
               </li>
               <li className="flex gap-2">
                 <ChevronRight size={13} />
-                <code>ollama pull qwen2.5-coder</code>
+                <code>ollama pull gemma4:31b</code>
               </li>
             </ol>
           </div>

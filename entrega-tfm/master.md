@@ -550,11 +550,11 @@ exponer el DSN.
 |------|-----------|-----------------|
 | AI Service | pytest 9.1 | 150 pruebas superadas, 70 omitidas condicionalmente |
 | API — unitario e integración | Jest 30 + Supertest | 50 pruebas superadas |
-| Frontend | Vitest 4 + Testing Library | 10 pruebas superadas |
+| Frontend | Vitest 4 + Testing Library | 11 pruebas superadas |
 | Calidad estática | ESLint, TypeScript, Ruff | lint y typecheck correctos |
 | Entrega | Builds + OpenSpec validator | build completo y 13 cambios OpenSpec válidos |
 
-**Resultado verificado el 25 de junio de 2026:** 210 pruebas superadas, además
+**Resultado verificado el 25 de junio de 2026:** 211 pruebas superadas, además
 de lint, typecheck, build y validación OpenSpec.
 
 ---

@@ -277,6 +277,7 @@ def get_config_state() -> dict:
             },
         ],
         "task_routing": {
+            "technology": resolve(["ollama"] + cloud),
             "reasoning": resolve(cloud + ["ollama"]),
             "code": resolve(["ollama"] + cloud),
             "spec": resolve(cloud + ["ollama"]),
