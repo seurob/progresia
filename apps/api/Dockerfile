@@ -8,9 +8,10 @@ COPY packages/config/package*.json packages/config/
 COPY packages/contracts/package*.json packages/contracts/
 COPY packages/shared/package*.json packages/shared/
 RUN npm ci
-# Copy only api source and shared packages (web is not needed at build time)
+# Copy only api source, shared packages and root scripts (build uses scripts/prisma-generate-safe.mjs)
 COPY apps/api apps/api
 COPY packages packages
+COPY scripts scripts
 RUN npm run build -w apps/api
 
 FROM node:22-alpine

@@ -1,0 +1,38 @@
+# Node.js — reinstalled fresh with npm ci inside Docker
+node_modules
+apps/*/node_modules
+packages/*/node_modules
+
+# Build outputs — rebuilt inside Docker
+apps/api/dist
+apps/web/dist
+
+# Python
+apps/ai-service/__pycache__
+apps/ai-service/**/__pycache__
+apps/ai-service/.venv
+apps/ai-service/env
+**/*.pyc
+**/*.pyo
+
+# Git
+.git
+
+# IDE / editor
+.vscode
+.idea
+
+# Claude Code
+.claude
+
+# Test files (not needed at runtime)
+**/*.spec.ts
+**/*.test.ts
+apps/ai-service/tests
+
+# TFM delivery (not part of the app)
+entrega-tfm
+
+# Logs and temp files
+*.log
+npm-debug.log*
