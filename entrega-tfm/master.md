@@ -326,6 +326,24 @@ propuestas de cada modelo se validan contra el tipo de producto y las
 restricciones obligatorias. Si se configura un proveedor forzado desde
 `/ai-settings`, se intenta primero y después continúa la cadena completa.
 
+### Validación práctica de la IA local
+
+El 25 de junio de 2026 se verificó el flujo local con Ollama `0.30.10`,
+FastAPI en el puerto `8003` y los modelos ya disponibles en el equipo:
+`llama3.1:latest` para razonamiento y `qwen2.5-coder:latest` para código.
+
+La inferencia directa devolvió JSON válido en 30,59 y 15,75 segundos,
+respectivamente. Una llamada real a `/suggest-features` generó diez
+funcionalidades contextualizadas en 17,79 segundos, confirmando que el agente
+utiliza el modelo local y no únicamente el catálogo fijo.
+
+La prueba de `/propose-tech` también confirmó el funcionamiento de las barreras
+de calidad: el modelo produjo una respuesta estructurada, pero recomendó Django
+para un proyecto educativo que no requería un backend pesado. La propuesta fue
+rechazada y el sistema continuó por la cadena de fallback. Este comportamiento
+es intencionado: la plataforma prioriza IA, pero no acepta una salida que
+incumpla las restricciones arquitectónicas.
+
 ### Endpoints del AI service
 
 ```
@@ -713,9 +731,9 @@ Ollama ejecuta los modelos de lenguaje en tu ordenador. Es necesario para que el
 # 1. Descargar e instalar Ollama desde:
 # https://ollama.com
 
-# 2. Instalar los modelos necesarios (4-5 GB cada uno, descarga única):
+# 2. Instalar uno de los perfiles recomendados (descarga única):
 ollama pull gemma4:26b-a4b-it-qat    # perfil equilibrado: ordenador normal
-ollama pull gemma4:31b        # máxima calidad: buena GPU o bastante RAM
+ollama pull gemma4:31b               # máxima calidad: buena GPU o bastante RAM
 
 # 3. Verificar que los modelos están instalados:
 ollama list
@@ -726,8 +744,9 @@ ollama list
 
 | Hardware | Configuración |
 |----------|---------------|
-| Ordenador normal, sin GPU potente | `OLLAMA_REASONING_MODEL=gemma4:26b-a4b-it-qat` y `OLLAMA_CODE_MODEL=gemma4:26b-a4b-it-qat` |
-| Buena GPU o bastante RAM | `OLLAMA_REASONING_MODEL=gemma4:31b` y `OLLAMA_CODE_MODEL=gemma4:31b` |
+| Ordenador normal, 32 GB de RAM recomendados | `gemma4:26b-a4b-it-qat`, descarga aproximada de 16 GB |
+| Buena GPU o bastante RAM | `gemma4:31b`, descarga aproximada de 20 GB |
+| Desarrollo ligero | `llama3.1:latest` para razonamiento y `qwen2.5-coder:latest` para código |
 
 ---
 

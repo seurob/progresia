@@ -281,6 +281,25 @@ El perfil equilibrado es el predeterminado. Para activar el perfil de máxima
 calidad, establecer `OLLAMA_REASONING_MODEL` y `OLLAMA_CODE_MODEL` como
 `gemma4:31b`.
 
+### Estado verificado de la IA local
+
+La integración local se comprobó el **25 de junio de 2026** con Ollama
+`0.30.10` y el servicio FastAPI ejecutándose en `http://127.0.0.1:8003`:
+
+| Prueba | Modelo | Resultado |
+|--------|--------|-----------|
+| Inferencia directa de razonamiento | `llama3.1:latest` | JSON válido en 30,59 s |
+| Inferencia directa de código | `qwen2.5-coder:latest` | Respuesta JSON en 15,75 s |
+| Agente `/suggest-features` | `qwen2.5-coder:latest` | 10 funciones generadas en 17,79 s |
+| Propuesta tecnológica completa | modelos locales de 7-8B | Respuesta estructurada, rechazada cuando incumple las reglas de arquitectura; fallback correcto |
+
+Esto confirma que la IA local funciona dentro del pipeline. Los modelos
+pequeños instalados son adecuados para desarrollo y pruebas, aunque pueden
+producir propuestas arquitectónicas menos fiables. La validación descarta, por
+ejemplo, Django cuando el dominio no justifica un backend pesado. Los perfiles
+Gemma 4 recomendados ofrecen más capacidad, pero requieren aproximadamente
+16 GB (`26b-a4b-it-qat`) o 20 GB (`31b`) de descarga y memoria suficiente.
+
 ### Variables LLM en `.env`
 
 ```env

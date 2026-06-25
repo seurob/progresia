@@ -51,24 +51,24 @@ DIAPOSITIVAS 10 Y 11 - EXPERIENCIA Y AGENTES (3:00-3:28)
 "El usuario trabaja con un wizard adaptado a su nivel tecnico y puede revisar cada resultado. Diez agentes especializados analizan producto, requisitos y arquitectura, generan OpenSpec, issues, tutorial y codigo, y aportan contexto mediante RAG. Esta separacion facilita validar cada etapa."
 
 
-DIAPOSITIVAS 12 Y 13 - MODELOS Y RAG (3:28-3:55)
+DIAPOSITIVAS 12 Y 13 - MODELOS, IA LOCAL Y RAG (3:28-3:58)
 
-"El sistema puede utilizar Groq, OpenAI, Gemini u Ollama con Gemma 4. Para un ordenador normal se recomienda gemma4 de 26B con activacion eficiente; con una GPU potente o bastante RAM se puede usar el modelo de 31B. En la decision tecnologica y la generacion de codigo se prueban todas las IA disponibles antes de recurrir a templates deterministas. RAG permite recuperar documentos desde Qdrant y producir respuestas basadas en evidencia."
+"El sistema puede utilizar Groq, OpenAI, Gemini u Ollama. La IA local se ha probado dentro del servicio con llama3.1 y qwen2.5-coder: una llamada real genero diez funcionalidades contextualizadas en menos de veinte segundos. Para mayor calidad se recomiendan gemma4:26b-a4b-it-qat o gemma4:31b. Las respuestas se validan antes de aceptarse: si un modelo propone una arquitectura incoherente, se intenta otro proveedor y finalmente el fallback determinista. RAG permite recuperar documentos desde Qdrant y responder con evidencia."
 
 
-DIAPOSITIVAS 14 A 16 - ENTREGA, SEGURIDAD, OBSERVABILIDAD Y CALIDAD (3:55-4:35)
+DIAPOSITIVAS 14 A 16 - ENTREGA, SEGURIDAD, OBSERVABILIDAD Y CALIDAD (3:58-4:38)
 
 "La entrega incluye README, documentacion, SDD, codigo, Docker y GitHub Actions. Antes de descargar se comprueba la estructura, la coherencia y la presencia de secretos. La plataforma incluye JWT, autorizacion, CAPTCHA y administracion aislada. Sentry aporta observabilidad opcional en React, NestJS y FastAPI sin enviar usuarios, cookies, cuerpos ni credenciales. La base ha superado 211 pruebas junto con lint, tipos, build y validacion OpenSpec."
 
 
-DIAPOSITIVA 17 - DEMOSTRACION (4:35-8:50)
+DIAPOSITIVA 17 - DEMOSTRACION (4:38-8:50)
 
-TRANSICION (4:35-4:43)
+TRANSICION (4:38-4:46)
 
 "Ahora voy a mostrar la aplicacion funcionando y despues su estructura tecnica."
 
 
-ESCENA A - APLICACION WEB Y ESTADO (4:43-5:12)
+ESCENA A - APLICACION WEB Y ESTADO (4:46-5:15)
 
 Acciones:
 1. Abrir el login e iniciar sesion mediante un corte.
@@ -80,25 +80,26 @@ Narracion:
 "Tras iniciar sesion aparece el dashboard con los proyectos y su estado. La API expone un health check que confirma la conexion con PostgreSQL y si la observabilidad esta activa. Desde aqui puedo abrir un proyecto existente o comenzar uno nuevo."
 
 
-ESCENA B - GENERAR UNA APLICACION (5:12-6:25)
+ESCENA B - CONFIGURACION IA Y GENERAR UNA APLICACION (5:15-6:28)
 
 Idea preparada:
 "Una aplicacion para gestionar reservas de aulas y tutorias. Profesores y alumnos pueden consultar disponibilidad, reservar, cancelar y recibir notificaciones."
 
 Acciones:
-1. Introducir el nombre y la idea.
-2. Avanzar rapidamente por el wizard.
-3. Mostrar nivel tecnico, datos, autenticacion y despliegue.
-4. Elegir una propuesta tecnologica.
-5. Iniciar la generacion.
-6. Mostrar brevemente los estados del pipeline.
-7. Cambiar mediante corte al proyecto ya completado.
+1. Abrir brevemente /ai-settings.
+2. Mostrar Ollama disponible, llama3.1 y qwen2.5-coder instalados.
+3. Mostrar los perfiles Gemma pendientes y volver al wizard.
+4. Introducir el nombre y la idea.
+5. Avanzar rapidamente por nivel, datos, autenticacion y despliegue.
+6. Elegir una propuesta tecnologica e iniciar la generacion.
+7. Mostrar brevemente los estados del pipeline.
+8. Cambiar mediante corte al proyecto ya completado.
 
 Narracion:
-"El wizard recoge el problema, los usuarios, las funciones y las restricciones sin exigir que el usuario conozca previamente el stack. La IA propone alternativas adaptadas a su nivel. La generacion se divide en trabajos asincronos. Para evitar una espera en el video, continuo con el resultado ya completado."
+"En configuracion puedo ver el proveedor efectivo, los modelos locales instalados y el orden de fallback. Ollama esta disponible con llama3.1 para razonamiento y qwen2.5-coder para codigo; los perfiles Gemma de mayor capacidad pueden instalarse desde los comandos mostrados. El wizard recoge problema, usuarios, funciones y restricciones sin exigir conocer el stack. La IA propone alternativas adaptadas al nivel y la generacion se divide en trabajos asincronos. Para evitar una espera en el video, continuo con el resultado ya completado."
 
 
-ESCENA C - RESULTADOS Y DESCARGA (6:25-7:10)
+ESCENA C - RESULTADOS Y DESCARGA (6:28-7:12)
 
 Acciones:
 1. Abrir requisitos y arquitectura.
@@ -111,7 +112,7 @@ Narracion:
 "Los requisitos describen que debe hacer el sistema y la arquitectura explica como construirlo. OpenSpec conecta entidades, API, reglas de negocio, relaciones e indices. El modelo de datos generado incluye claves primarias, foraneas, auditoria y un diagrama entidad-relacion profesional. A partir de el se generan los issues, el tutorial y el codigo. Antes de descargar se validan README, documentacion, SDD, infraestructura y secretos."
 
 
-ESCENA D - ADMINISTRACION (7:10-7:40)
+ESCENA D - ADMINISTRACION (7:12-7:42)
 
 Acciones:
 1. Abrir la ruta de administracion.
@@ -122,7 +123,7 @@ Narracion:
 "El panel de administracion esta separado de la aplicacion normal y utiliza autenticacion propia. Permite buscar y gestionar usuarios, consultar proyectos y revisar su estado sin conceder estos permisos a los usuarios normales."
 
 
-ESCENA E - CODIGO, ESTRUCTURA Y OBSERVABILIDAD (7:40-8:50)
+ESCENA E - CODIGO, ESTRUCTURA Y OBSERVABILIDAD (7:42-8:50)
 
 Acciones:
 1. Mostrar la raiz del monorepo.
@@ -142,7 +143,7 @@ CIERRE DE LA DEMO:
 
 DIAPOSITIVA 18 - LIMITES Y EVOLUCION (8:50-9:15)
 
-"El MVP ya conecta el pipeline completo. Las siguientes mejoras son integrar RAG en el wizard, ampliar los itinerarios educativos, mejorar la edicion visual de OpenSpec, activar los proyectos reales de Sentry y completar un despliegue publico reproducible."
+"El MVP ya conecta el pipeline completo y la IA local esta verificada. Las siguientes mejoras son integrar RAG en el wizard, ampliar los itinerarios educativos, evaluar modelos locales de mayor capacidad, activar los proyectos reales de Sentry y completar un despliegue publico reproducible."
 
 
 DIAPOSITIVA 19 - CONCLUSION (9:15-9:45)
