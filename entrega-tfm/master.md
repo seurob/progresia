@@ -252,41 +252,71 @@ src/modules/
 | `OpenSpecAgent` | `openspec_agent.py` | spec | OpenSpec completo (JSON estructurado) — fuente de verdad para agentes downstream |
 | `IssueGeneratorAgent` | `issue_generator_agent.py` | reasoning | Issues de GitHub con milestones, labels y prioridad a partir del OpenSpec |
 | `TutorialAgent` | `tutorial_agent.py` | general | Tutorial paso a paso con comandos específicos por arquitectura |
-| `CodeGenerationAgent` | `codegen_agent.py` | code | Scaffold de código — usa `data_entities` y `api_endpoints` del OpenSpec + 17 templates de sector |
+| `CodeGenerationAgent` | `codegen_agent.py` | code | Scaffold de código — LLM-first usando `data_entities` y `api_endpoints` del OpenSpec; delega en `FallbackGenerator` (19 stacks) si el LLM falla |
 | `TechProposalAgent` | `tech_proposal_agent.py` | general | 3 propuestas de stack con ventajas, limitaciones y learning outcomes |
 | `RAGAgent` | `rag_agent.py` | general | Respuestas fundamentadas en documentos indexados — retrieval sobre Qdrant + citas de fuente |
 
-### Templates de arquitectura (5)
+### FallbackGenerator — Scaffolds de arquitectura (19 stacks)
 
-Los templates definen el **stack tecnológico** del scaffold — no el dominio. El dominio (modelos Prisma, rutas, páginas) lo genera el LLM usando el OpenSpec (`data_entities` + `api_endpoints`), o el scaffold genérico si el LLM falla.
+Cuando el LLM no está disponible o falla, el `CodeGenerationAgent` delega en el `FallbackGenerator`, que produce un scaffold estructurado determinístico según el `architecture_type` del OpenSpec.
 
-La selección se basa en `architecture_type` (del `ArchitectureAgent`), `technical_level`, o keywords en el sector/stack.
+El `FallbackGenerator` detecta el stack del proyecto (`detector.py`) y selecciona el template adecuado entre 19 stacks disponibles (`fallback/stacks/`). Cada stack genera archivos de proyecto reales: estructura de directorios, configuración, `package.json` / `pyproject.toml`, `docker-compose.yml`, `Dockerfile`, README y esquema de base de datos.
 
-| Template | Arquitectura | Cuándo se usa |
-|----------|-------------|---------------|
-| `nextjs_app.py` | Next.js 15 App Router + Prisma + PostgreSQL | Default para apps web modernas |
-| `express_beginner.py` | Express.js + React + Prisma | Nivel BEGINNER o `REACT_EXPRESS` |
-| `academia.py` | Next.js 14 + tRPC + Fastify + PostgreSQL | Sector educativo / SaaS de formación |
-| `django_rest.py` | Django 5 + DRF + PostgreSQL | Stack Python / `DJANGO_REST` |
-| `laravel_monolith.py` | Laravel 11 + Blade + MySQL | Stack PHP / `LARAVEL_*` |
+| Stack | Archivo | Cuándo se usa |
+|-------|---------|---------------|
+| `nextjs.py` | Next.js 15 App Router + Prisma | Default web moderno |
+| `nestjs.py` | NestJS 11 + React + Prisma + PostgreSQL | Proyectos web desacoplados |
+| `express_ts.py` | Express.js + TypeScript + Prisma | BEGINNER / `REACT_EXPRESS` |
+| `react_vite.py` | React 19 + Vite + Tailwind | SPA puro sin backend propio |
+| `vue_vite.py` | Vue 3 + Vite + Pinia | Alternativa Vue |
+| `angular.py` | Angular + TypeScript + RxJS | Proyectos empresariales |
+| `svelte­kit.py` | SvelteKit + Prisma | Apps web ligeras |
+| `astro.py` | Astro + React | Sites con SSR/SSG |
+| `fastapi_ai.py` | FastAPI + LangChain + PostgreSQL | Proyectos IA / `FASTAPI_AI` |
+| `flask_app.py` | Flask + SQLAlchemy + PostgreSQL | Python BEGINNER |
+| `go_gin.py` | Go + Gin + PostgreSQL | APIs de alto rendimiento |
+| `laravel.py` | Laravel 11 + Blade/Inertia | Stack PHP / `LARAVEL_*` |
+| `node_postgres.py` | Node.js + PostgreSQL (sin ORM) | Backend minimalista |
+| `firebase.py` | React + Firebase + Tailwind | Serverless / sin backend propio |
+| `supabase.py` | React + Supabase + Tailwind | BaaS con auth incluida |
+| `mobile.py` | Flutter / React Native | `productType: mobile` |
+| `desktop.py` | Tauri / Electron | `productType: desktop` |
+| `tauri.py` | Tauri + React + Rust | Desktop nativo / `TAURI_FASTAPI` |
+| `universal.py` | Scaffold genérico | Fallback absoluto |
+
+**Flujo de generación de código:**
+```
+CodeGenerationAgent.generate(payload)
+    │
+    ├─ LLM disponible → genera archivos con structured output (calidad máxima)
+    │
+    └─ LLM falla / no disponible
+           │
+           └─ FallbackGenerator.generate()
+                  │
+                  ├─ StackDetector.detect(payload) → identifica stack
+                  └─ StackModule.build(ctx) → archivos determinísticos
+```
 
 ### Cadena de fallback LLM (por tipo de tarea)
 
+El orden de proveedores cloud es configurable en tiempo real desde `/ai-settings` (campo `cloud_order`). El orden por defecto es **Groq → OpenAI → Gemini**.
+
 ```
 Tipo "reasoning" (requisitos, arquitectura):
-  Groq (llama-3.3-70b) → OpenAI → Gemini → Ollama (llama3.1) → determinístico
+  Groq → OpenAI → Gemini → Ollama (llama3.1) → determinístico
 
 Tipo "spec" (OpenSpec):
-  OpenAI (gpt-4o-mini) → Gemini → Groq → Ollama (llama3.1) → determinístico
+  Groq → OpenAI → Gemini → Ollama (llama3.1) → determinístico
 
 Tipo "code" (generación de código):
-  Ollama (qwen2.5-coder) → Groq → OpenAI → Gemini → determinístico
+  Ollama (qwen2.5-coder) → Groq → OpenAI → Gemini → FallbackGenerator
 
-Tipo "general" (features, tutorial):
+Tipo "general" (features, tutorial, propuestas):
   Groq → OpenAI → Gemini → Ollama (llama3.1) → determinístico
 ```
 
-Si se configura un proveedor forzado desde `/ai-settings`, ese proveedor se intenta primero para todos los tipos.
+Si se configura un proveedor forzado desde `/ai-settings`, ese proveedor se intenta primero para todos los tipos. Si falla, el sistema continúa con la cadena normal.
 
 ### Endpoints del AI service
 
@@ -303,8 +333,9 @@ POST /generate-code             → CodeGenerationAgent — archivos de scaffold
 POST /suggest-features          → sugerencias de funcionalidades por sector
 
 Configuración LLM (en caliente, sin reiniciar)
-GET  /config/llm                → estado actual (proveedor, modelos, enrutamiento)
-PATCH /config/llm               → forzar proveedor / cambiar modelos
+GET  /config/llm                → estado actual (proveedor, modelos, enrutamiento, cloud_order)
+PATCH /config/llm               → forzar proveedor / cambiar modelos / reordenar fallback chain
+GET  /config/llm/provider-models → modelos disponibles en cada proveedor cloud (consulta APIs externas)
 GET  /ollama/models             → modelos instalados en Ollama local
 
 RAG (Retrieval-Augmented Generation)
@@ -492,10 +523,10 @@ VITE_CAPTCHA_SITE_KEY=<Cloudflare Turnstile site key>
 - [x] Wizard conversacional de 6 pasos con mensajes de IA en cola
 - [x] Pipeline SDD completo: requisitos → arquitectura → OpenSpec → issues → tutorial → código → ZIP
 - [x] 12 arquitecturas soportadas: 8 web + 2 mobile + 2 desktop
-- [x] **5 templates de arquitectura** — scaffolds por stack tecnológico (nextjs, express-beginner, academia, django, laravel); el dominio lo generan el LLM + OpenSpec data_entities
+- [x] **FallbackGenerator con 19 stacks** — generación de código LLM-first; si el LLM falla, scaffold determinístico por stack (Next.js, NestJS, Express TS, React Vite, Vue, Angular, SvelteKit, Astro, FastAPI AI, Flask, Go Gin, Laravel, Node+Postgres, Firebase, Supabase, mobile, desktop, Tauri, universal)
 - [x] Cadena de fallback LLM con 4 proveedores (Groq → OpenAI → Gemini → Ollama → determinístico)
 - [x] Enrutamiento de tarea: cada tipo de agente usa el proveedor óptimo
-- [x] **UI de configuración LLM** (`/ai-settings`) — cambio de proveedor y modelo en caliente sin reiniciar
+- [x] **UI de configuración LLM** (`/ai-settings`) — cambio de proveedor, modelo y **orden de fallback chain** en caliente sin reiniciar; selects validados con modelos reales de cada proveedor
 - [x] Auth JWT con refresh token rotation
 - [x] **CAPTCHA** en login y registro (widget estilo Cloudflare Turnstile — soporta Turnstile, hCaptcha, reCAPTCHA)
 - [x] Panel de administración aislado (`/gestion-usuarios`) con auth separada

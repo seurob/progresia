@@ -1,346 +1,527 @@
 # ProgresIA Studio
 
-**Plataforma educativa de desarrollo guiado por IA — de la idea al MVP.**
+> De una idea a un MVP completo mediante desarrollo guiado por especificaciones e IA.
 
-ProgresIA Studio convierte ideas en proyectos técnicos completos a través de la metodología **Spec-to-Software (SDD)**: primero se especifica con precisión, luego la IA genera. El resultado es un MVP con requisitos, arquitectura, código base, issues de GitHub y tutorial — todo coherente y listo para implementar.
+ProgresIA Studio es una plataforma educativa que convierte cualquier idea de producto en un proyecto técnico completo en minutos. Aplica la metodología **SDD (Spec-Driven Development)**: primero especifica con precisión usando múltiples agentes de IA encadenados, luego genera código, documentación, issues y un ZIP listo para continuar el desarrollo.
 
----
-
-## Metodología SDD (Spec-to-Software)
-
-La plataforma impone un orden de trabajo que refleja cómo se construyen productos reales:
-
-```
-Idea del usuario
-      │
-      ▼
-1. Análisis de requisitos   ← agente: requirements_agent
-      │
-      ▼
-2. Arquitectura recomendada ← agente: architecture_agent
-      │
-      ▼
-3. OpenSpec completo        ← agente: openspec_agent  (fuente de verdad)
-      │
-      ├──▶ 4. Issues GitHub      ← agente: issue_generator_agent
-      ├──▶ 5. Tutorial           ← agente: tutorial_agent
-      ├──▶ 6. Código base        ← agente: code_generation_agent
-      └──▶ 7. Bundle ZIP         ← service: bundle_service
-```
-
-El **OpenSpec** es el documento central: un JSON estructurado con entidades de datos, contratos de API, reglas de negocio y pasos de implementación. Cualquier modelo de IA puede leerlo y continuar el desarrollo.
+El diferenciador clave no es la velocidad de generación, sino la **trazabilidad pedagógica**: cada artefacto generado explica la decisión arquitectónica que lo motivó.
 
 ---
 
-## Arquitectura del sistema
+## Características principales
 
-```
-apps/
-├── web/          React 19 + Vite + Tailwind CSS 4  (puerto 5173)
-├── api/          NestJS 11 + Prisma + PostgreSQL    (puerto 3000)
-└── ai-service/   FastAPI + LangChain + LangGraph    (puerto 8003)
-
-packages/
-└── shared-types/ Tipos TypeScript compartidos
-
-infra/
-└── docker-compose.yml  PostgreSQL, Redis, pgAdmin
-```
-
-### Flujo de datos
-
-1. El usuario define su proyecto en el **wizard conversacional** (web)
-2. El **api** almacena el proyecto e idea en PostgreSQL y encola jobs con BullMQ
-3. Cada job llama al **ai-service** que ejecuta el agente correspondiente
-4. Los resultados se persisten como `Specification` y se exponen vía REST
-
-### Autenticación
-
-- JWT access token (15 min) + refresh token rotativo (7 días)
-- Todos los endpoints privados validan ownership del proyecto
+- **Wizard conversacional** — guía al usuario en 6 pasos adaptados a su nivel técnico
+- **Pipeline SDD de 7 etapas** — requisitos → arquitectura → OpenSpec → issues → tutorial → código → ZIP
+- **OpenSpec como fuente de verdad** — contrato JSON central que todos los agentes downstream consumen
+- **12 arquitecturas soportadas** — web, mobile y desktop, de principiante a avanzado
+- **Fallback chain de 4 LLMs** — Groq → OpenAI → Gemini → Ollama → generación determinista
+- **Exportación múltiple** — PDF, Markdown, ZIP descargable, publicación directa a GitHub
+- **Panel de administración** aislado con auth propia
+- **CI verde** — lint, tipos, tests y build validados en GitHub Actions
 
 ---
 
 ## Stack técnico
 
-| Capa | Tecnología |
-|------|-----------|
-| Frontend | React 19, Vite 6, Tailwind CSS 4, TanStack Query, React Router 7 |
-| Backend | NestJS 11, Prisma 6, PostgreSQL 16, BullMQ, Passport-JWT |
-| AI Service | FastAPI 0.115, LangChain 0.3, LangGraph 0.5, Pydantic v2 |
-| Infra | Docker Compose, Redis (queue), pgAdmin |
-| LLM | Groq (primario), OpenAI, Google Gemini (fallback) |
+| Capa | Tecnología | Puerto |
+|------|-----------|--------|
+| Frontend | React 19, Vite 8, Tailwind CSS 4, TanStack Query, React Router 7 | 5173 |
+| Backend | NestJS 11, Prisma 6, PostgreSQL 16, BullMQ, Passport-JWT | 3000 |
+| AI Service | FastAPI 0.115, LangChain 0.3, LangGraph 0.5, Pydantic v2 | 8003 |
+| Base de datos | PostgreSQL 16 | 5432 |
+| Cola de jobs | Redis 7 | 6380 * |
+| Vectores (RAG) | Qdrant | 6333 |
+| Almacenamiento | MinIO | 9000 / 9001 |
+| Email (dev) | Mailpit | 1025 SMTP / 8025 UI |
+
+> \* Redis en el puerto 6380 para evitar conflicto con Docker Desktop en Windows.
 
 ---
 
-## Puesta en marcha
+## Requisitos previos
 
-### Requisitos
+| Herramienta | Versión mínima | Notas |
+|-------------|---------------|-------|
+| Node.js | 22 LTS | Usar `nvm` o `volta` recomendado |
+| Python | 3.12+ | Gestor `uv` o `pip` |
+| Docker Desktop | Última estable | Con Docker Compose v2 integrado |
+| Git | 2.40+ | |
 
-- Node.js ≥ 20, Python ≥ 3.11, Docker Desktop
+**LLM (al menos uno requerido):**
 
-### 1. Variables de entorno
+| Proveedor | Clave | Gratuito |
+|-----------|-------|---------|
+| Groq | `GROQ_API_KEY` | Sí (tier gratuito generoso) |
+| OpenAI | `OPENAI_API_KEY` | No |
+| Google Gemini | `GEMINI_API_KEY` | Sí (tier gratuito) |
+| Ollama | — (local) | Sí |
+
+---
+
+## Puesta en marcha (desarrollo local)
+
+### 1. Clonar e instalar dependencias
 
 ```bash
+git clone <repo-url>
+cd progresia
+
+# Instalar dependencias de todos los packages y apps
+npm install
+```
+
+### 2. Configurar variables de entorno
+
+```bash
+# Variables de infraestructura y API
 cp .env.example .env
-# Editar .env: DATABASE_URL, JWT_SECRET, CAPTCHA_*, GROQ_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, GITHUB_TOKEN
 ```
 
-Para el ai-service:
+Editar `.env` con los valores reales. Los campos mínimos para arrancar:
+
+```env
+DATABASE_URL=postgresql://progresia:change_me_in_production@localhost:5432/progresia_studio
+JWT_SECRET=una_clave_secreta_larga_y_aleatoria
+JWT_REFRESH_SECRET=otra_clave_secreta_diferente
+GROQ_API_KEY=gsk_...          # O cualquier otro proveedor LLM
+```
 
 ```bash
+# Variables del AI service (LLM keys)
 cp apps/ai-service/.env.example apps/ai-service/.env
-# Añadir claves de LLM
+# Añadir al menos una clave LLM en GROQ_API_KEY, OPENAI_API_KEY o GEMINI_API_KEY
 ```
 
-### 2. Infraestructura
+### 3. Levantar la infraestructura (Docker)
 
 ```bash
-docker compose up -d   # PostgreSQL + Redis + pgAdmin
+docker compose up -d
 ```
 
-### 3. Base de datos
+Esto inicia PostgreSQL, Redis, MinIO, Qdrant y Mailpit. Verificar que todo esté sano:
+
+```bash
+docker compose ps        # todos en estado "running"
+curl http://localhost:9001  # MinIO console
+curl http://localhost:8025  # Mailpit UI
+```
+
+### 4. Preparar la base de datos
 
 ```bash
 cd apps/api
-npx prisma migrate deploy   # producción
-# o
-npx prisma migrate dev      # desarrollo (recrea si es necesario)
+
+# Primera vez (desarrollo) — aplica migraciones y genera el cliente Prisma
+npx prisma migrate dev
 npx prisma generate
-npx prisma db seed
+
+# Crear el usuario administrador de desarrollo
+npm run prisma:seed
 ```
 
-### 4. API (NestJS)
+> En producción usar `npx prisma migrate deploy` en lugar de `migrate dev`.
+
+### 5. Arrancar el AI Service (FastAPI)
+
+```bash
+cd apps/ai-service
+
+# Instalar dependencias Python (una sola vez)
+pip install -e ".[dev]"
+
+# Arrancar (puerto 8003 — Docker Desktop ocupa 8000/8001 en Windows)
+uvicorn app.main:app --port 8003 --reload
+```
+
+Verificar: `curl http://localhost:8003/health` → `{"status":"ok","service":"progresia-ai-service"}`
+
+### 6. Arrancar el API (NestJS)
 
 ```bash
 cd apps/api
 npm install
-npm run build          # compila a dist/
+
+# Compilar y arrancar
+npx tsc --project tsconfig.build.json
 node --enable-source-maps dist/main
 ```
 
-### 5. AI Service (FastAPI)
+> **Windows:** No usar `nest start --watch` — crea procesos zombi. Usar siempre `tsc + node`.
 
-```bash
-cd apps/ai-service
-pip install -e ".[dev]"
-uvicorn app.main:app --port 8003 --reload
-```
+Verificar: `curl http://localhost:3000/api/health`
 
-### 6. Frontend (React)
+### 7. Arrancar el Frontend (React)
 
 ```bash
 cd apps/web
 npm install
-npm run dev            # http://localhost:5173
+npm run dev
 ```
 
----
-
-## Niveles técnicos del usuario
-
-El wizard pregunta por el nivel técnico del desarrollador. Este valor fluye por todo el pipeline:
-
-| Nivel | Campo DB | Arquitecturas recomendadas |
-|-------|----------|---------------------------|
-| Principiante | `complexity: "simple"` | Laravel Monolith, Django REST, React+Express |
-| Intermedio | `complexity: "standard"` | Next.js App Router, NestJS+React |
-| Avanzado | `complexity: "complex"` | NestJS+React, FastAPI+IA, arquitecturas desacopladas |
+Abrir `http://localhost:5173`
 
 ---
 
-## Arquitecturas soportadas
+## Resumen de URLs en desarrollo
 
-| ID | Nombre | Nivel |
-|----|--------|-------|
-| `LARAVEL_MONOLITH` | Laravel 11 REST API | Principiante |
-| `LARAVEL_INERTIA_REACT` | Laravel + Inertia + React | Intermedio |
-| `DJANGO_REST` | Django 5 + DRF | Principiante |
-| `NEXTJS_APP` | Next.js 15 App Router | Intermedio |
-| `NESTJS_REACT` | NestJS + React desacoplado | Intermedio/Avanzado |
-| `REACT_EXPRESS` | React + Express Node.js | Principiante |
-| `FASTAPI_AI` | FastAPI + LangChain/LangGraph | Avanzado |
+| Servicio | URL | Descripción |
+|---------|-----|-------------|
+| Frontend | http://localhost:5173 | App principal |
+| API | http://localhost:3000/api | REST API |
+| AI Service | http://localhost:8003 | Agentes IA |
+| AI Service docs | http://localhost:8003/docs | Swagger interactivo |
+| Mailpit | http://localhost:8025 | Bandeja de email de desarrollo |
+| MinIO | http://localhost:9001 | Consola de almacenamiento |
+| Qdrant | http://localhost:6333/dashboard | Panel de vectores |
 
 ---
 
-## Estructura del OpenSpec
+## Metodología SDD — Pipeline de generación
 
-El `OpenSpecDoc` es la fuente de verdad para todos los agentes downstream:
+La plataforma impone un orden de trabajo que refleja cómo se construyen productos reales. Cada paso depende del anterior y consume el OpenSpec como fuente de verdad.
+
+```
+Idea del usuario  (wizard conversacional — 6 pasos)
+      │
+      ▼
+1. Análisis de requisitos    ← requirements_agent.py
+      │                         Extrae RF, RNF, user stories y restricciones
+      ▼
+2. Arquitectura tecnológica  ← architecture_agent.py
+      │                         Selecciona stack, justifica la decisión
+      ▼
+3. OpenSpec completo         ← openspec_agent.py   ← FUENTE DE VERDAD
+      │
+      ├──▶ 4. Issues de GitHub    ← issue_generator_agent.py
+      ├──▶ 5. Tutorial            ← tutorial_agent.py
+      ├──▶ 6. Código base         ← codegen_agent.py
+      └──▶ 7. Bundle ZIP          ← bundle_service
+```
+
+### El OpenSpec
+
+El `OpenSpecDoc` es el contrato central que todos los agentes downstream consumen:
 
 ```json
 {
-  "project":        { "name", "sector", "target_users", "problem", "description" },
+  "project":        { "name", "sector", "target_users", "problem" },
   "architecture":   { "type", "name", "stack", "difficulty" },
   "requirements":   [{ "id", "title", "description", "acceptance_criteria" }],
   "user_stories":   [{ "id", "actor", "goal", "benefit" }],
   "modules":        ["Auth", "Reservas", "Admin"],
   "milestones":     ["Milestone 1: Setup", "..."],
-  "data_entities":  [{ "name", "description", "fields", "relations" }],
-  "api_endpoints":  [{ "method", "path", "description", "auth_required", "request_body", "response" }],
-  "business_rules": ["Un usuario solo puede acceder a sus propios recursos", "..."],
-  "dev_steps":      [{ "step", "title", "description", "commands" }],
+  "data_entities":  [{ "name", "fields", "relations" }],
+  "api_endpoints":  [{ "method", "path", "auth_required", "request_body", "response" }],
+  "business_rules": ["Un usuario solo puede ver sus propios proyectos"],
+  "dev_steps":      [{ "step", "title", "commands" }],
   "constraints":    { "delivery", "environments" }
 }
 ```
 
+Mejorar el OpenSpec (su esquema o el prompt del agente) mejora automáticamente todos los artefactos downstream.
+
 ---
 
-## Variables de entorno
+## Arquitecturas soportadas
 
-| Variable | Servicio | Descripción |
-|----------|----------|-------------|
-| `DATABASE_URL` | api | PostgreSQL connection string |
-| `JWT_SECRET` | api | Clave de firma JWT |
-| `JWT_REFRESH_SECRET` | api | Clave de firma refresh token |
-| `CAPTCHA_ENABLED` | api | Activa validacion CAPTCHA en backend (`true`/`false`) |
-| `CAPTCHA_PROVIDER` | api | `turnstile`, `hcaptcha` o `recaptcha` |
-| `CAPTCHA_SECRET_KEY` | api | Secreto del proveedor CAPTCHA |
-| `VITE_CAPTCHA_PROVIDER` | web | Proveedor del widget: `turnstile`, `hcaptcha` o `recaptcha` |
-| `VITE_CAPTCHA_SITE_KEY` | web | Clave publica del widget CAPTCHA |
-| `AI_SERVICE_URL` | api | URL del ai-service (default: `http://127.0.0.1:8003`) |
-| `GROQ_API_KEY` | ai-service | Clave Groq (LLM primario) |
-| `OPENAI_API_KEY` | ai-service | Clave OpenAI (fallback) |
-| `GEMINI_API_KEY` | ai-service | Clave Google Gemini (fallback) |
-| `GITHUB_TOKEN` | ai-service | Token para crear issues en GitHub |
+El `ArchitectureAgent` selecciona la arquitectura óptima según el nivel técnico del usuario y el tipo de producto. El `FallbackGenerator` incluye scaffolds deterministas para cada una.
 
-> Las claves de API nunca se commitean. Solo existen en `.env` (gitignored).
+| ID | Nombre | Nivel | Tipo |
+|----|--------|-------|------|
+| `LARAVEL_MONOLITH` | Laravel 11 REST API | Principiante | Web |
+| `LARAVEL_INERTIA_REACT` | Laravel + Inertia + React | Intermedio | Web |
+| `LARAVEL_INERTIA_VUE` | Laravel + Inertia + Vue 3 | Intermedio | Web |
+| `DJANGO_REST` | Django 5 + DRF | Principiante | Web |
+| `NEXTJS_APP` | Next.js 15 App Router | Intermedio | Web |
+| `NESTJS_REACT` | NestJS 11 + React desacoplado | Intermedio/Avanzado | Web |
+| `REACT_EXPRESS` | React + Express Node.js | Principiante | Web |
+| `FASTAPI_AI` | FastAPI + LangChain/LangGraph | Avanzado | Web/IA |
+| `FLUTTER_FASTAPI` | Flutter + FastAPI | Avanzado | Mobile |
+| `REACT_NATIVE_NESTJS` | React Native (Expo) + NestJS | Avanzado | Mobile |
+| `TAURI_FASTAPI` | Tauri (Rust) + FastAPI | Avanzado | Desktop |
+| `ELECTRON_NESTJS` | Electron + NestJS | Intermedio | Desktop |
+
+---
+
+## Configuración LLM
+
+### Fallback chain por tipo de tarea
+
+El orden de proveedores cloud es configurable en tiempo real desde `/ai-settings`. El orden por defecto es Groq → OpenAI → Gemini.
+
+| Tipo de tarea | Cadena de fallback |
+|--------------|-------------------|
+| Requisitos, arquitectura, spec | Groq → OpenAI → Gemini → Ollama → determinístico |
+| Generación de código | Ollama (qwen2.5-coder) → Groq → OpenAI → Gemini → FallbackGenerator |
+| Tutorial, propuestas, features | Groq → OpenAI → Gemini → Ollama → determinístico |
+
+Si el LLM configurado falla, el sistema continúa automáticamente con el siguiente en la cadena, garantizando siempre una entrega útil.
+
+### Variables LLM en `.env`
+
+```env
+LLM_PROVIDER=groq                          # proveedor por defecto
+
+GROQ_API_KEY=gsk_...
+GROQ_MODEL=llama-3.3-70b-versatile
+
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4o-mini
+
+GEMINI_API_KEY=AIza...
+GEMINI_MODEL=gemini-2.0-flash
+
+OLLAMA_BASE_URL=http://localhost:11434     # solo si tienes Ollama instalado
+OLLAMA_REASONING_MODEL=llama3.1
+OLLAMA_CODE_MODEL=qwen2.5-coder
+```
+
+---
+
+## Variables de entorno — referencia completa
+
+### `.env` (raíz del monorepo)
+
+| Variable | Requerida | Descripción |
+|----------|-----------|-------------|
+| `DATABASE_URL` | Sí | PostgreSQL connection string |
+| `JWT_SECRET` | Sí | Clave de firma del access token |
+| `JWT_REFRESH_SECRET` | Sí | Clave de firma del refresh token |
+| `JWT_EXPIRES_IN` | No | Duración del access token (default: `1d`) |
+| `REDIS_HOST` | No | Host de Redis (default: `localhost`) |
+| `REDIS_PORT` | No | Puerto interno de Redis (default: `6379`) |
+| `REDIS_PUBLIC_PORT` | No | Puerto externo mapeado (default: `6380`) |
+| `AI_SERVICE_URL` | No | URL del AI service (default: `http://127.0.0.1:8003`) |
+| `CAPTCHA_ENABLED` | No | Activa CAPTCHA en backend (`true`/`false`, default: `false`) |
+| `CAPTCHA_PROVIDER` | No | `turnstile`, `hcaptcha` o `recaptcha` |
+| `CAPTCHA_SECRET_KEY` | No* | Secreto del proveedor (requerido si CAPTCHA_ENABLED=true) |
+| `VITE_CAPTCHA_PROVIDER` | No | Proveedor del widget frontend |
+| `VITE_CAPTCHA_SITE_KEY` | No* | Clave pública del widget (requerida si CAPTCHA activado) |
+| `MINIO_ACCESS_KEY` | No | Credencial MinIO (default: `progresia`) |
+| `MINIO_SECRET_KEY` | No | Secreto MinIO (default: `progresia_secret`) |
+| `GITHUB_TOKEN` | No | Token para publicar issues en GitHub |
+| `ADMIN_JWT_SECRET` | No | Clave JWT del panel admin (default: `admin_change_me`) |
+| `ADMIN_EMAIL` | No | Email del admin inicial (default: `admin@progresia.local`) |
+| `ADMIN_USERNAME` | No | Username del admin inicial |
+| `ADMIN_PASSWORD` | No | Password del admin inicial |
+
+### `apps/ai-service/.env`
+
+| Variable | Requerida | Descripción |
+|----------|-----------|-------------|
+| `LLM_PROVIDER` | No | Proveedor LLM por defecto (`groq`) |
+| `GROQ_API_KEY` | No* | Al menos una clave LLM es requerida |
+| `OPENAI_API_KEY` | No* | |
+| `GEMINI_API_KEY` | No* | |
+| `OLLAMA_BASE_URL` | No | URL de Ollama local |
+| `QDRANT_URL` | No | URL de Qdrant (default: `http://localhost:6333`) |
+
+> Las claves de API nunca se commitean. Solo existen en archivos `.env` (gitignored).
+
+---
+
+## API — endpoints principales
+
+### Autenticación (`/api/auth`)
+
+```
+POST /api/auth/register   → crea cuenta, devuelve { accessToken, refreshToken, user }
+POST /api/auth/login      → devuelve { accessToken, refreshToken, user }
+POST /api/auth/refresh    → rota el refresh token
+POST /api/auth/logout     → invalida el refresh token
+```
+
+El registro crea la cuenta activa al instante — no hay verificación por email en desarrollo.
+
+### Proyectos (`/api/projects`)
+
+```
+GET    /api/projects                    → lista proyectos del usuario
+POST   /api/projects                    → crea proyecto + workspace
+GET    /api/projects/:idOrSlug          → detalle (acepta UUID o slug)
+PATCH  /api/projects/:idOrSlug          → actualiza
+DELETE /api/projects/:idOrSlug          → elimina
+```
+
+### Pipeline SDD (`/api/jobs`)
+
+```
+POST /api/jobs/generate-requirements    → inicia job de requisitos
+POST /api/jobs/recommend-architecture   → inicia job de arquitectura
+POST /api/jobs/generate-openspec        → inicia job de OpenSpec
+POST /api/jobs/generate-issues          → inicia job de issues
+POST /api/jobs/generate-tutorial        → inicia job de tutorial
+POST /api/jobs/generate-code            → inicia job de código
+GET  /api/jobs/:jobId                   → estado del job (pending/active/completed/failed)
+```
+
+### Especificaciones (`/api/specifications`)
+
+```
+GET  /api/specifications/project/:id           → todas las specs del proyecto
+GET  /api/specifications/:id                   → spec individual
+GET  /api/specifications/:id/export/pdf        → descarga PDF
+GET  /api/specifications/:id/export/markdown   → descarga Markdown
+```
+
+### Artefactos (`/api/artifacts`)
+
+```
+POST /api/artifacts/project/:id/generate   → genera el bundle ZIP
+GET  /api/artifacts/project/:id            → estado del bundle
+GET  /api/artifacts/:bundleId/download-url → URL firmada de descarga (1h)
+```
+
+### AI Service (`http://localhost:8003`)
+
+```
+GET  /health                     → estado del servicio
+GET  /docs                       → Swagger interactivo
+POST /suggest-features           → sugerencias de features por sector
+POST /propose-tech               → 3 propuestas de stack técnico
+GET  /config/llm                 → estado actual del LLM (proveedor, modelos, cadena)
+PATCH /config/llm                → cambiar proveedor/modelos en caliente
+GET  /config/llm/provider-models → modelos disponibles por proveedor
+GET  /ollama/models              → modelos instalados en Ollama local
+```
+
+---
+
+## Autenticación y seguridad
+
+- **JWT** — access token (1 día por defecto) + refresh token rotativo (7 días)
+- **CAPTCHA** — configurable por proveedor (Turnstile, hCaptcha, reCAPTCHA); desactivado en desarrollo
+- **Ownership** — todos los endpoints de proyectos validan que el usuario sea el propietario
+- **Admin aislado** — `ADMIN_JWT_SECRET` separado; tokens admin no válidos en la app normal
+- **Secretos fuera del código** — las claves de API solo existen en `.env` (gitignored)
+
+---
 
 ## Panel de administración
 
-Disponible en `http://localhost:5173/gestion-usuarios` (web) o a través del proxy de Docker.
-
-La ruta no aparece en ningún menú ni navegación normal. Solo usuarios con rol `ADMIN` pueden acceder.
-
-### Credenciales de desarrollo
-
-> **⚠ SOLO PARA DESARROLLO LOCAL** — cambiar antes de desplegar en producción.
-
-| Campo    | Valor                |
-|----------|----------------------|
-| Usuario  | `seurobman`          |
-| Email    | `admin@progresia.local` |
-| Password | `$eurobman2026`      |
+Ruta: `http://localhost:5173/gestion-usuarios` — no aparece en ninguna navegación normal.
 
 ```bash
-# Crear el usuario administrador (o recrear si ya existe):
-cd apps/api && npx ts-node prisma/seed.ts
+# Crear el usuario administrador de desarrollo
+cd apps/api && npm run prisma:seed
 ```
 
-Variables de entorno para personalizar las credenciales de desarrollo:
-```env
-ADMIN_JWT_SECRET=admin_change_me   # Cambiar en producción
-ADMIN_EMAIL=admin@progresia.local
-ADMIN_USERNAME=seurobman
-ADMIN_PASSWORD=$eurobman2026
+| Campo | Valor por defecto |
+|-------|-----------------|
+| Email | `admin@progresia.local` |
+| Username | `seurobman` |
+| Password | `$eurobman2026` |
+
+> Cambiar estos valores en `.env` antes de cualquier despliegue.
+
+Los endpoints admin requieren `Authorization: Bearer <admin_token>` obtenido en `POST /api/admin/auth/login`.
+
 ```
-
-### Endpoints de administración
-
-Todos requieren `Authorization: Bearer <admin_token>` (el token se obtiene en `/api/admin/auth/login`).
-
-```text
-POST   /api/admin/auth/login        ← acepta email o nombre de usuario
-GET    /api/admin/auth/me
-POST   /api/admin/auth/logout
-
-GET    /api/admin/users?search=
-POST   /api/admin/users
-PATCH  /api/admin/users/:id
-DELETE /api/admin/users/:id
-
-GET    /api/admin/projects?search=
-POST   /api/admin/projects
-PATCH  /api/admin/projects/:id
-DELETE /api/admin/projects/:id
+POST /api/admin/auth/login     → acepta email o username
+GET  /api/admin/users          → lista usuarios (con ?search=)
+POST /api/admin/users          → crear usuario
+PATCH /api/admin/users/:id     → editar usuario
+DELETE /api/admin/users/:id    → eliminar usuario
+GET  /api/admin/projects       → lista proyectos (con ?search=)
 ```
 
 ---
 
-## Autenticación y registro
-
-El registro crea la cuenta inmediatamente en estado activo y devuelve tokens de acceso — no hay pasos adicionales de verificacion. El usuario queda logueado al instante.
-
-En local, CAPTCHA queda desactivado si `CAPTCHA_ENABLED=false`. En produccion debe configurarse un proveedor CAPTCHA real.
-
-Configuracion minima de produccion:
-
-```env
-CAPTCHA_ENABLED=true
-CAPTCHA_PROVIDER=turnstile
-CAPTCHA_SECRET_KEY=...
-VITE_CAPTCHA_PROVIDER=turnstile
-VITE_CAPTCHA_SITE_KEY=...
-```
-
-Endpoints de autenticacion:
-
-- `POST /api/auth/register` — crea cuenta y devuelve `{ accessToken, refreshToken, user }`
-- `POST /api/auth/login` — devuelve `{ accessToken, refreshToken, user }`
-- `POST /api/auth/refresh` — rota el refresh token
-- `POST /api/auth/logout` — invalida el refresh token
-
----
-
-## Testing
+## Tests
 
 ```bash
-# AI Service
+# AI Service (pytest)
 cd apps/ai-service
 pytest -v
 
-# API
+# API — suite Jest (unitaria e integración)
 cd apps/api
 npm run test
-npm run test:e2e
+
+# Frontend — tipos
+cd apps/web
+npm run typecheck
+```
+
+La CI ejecuta todos los checks en cada push (`lint → types → tests → build`).
+
+---
+
+## Estructura del monorepo
+
+```
+progresia/
+├── apps/
+│   ├── api/                         NestJS API
+│   │   ├── prisma/
+│   │   │   ├── schema.prisma        modelos: User, Workspace, Project, Idea,
+│   │   │   │                        Specification, ArtifactBundle
+│   │   │   ├── migrations/
+│   │   │   └── seed.ts              datos iniciales de desarrollo
+│   │   └── src/modules/
+│   │       ├── auth/                JWT + refresh token rotation
+│   │       ├── projects/            CRUD + slug generation + UUID/slug dual-lookup
+│   │       ├── ideas/               intake de la idea del usuario
+│   │       ├── specifications/      pipeline SDD + exportación PDF/MD
+│   │       ├── artifacts/           bundle ZIP + generación de código
+│   │       └── ai-service/          cliente HTTP hacia FastAPI
+│   │
+│   ├── ai-service/                  FastAPI — Agentes IA
+│   │   └── app/
+│   │       ├── agents/
+│   │       │   ├── requirements_agent.py
+│   │       │   ├── architecture_agent.py
+│   │       │   ├── openspec_agent.py    ← agente central SDD
+│   │       │   ├── issue_generator_agent.py
+│   │       │   ├── tutorial_agent.py
+│   │       │   ├── codegen_agent.py
+│   │       │   └── fallback/stacks/     19 scaffolds deterministas por stack
+│   │       ├── schemas/
+│   │       │   ├── openspec.py          OpenSpecDoc — fuente de verdad
+│   │       │   ├── idea.py
+│   │       │   └── architecture.py
+│   │       ├── core/
+│   │       │   └── llm.py               get_llm() con fallback chain configurable
+│   │       └── api/
+│   │           ├── specifications.py    endpoints del pipeline SDD
+│   │           ├── llm_config.py        configuración LLM en caliente
+│   │           └── rag.py               búsqueda y consulta RAG
+│   │
+│   └── web/                         React 19 Frontend
+│       └── src/
+│           ├── routes/
+│           │   ├── NewProjectPage.tsx   wizard conversacional SDD (6 pasos)
+│           │   ├── ProjectDetailPage.tsx pipeline + 7 tarjetas de resultado
+│           │   └── DashboardPage.tsx
+│           ├── hooks/
+│           │   └── useGeneratePipeline.ts  máquina de estados del pipeline
+│           ├── features/auth/
+│           └── lib/api.ts
+│
+├── packages/
+│   ├── config/       configuración ESLint/TypeScript compartida
+│   ├── contracts/    contratos e interfaces cross-service
+│   └── shared/       utilidades TypeScript compartidas
+│
+├── docker-compose.yml
+├── .env.example
+└── .github/workflows/
+    ├── ci.yml              lint + types + tests + build
+    └── dependency-review.yml
 ```
 
 ---
 
-## Estructura del repositorio
+## Notas de plataforma (Windows)
 
-```
-apps/api/
-  prisma/
-    schema.prisma           modelos: User, Workspace, Project, Idea, Specification, ArtifactBundle
-    migrations/             historial de migraciones
-    seed.ts                 datos iniciales de desarrollo
-  src/
-    modules/
-      auth/                 JWT + refresh token rotation
-      projects/             CRUD + slug generation + UUID/slug dual-lookup
-      ideas/                intake de la idea del usuario
-      specifications/       pipeline de generación de specs
-      artifacts/            bundle ZIP + code generation
-      ai-service/           cliente HTTP hacia FastAPI
+- **Redis** — mapeado al puerto 6380 (Docker Desktop ocupa el 6379)
+- **AI Service** — usar el puerto 8003 (Docker Desktop ocupa 8000 y 8001)
+- **NestJS** — no usar `nest start --watch`; compilar con `tsc` y lanzar con `node`
+- **Prisma** — detener el servidor API antes de `npx prisma generate` (lock de DLL)
 
-apps/ai-service/
-  app/
-    agents/
-      requirements_agent.py
-      architecture_agent.py
-      openspec_agent.py       agente central SDD
-      issue_generator_agent.py
-      tutorial_agent.py
-      code_generation_agent.py
-    schemas/
-      openspec.py             OpenSpecDoc (fuente de verdad)
-      idea.py
-      architecture.py
-    core/
-      llm.py                  get_llm() con fallback chain
+---
 
-apps/web/
-  src/
-    routes/
-      NewProjectPage.tsx      wizard conversacional SDD (6 pasos)
-      ProjectDetailPage.tsx   pipeline + 7 tarjetas de resultado
-      DashboardPage.tsx
-    features/auth/
-    lib/api.ts
-```
+## Licencia
 
-## License
-
-Copyright © 2026 Roberto Manca. All rights reserved.
-This project is proprietary and confidential. Unauthorized copying,
-modification, distribution, or reuse is prohibited.
+Copyright © 2026 Roberto Manca. Todos los derechos reservados.
+Este proyecto es propietario y confidencial. Queda prohibida su copia, modificación, distribución o reutilización sin autorización expresa por escrito.

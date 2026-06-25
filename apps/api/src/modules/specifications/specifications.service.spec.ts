@@ -1,5 +1,6 @@
 import { ConflictException } from "@nestjs/common";
 import { ProjectStatus, SpecificationStatus, SpecificationType } from "@prisma/client";
+import { SpecificationExportService } from "./specifications.export.service";
 import { SpecificationsService } from "./specifications.service";
 
 describe("SpecificationsService", () => {
@@ -44,7 +45,8 @@ describe("SpecificationsService", () => {
     const service = new SpecificationsService(
       prisma as never,
       projectsService as never,
-      aiServiceClient as never
+      aiServiceClient as never,
+      new SpecificationExportService()
     );
 
     await expect(service.generateOpenSpec("user-1", "project-1")).resolves.toEqual({ id: "spec-1" });
@@ -92,7 +94,8 @@ describe("SpecificationsService", () => {
     const service = new SpecificationsService(
       prisma as never,
       projectsService as never,
-      {} as never
+      {} as never,
+      new SpecificationExportService()
     );
 
     await expect(service.generateOpenSpec("user-1", "project-1")).rejects.toBeInstanceOf(
@@ -125,7 +128,8 @@ describe("SpecificationsService", () => {
     const service = new SpecificationsService(
       prisma as never,
       projectsService as never,
-      {} as never
+      {} as never,
+      new SpecificationExportService()
     );
 
     const result = await service.exportPdf("user-1", "spec-1");
