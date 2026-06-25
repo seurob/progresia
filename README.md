@@ -255,11 +255,31 @@ El orden de proveedores cloud es configurable en tiempo real desde `/ai-settings
 
 | Tipo de tarea | Cadena de fallback |
 |--------------|-------------------|
-| Requisitos, arquitectura, spec | Groq → OpenAI → Gemini → Ollama → determinístico |
-| Generación de código | Ollama (qwen2.5-coder) → Groq → OpenAI → Gemini → FallbackGenerator |
-| Tutorial, propuestas, features | Groq → OpenAI → Gemini → Ollama → determinístico |
+| Decisión tecnológica | Ollama Gemma 4 → Groq → OpenAI → Gemini → catálogo determinista |
+| Requisitos, arquitectura, spec | IA configurada → siguiente IA disponible → determinístico |
+| Generación de código | Ollama Gemma 4 → Groq → OpenAI → Gemini → FallbackGenerator |
+| Tutorial, propuestas, features | IA configurada → siguiente IA disponible → determinístico |
 
-Si el LLM configurado falla, el sistema continúa automáticamente con el siguiente en la cadena, garantizando siempre una entrega útil.
+Las propuestas tecnológicas y la generación de código prueban todas las IA
+disponibles antes de recurrir a templates. Las respuestas de IA se validan
+contra el tipo de producto: una propuesta móvil, desktop o Django injustificada
+se descarta y se intenta con el siguiente modelo.
+
+### Perfiles locales Gemma 4
+
+```bash
+ollama pull gemma4:26b-a4b
+ollama pull gemma4:31b
+```
+
+| Equipo | Modelo recomendado | Uso |
+|--------|--------------------|-----|
+| Ordenador normal, sin GPU potente | `gemma4:26b-a4b` | Razonamiento, agentes, planificación y código con activación eficiente |
+| Buena GPU o bastante RAM | `gemma4:31b` | Arquitectura, refactorización, análisis de repositorios y código largo |
+
+El perfil equilibrado es el predeterminado. Para activar el perfil de máxima
+calidad, establecer `OLLAMA_REASONING_MODEL` y `OLLAMA_CODE_MODEL` como
+`gemma4:31b`.
 
 ### Variables LLM en `.env`
 
@@ -276,8 +296,8 @@ GEMINI_API_KEY=AIza...
 GEMINI_MODEL=gemini-2.0-flash
 
 OLLAMA_BASE_URL=http://localhost:11434     # solo si tienes Ollama instalado
-OLLAMA_REASONING_MODEL=llama3.1
-OLLAMA_CODE_MODEL=qwen2.5-coder
+OLLAMA_REASONING_MODEL=gemma4:26b-a4b
+OLLAMA_CODE_MODEL=gemma4:26b-a4b
 ```
 
 ---
@@ -490,8 +510,8 @@ Estado verificado el 25 de junio de 2026:
 
 - Frontend: **10 pruebas superadas**
 - API: **50 pruebas superadas**
-- AI Service: **147 pruebas superadas y 70 omitidas condicionalmente**
-- Total ejecutado correctamente: **207 pruebas**
+- AI Service: **150 pruebas superadas y 70 omitidas condicionalmente**
+- Total ejecutado correctamente: **210 pruebas**
 - Lint, typecheck, build y validación OpenSpec: **correctos**
 
 La CI ejecuta los controles principales en cada push y pull request.

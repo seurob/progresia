@@ -53,12 +53,12 @@ DIAPOSITIVAS 10 Y 11 - EXPERIENCIA Y AGENTES (3:00-3:28)
 
 DIAPOSITIVAS 12 Y 13 - MODELOS Y RAG (3:28-3:55)
 
-"El sistema puede utilizar Groq, OpenAI, Gemini u Ollama. Si un proveedor falla, continua con otro o con un generador determinista. RAG permite recuperar documentos desde Qdrant y producir respuestas basadas en evidencia, no solamente en la memoria del modelo."
+"El sistema puede utilizar Groq, OpenAI, Gemini u Ollama con Gemma 4. Para un ordenador normal se recomienda gemma4 de 26B con activacion eficiente; con una GPU potente o bastante RAM se puede usar el modelo de 31B. En la decision tecnologica y la generacion de codigo se prueban todas las IA disponibles antes de recurrir a templates deterministas. RAG permite recuperar documentos desde Qdrant y producir respuestas basadas en evidencia."
 
 
 DIAPOSITIVAS 14 A 16 - ENTREGA, SEGURIDAD, OBSERVABILIDAD Y CALIDAD (3:55-4:35)
 
-"La entrega incluye README, documentacion, SDD, codigo, Docker y GitHub Actions. Antes de descargar se comprueba la estructura, la coherencia y la presencia de secretos. La plataforma incluye JWT, autorizacion, CAPTCHA y administracion aislada. Sentry aporta observabilidad opcional en React, NestJS y FastAPI sin enviar usuarios, cookies, cuerpos ni credenciales. La base ha superado 207 pruebas junto con lint, tipos, build y validacion OpenSpec."
+"La entrega incluye README, documentacion, SDD, codigo, Docker y GitHub Actions. Antes de descargar se comprueba la estructura, la coherencia y la presencia de secretos. La plataforma incluye JWT, autorizacion, CAPTCHA y administracion aislada. Sentry aporta observabilidad opcional en React, NestJS y FastAPI sin enviar usuarios, cookies, cuerpos ni credenciales. La base ha superado 210 pruebas junto con lint, tipos, build y validacion OpenSpec."
 
 
 DIAPOSITIVA 17 - DEMOSTRACION (4:35-8:50)

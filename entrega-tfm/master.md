@@ -308,19 +308,23 @@ El orden de proveedores cloud es configurable en tiempo real desde `/ai-settings
 
 ```
 Tipo "reasoning" (requisitos, arquitectura):
-  Groq → OpenAI → Gemini → Ollama (llama3.1) → determinístico
+  Groq → OpenAI → Gemini → Ollama (Gemma 4) → determinístico
 
 Tipo "spec" (OpenSpec):
-  Groq → OpenAI → Gemini → Ollama (llama3.1) → determinístico
+  OpenAI → Gemini → Groq → Ollama (Gemma 4) → determinístico
 
 Tipo "code" (generación de código):
-  Ollama (qwen2.5-coder) → Groq → OpenAI → Gemini → FallbackGenerator
+  Ollama (Gemma 4) → Groq → OpenAI → Gemini → FallbackGenerator
 
 Tipo "general" (features, tutorial, propuestas):
-  Groq → OpenAI → Gemini → Ollama (llama3.1) → determinístico
+  Ollama (Gemma 4) → Groq → OpenAI → Gemini → catálogo determinístico
 ```
 
-Si se configura un proveedor forzado desde `/ai-settings`, ese proveedor se intenta primero para todos los tipos. Si falla, el sistema continúa con la cadena normal.
+En la decisión tecnológica y la generación de código se prueban todos los
+modelos disponibles antes de usar catálogos o scaffolds deterministas. Las
+propuestas de cada modelo se validan contra el tipo de producto y las
+restricciones obligatorias. Si se configura un proveedor forzado desde
+`/ai-settings`, se intenta primero y después continúa la cadena completa.
 
 ### Endpoints del AI service
 
@@ -544,13 +548,13 @@ exponer el DSN.
 
 | Capa | Framework | Cobertura actual |
 |------|-----------|-----------------|
-| AI Service | pytest 9.1 | 147 pruebas superadas, 70 omitidas condicionalmente |
+| AI Service | pytest 9.1 | 150 pruebas superadas, 70 omitidas condicionalmente |
 | API — unitario e integración | Jest 30 + Supertest | 50 pruebas superadas |
 | Frontend | Vitest 4 + Testing Library | 10 pruebas superadas |
 | Calidad estática | ESLint, TypeScript, Ruff | lint y typecheck correctos |
 | Entrega | Builds + OpenSpec validator | build completo y 13 cambios OpenSpec válidos |
 
-**Resultado verificado el 25 de junio de 2026:** 207 pruebas superadas, además
+**Resultado verificado el 25 de junio de 2026:** 210 pruebas superadas, además
 de lint, typecheck, build y validación OpenSpec.
 
 ---
@@ -710,8 +714,8 @@ Ollama ejecuta los modelos de lenguaje en tu ordenador. Es necesario para que el
 # https://ollama.com
 
 # 2. Instalar los modelos necesarios (4-5 GB cada uno, descarga única):
-ollama pull llama3.1          # razonamiento, requisitos, arquitectura
-ollama pull qwen2.5-coder     # generación de código
+ollama pull gemma4:26b-a4b    # perfil equilibrado: ordenador normal
+ollama pull gemma4:31b        # máxima calidad: buena GPU o bastante RAM
 
 # 3. Verificar que los modelos están instalados:
 ollama list
@@ -719,6 +723,11 @@ ollama list
 
 > Ollama se arranca automáticamente como servicio en Windows después de instalarlo.
 > Si necesitas arrancarlo manualmente: `ollama serve`
+
+| Hardware | Configuración |
+|----------|---------------|
+| Ordenador normal, sin GPU potente | `OLLAMA_REASONING_MODEL=gemma4:26b-a4b` y `OLLAMA_CODE_MODEL=gemma4:26b-a4b` |
+| Buena GPU o bastante RAM | `OLLAMA_REASONING_MODEL=gemma4:31b` y `OLLAMA_CODE_MODEL=gemma4:31b` |
 
 ---
 
@@ -776,6 +785,8 @@ OPENAI_MODEL=gpt-4o-mini
 GEMINI_MODEL=gemini-2.0-flash
 
 OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_REASONING_MODEL=gemma4:26b-a4b
+OLLAMA_CODE_MODEL=gemma4:26b-a4b
 
 QDRANT_URL=http://localhost:6333
 ```

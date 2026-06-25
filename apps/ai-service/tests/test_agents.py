@@ -433,7 +433,7 @@ class TestCodeGenerationAgent:
 
     def test_falls_back_when_no_llm(self) -> None:
         # Neutral sector → generic DDD scaffold (tRPC + Prisma)
-        with patch("app.agents.codegen_agent.get_llm", return_value=None):
+        with patch("app.agents.codegen_agent.get_llm_candidates", return_value=[]):
             result = CodeGenerationAgent().generate(CODEGEN_REQUEST_NEUTRAL)
 
         assert result.project_name == CODEGEN_REQUEST_NEUTRAL.project_name
@@ -444,7 +444,7 @@ class TestCodeGenerationAgent:
         assert "prisma/schema.prisma" in paths
 
     def test_fallback_includes_auth_model_when_needed(self) -> None:
-        with patch("app.agents.codegen_agent.get_llm", return_value=None):
+        with patch("app.agents.codegen_agent.get_llm_candidates", return_value=[]):
             result = CodeGenerationAgent().generate(CODEGEN_REQUEST)
 
         schema_file = next(f for f in result.files if f.path == "prisma/schema.prisma")
@@ -452,7 +452,7 @@ class TestCodeGenerationAgent:
 
     def test_fallback_skips_auth_model_when_not_needed(self) -> None:
         req_no_auth = CODEGEN_REQUEST_NEUTRAL.model_copy(update={"needs_auth": False})
-        with patch("app.agents.codegen_agent.get_llm", return_value=None):
+        with patch("app.agents.codegen_agent.get_llm_candidates", return_value=[]):
             result = CodeGenerationAgent().generate(req_no_auth)
 
         schema_file = next(f for f in result.files if f.path == "prisma/schema.prisma")
@@ -465,7 +465,7 @@ class TestCodeGenerationAgent:
         mock_structured.invoke.return_value = MOCK_CODEGEN_RESPONSE
 
         # Neutral sector ensures the LLM path is taken (no template bypass)
-        with patch("app.agents.codegen_agent.get_llm", return_value=mock_llm):
+        with patch("app.agents.codegen_agent.get_llm_candidates", return_value=[mock_llm]):
             response = client.post("/generate-code", json=CODEGEN_REQUEST_NEUTRAL.model_dump())
 
         assert response.status_code == 200
@@ -481,7 +481,7 @@ class TestCodeGenerationAgent:
         assert all("path" in f and "content" in f for f in body["files"])
 
     def test_endpoint_fallback_without_llm(self) -> None:
-        with patch("app.agents.codegen_agent.get_llm", return_value=None):
+        with patch("app.agents.codegen_agent.get_llm_candidates", return_value=[]):
             response = client.post("/generate-code", json=CODEGEN_REQUEST.model_dump())
 
         assert response.status_code == 200
@@ -1613,12 +1613,12 @@ class TestTechProposalAgent:
             _TECH_REQ_INTERMEDIATE_MOBILE,
             _TECH_REQ_INTERMEDIATE_DESKTOP,
         ]:
-            with patch("app.agents.tech_proposal_agent.get_llm", return_value=None):
+            with patch("app.agents.tech_proposal_agent.get_llm_candidates", return_value=[]):
                 result = TechProposalAgent().propose(req)
             assert len(result.proposals) == 3, f"Expected 3 proposals for {_catalog_key(req)}, got {len(result.proposals)}"
 
     def test_proposals_have_sequential_ids(self) -> None:
-        with patch("app.agents.tech_proposal_agent.get_llm", return_value=None):
+        with patch("app.agents.tech_proposal_agent.get_llm_candidates", return_value=[]):
             result = TechProposalAgent().propose(_TECH_REQ_BEGINNER_SINGLE)
 
         ids = [p.id for p in result.proposals]
@@ -1626,18 +1626,18 @@ class TestTechProposalAgent:
 
     def test_recommended_id_in_range(self) -> None:
         for req in [_TECH_REQ_BEGINNER_SINGLE, _TECH_REQ_INTERMEDIATE_AI, _TECH_REQ_INTERMEDIATE_SINGLE]:
-            with patch("app.agents.tech_proposal_agent.get_llm", return_value=None):
+            with patch("app.agents.tech_proposal_agent.get_llm_candidates", return_value=[]):
                 result = TechProposalAgent().propose(req)
             assert result.recommended_id in {p.id for p in result.proposals}
 
     def test_recommendation_reason_not_empty(self) -> None:
-        with patch("app.agents.tech_proposal_agent.get_llm", return_value=None):
+        with patch("app.agents.tech_proposal_agent.get_llm_candidates", return_value=[]):
             result = TechProposalAgent().propose(_TECH_REQ_INTERMEDIATE_AI)
 
         assert len(result.recommendation_reason) > 0
 
     def test_each_proposal_has_required_fields(self) -> None:
-        with patch("app.agents.tech_proposal_agent.get_llm", return_value=None):
+        with patch("app.agents.tech_proposal_agent.get_llm_candidates", return_value=[]):
             result = TechProposalAgent().propose(_TECH_REQ_INTERMEDIATE_FRONTEND_API)
 
         for p in result.proposals:
@@ -1650,7 +1650,7 @@ class TestTechProposalAgent:
             assert p.estimated_setup_minutes > 0
 
     def test_ai_service_variant_has_ai_ready_proposals(self) -> None:
-        with patch("app.agents.tech_proposal_agent.get_llm", return_value=None):
+        with patch("app.agents.tech_proposal_agent.get_llm_candidates", return_value=[]):
             result = TechProposalAgent().propose(_TECH_REQ_INTERMEDIATE_AI)
 
         assert all(p.ai_ready for p in result.proposals), "All INTERMEDIATE_ai_service proposals must be ai_ready"
@@ -1662,7 +1662,7 @@ class TestTechProposalAgent:
             _TECH_REQ_INTERMEDIATE_SINGLE,
             _TECH_REQ_INTERMEDIATE_FRONTEND_API,
         ):
-            with patch("app.agents.tech_proposal_agent.get_llm", return_value=None):
+            with patch("app.agents.tech_proposal_agent.get_llm_candidates", return_value=[]):
                 result = TechProposalAgent().propose(req)
             stacks = [" ".join(proposal.stack).lower() for proposal in result.proposals]
             assert all("django" not in stack for stack in stacks)
@@ -1679,7 +1679,7 @@ class TestTechProposalAgent:
         })
         assert _django_is_justified(req)
 
-        with patch("app.agents.tech_proposal_agent.get_llm", return_value=None):
+        with patch("app.agents.tech_proposal_agent.get_llm_candidates", return_value=[]):
             result = TechProposalAgent().propose(req)
 
         django_proposals = [
@@ -1792,6 +1792,64 @@ class TestTechProposalAgent:
 
         assert len(result.proposals) == 3
 
+    def test_tries_next_ai_before_catalog_fallback(self) -> None:
+        from app.schemas.tech_proposal import TechProposal as TP
+
+        failing_llm = MagicMock()
+        failing_llm.with_structured_output.return_value.invoke.side_effect = RuntimeError(
+            "first model unavailable"
+        )
+        successful_response = TechProposalResponse(
+            proposals=[
+                TP(id=1, name="AI A", tagline="t", stack=["React", "NestJS"],
+                   difficulty="Intermedio", description="d", advantages=["a"], limitations=["l"],
+                   recommended_for="r", learning_outcomes=["o"], docker_ready=True,
+                   ai_ready=True, estimated_setup_minutes=20),
+                TP(id=2, name="AI B", tagline="t", stack=["Vue", "FastAPI"],
+                   difficulty="Intermedio", description="d", advantages=["a"], limitations=["l"],
+                   recommended_for="r", learning_outcomes=["o"], docker_ready=True,
+                   ai_ready=True, estimated_setup_minutes=20),
+            ],
+            recommended_id=2,
+            recommendation_reason="Generated by the second AI",
+        )
+        successful_llm = MagicMock()
+        successful_llm.with_structured_output.return_value.invoke.return_value = successful_response
+
+        with patch(
+            "app.agents.tech_proposal_agent.get_llm_candidates",
+            return_value=[failing_llm, successful_llm],
+        ):
+            result = TechProposalAgent().propose(_TECH_REQ_INTERMEDIATE_FRONTEND_API)
+
+        assert result.recommendation_reason == "Generated by the second AI"
+
+    def test_mobile_proposals_use_ai_when_valid(self) -> None:
+        from app.schemas.tech_proposal import TechProposal as TP
+
+        response = TechProposalResponse(
+            proposals=[
+                TP(id=1, name="Flutter AI", tagline="Flutter + FastAPI",
+                   stack=["Flutter", "FastAPI"], difficulty="Intermedio", description="d",
+                   advantages=["a"], limitations=["l"], recommended_for="r",
+                   learning_outcomes=["o"], docker_ready=True, ai_ready=True,
+                   estimated_setup_minutes=20),
+                TP(id=2, name="Expo AI", tagline="React Native + Expo + NestJS",
+                   stack=["React Native", "Expo", "NestJS"], difficulty="Intermedio",
+                   description="d", advantages=["a"], limitations=["l"], recommended_for="r",
+                   learning_outcomes=["o"], docker_ready=True, ai_ready=True,
+                   estimated_setup_minutes=20),
+            ],
+            recommended_id=1,
+            recommendation_reason="Mobile AI proposal",
+        )
+        mock_llm = MagicMock()
+        mock_llm.with_structured_output.return_value.invoke.return_value = response
+
+        result = TechProposalAgent().propose(_TECH_REQ_INTERMEDIATE_MOBILE, llm=mock_llm)
+
+        assert result.recommendation_reason == "Mobile AI proposal"
+
     def test_falls_back_when_llm_returns_too_few_proposals(self) -> None:
         from app.schemas.tech_proposal import TechProposal as TP
         short_response = TechProposalResponse(
@@ -1814,7 +1872,7 @@ class TestTechProposalAgent:
         assert len(result.proposals) == 3
 
     def test_endpoint_propose_tech_returns_valid_response(self) -> None:
-        with patch("app.agents.tech_proposal_agent.get_llm", return_value=None):
+        with patch("app.agents.tech_proposal_agent.get_llm_candidates", return_value=[]):
             response = client.post("/propose-tech", json=_TECH_REQ_BEGINNER_SINGLE.model_dump())
 
         assert response.status_code == 200
@@ -1824,7 +1882,7 @@ class TestTechProposalAgent:
         assert body["recommendation_reason"]
 
     def test_endpoint_intermediate_ai_returns_ai_ready_stacks(self) -> None:
-        with patch("app.agents.tech_proposal_agent.get_llm", return_value=None):
+        with patch("app.agents.tech_proposal_agent.get_llm_candidates", return_value=[]):
             response = client.post("/propose-tech", json=_TECH_REQ_INTERMEDIATE_AI.model_dump())
 
         assert response.status_code == 200
@@ -1832,7 +1890,7 @@ class TestTechProposalAgent:
         assert all(p["ai_ready"] for p in body["proposals"])
 
     def test_endpoint_proposal_fields_complete(self) -> None:
-        with patch("app.agents.tech_proposal_agent.get_llm", return_value=None):
+        with patch("app.agents.tech_proposal_agent.get_llm_candidates", return_value=[]):
             response = client.post("/propose-tech", json=_TECH_REQ_INTERMEDIATE_FRONTEND_API.model_dump())
 
         assert response.status_code == 200

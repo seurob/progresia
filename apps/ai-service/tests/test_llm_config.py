@@ -43,6 +43,25 @@ def test_apply_config_update_changes_routing_order() -> None:
         llm._override_provider = original_override
 
 
+def test_ai_candidates_can_prioritize_local_ollama() -> None:
+    ollama_model = object()
+    groq_model = object()
+    with (
+        patch("app.core.llm._ollama", return_value=ollama_model),
+        patch.dict(
+            "app.core.llm._CLOUD_FACTORIES",
+            {
+                "groq": lambda: groq_model,
+                "openai": lambda: None,
+                "gemini": lambda: None,
+            },
+        ),
+    ):
+        candidates = llm.get_llm_candidates("reasoning", prefer_ollama=True)
+
+    assert candidates == [ollama_model, groq_model]
+
+
 def test_model_catalog_filters_openai_chat_models() -> None:
     def fetch_json(url: str, headers: dict[str, str], timeout: float) -> dict:
         assert url == "https://api.openai.com/v1/models"

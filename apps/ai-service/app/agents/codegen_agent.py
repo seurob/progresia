@@ -5,7 +5,7 @@ import re
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from app.core.llm import TaskType, get_llm
+from app.core.llm import TaskType, get_llm_candidates
 from app.schemas.codegen import CodeGenerationRequest, CodeGenerationResponse, GeneratedFile
 from app.agents.fallback.generator import FallbackGenerator
 
@@ -113,12 +113,14 @@ class CodeGenerationAgent:
     ) -> CodeGenerationResponse:
         # LLM first: uses the full OpenSpec (architecture_type, data_entities,
         # api_endpoints, requirements) to generate code tailored to the project.
-        resolved_llm = get_llm(task) if llm is _AUTO_LLM else llm
+        candidates = get_llm_candidates(task) if llm is _AUTO_LLM else [llm]
         reason = _REASON_UNAVAILABLE
 
-        if resolved_llm is not None and resolved_llm is not _AUTO_LLM:
+        for candidate in candidates:
+            if candidate is None or candidate is _AUTO_LLM:
+                continue
             try:
-                structured = resolved_llm.with_structured_output(CodeGenerationResponse)
+                structured = candidate.with_structured_output(CodeGenerationResponse)
                 result = structured.invoke([
                     SystemMessage(content=SYSTEM_PROMPT),
                     HumanMessage(content=_build_human_message(req)),
@@ -131,14 +133,15 @@ class CodeGenerationAgent:
                     reason = _REASON_INVALID_JSON
             except TimeoutError:
                 reason = _REASON_TIMEOUT
-                logger.warning("LLM code generation timed out")
+                logger.warning("AI code generation timed out; trying next model")
             except (json.JSONDecodeError, ValueError) as exc:
                 reason = _REASON_INVALID_JSON
-                logger.warning("LLM invalid JSON (%s): %s", reason, exc)
+                logger.warning("AI invalid JSON (%s); trying next model: %s", reason, exc)
             except Exception as exc:
                 reason = _REASON_TIMEOUT if "timeout" in str(exc).lower() else _REASON_INVALID_JSON
-                logger.warning("LLM code generation failed (%s): %s", reason, exc)
+                logger.warning("AI code generation failed (%s); trying next model: %s", reason, exc)
 
+        logger.warning("All AI code generation candidates failed; using scaffold template")
         fallback_result = _fallback.generate(req, reason=reason)
         return self._extend_with_sdd(fallback_result, req)
 

@@ -2,9 +2,9 @@
 Multi-provider LLM factory with task-aware routing and runtime overrides.
 
 Task routing strategy (default — no override):
-  reasoning  → Groq (llama-3.3-70b) → OpenAI → Gemini → Ollama (llama3.1)
-  code       → Ollama (qwen2.5-coder) → Groq  → OpenAI → Gemini
-  spec       → OpenAI → Gemini → Groq → Ollama (llama3.1)
+  reasoning  → Groq (llama-3.3-70b) → OpenAI → Gemini → Ollama (Gemma 4)
+  code       → Ollama (Gemma 4) → Groq → OpenAI → Gemini
+  spec       → OpenAI → Gemini → Groq → Ollama (Gemma 4)
   general    → Groq   → OpenAI → Gemini → Ollama
 
 If override_provider is set via apply_config_update(), all tasks use that
@@ -157,6 +157,64 @@ def get_llm(task: TaskType = "general") -> BaseChatModel | None:
 
     logger.warning("No LLM available for task=%s — deterministic fallback active", task)
     return None
+
+
+def get_llm_candidates(
+    task: TaskType = "general",
+    *,
+    prefer_ollama: bool = False,
+) -> list[BaseChatModel]:
+    """Return every configured AI candidate in execution order.
+
+    Agents that use this function can retry another model after an invocation
+    failure instead of jumping directly to deterministic templates.
+    """
+    factories = _get_task_chain(task)
+    if prefer_ollama and task != "code":
+        factories = [factories[-1], *factories[:-1]]
+
+    candidates: list[BaseChatModel] = []
+    if _override_provider:
+        override: BaseChatModel | None = None
+        if _override_provider == "groq":
+            override = _groq()
+        elif _override_provider == "openai":
+            override = _openai()
+        elif _override_provider == "gemini":
+            override = _gemini()
+        elif _override_provider == "ollama":
+            model = (
+                _eff("ollama_code_model", settings.ollama_code_model)
+                if task == "code"
+                else _eff("ollama_reasoning_model", settings.ollama_reasoning_model)
+            )
+            override = _ollama(model)
+        if override is not None:
+            candidates.append(override)
+
+    for factory in factories:
+        candidate = factory()
+        if candidate is None:
+            continue
+        candidate_model = (
+            getattr(candidate, "model", None)
+            or getattr(candidate, "model_name", None)
+        )
+        duplicate = any(
+            existing is candidate
+            or (
+                candidate_model is not None
+                and type(existing) is type(candidate)
+                and (
+                    getattr(existing, "model", None)
+                    or getattr(existing, "model_name", None)
+                ) == candidate_model
+            )
+            for existing in candidates
+        )
+        if not duplicate:
+            candidates.append(candidate)
+    return candidates
 
 
 # ── Config state helpers (used by /config/llm endpoint) ──────────────────────
