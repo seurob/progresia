@@ -1,7 +1,10 @@
 from fastapi import FastAPI
 
 from app.api import llm_config, rag, specifications
+from app.core.monitoring import init_sentry
 from app.core.settings import settings
+
+init_sentry()
 
 app = FastAPI(
     title="ProgresIA Studio AI Service",

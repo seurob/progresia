@@ -17,19 +17,26 @@ import { WorkspacesModule } from "./workspaces/workspaces.module";
 import { AdminModule } from "./admin/admin.module";
 import { LlmConfigModule } from "./llm-config/llm-config.module";
 
+const queueModules = process.env.DISABLE_QUEUES === "true"
+  ? []
+  : [
+      BullModule.forRootAsync({
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => ({
+          connection: {
+            host: config.get("REDIS_HOST", "localhost"),
+            port: config.get<number>("REDIS_PORT", 6379)
+          }
+        })
+      }),
+      JobsModule
+    ];
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 300 }]),
-    BullModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        connection: {
-          host: config.get("REDIS_HOST", "localhost"),
-          port: config.get<number>("REDIS_PORT", 6379)
-        }
-      })
-    }),
+    ...queueModules,
     PrismaModule,
     HealthModule,
     AiServiceModule,
@@ -40,7 +47,6 @@ import { LlmConfigModule } from "./llm-config/llm-config.module";
     IdeasModule,
     SpecificationsModule,
     ArtifactsModule,
-    JobsModule,
     StorageModule,
     AdminModule,
     LlmConfigModule

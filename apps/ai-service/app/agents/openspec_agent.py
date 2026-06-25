@@ -10,6 +10,8 @@ The richer this spec, the better the generated code and tutorials will be.
 from __future__ import annotations
 
 import logging
+import re
+import unicodedata
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -140,6 +142,9 @@ class _DataModelLLM(BaseModel):
     orm_rationale: str = ""
     relationships: list[_RelationshipLLM] = Field(default_factory=list)
     indexes: list[str] = Field(default_factory=list)
+    constraints: list[str] = Field(default_factory=list)
+    naming_conventions: list[str] = Field(default_factory=list)
+    migration_strategy: str = ""
     mermaid_diagram: str = ""
     seed_needed: bool = False
     seed_instructions: list[str] = Field(default_factory=list)
@@ -311,6 +316,17 @@ Responde SIEMPRE en español. Devuelve un JSON con este esquema exacto:
       "CREATE INDEX idx_tasks_project_id ON tasks(project_id)",
       "CREATE INDEX idx_tasks_status ON tasks(project_id, status)"
     ],
+    "constraints": [
+      "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+      "CHECK (status IN ('draft', 'active', 'archived'))",
+      "UNIQUE (user_id, external_reference)"
+    ],
+    "naming_conventions": [
+      "Tablas y columnas en snake_case; modelos de dominio en PascalCase",
+      "PK UUID denominada id; FK denominada <entidad>_id",
+      "Índices idx_<tabla>_<columnas> y restricciones uq_/fk_/chk_"
+    ],
+    "migration_strategy": "Migraciones versionadas, una por cambio cohesivo, revisadas en CI y aplicadas con migrate deploy en producción.",
     "mermaid_diagram": "erDiagram\\n    USER ||--o{ TASK : crea\\n    USER {\\n        uuid id PK\\n        string email UK\\n        string password_hash\\n        datetime created_at\\n    }\\n    TASK {\\n        uuid id PK\\n        string title\\n        string status\\n        uuid user_id FK\\n        datetime created_at\\n    }",
     "seed_needed": true,
     "seed_instructions": [
@@ -338,7 +354,8 @@ REGLAS CRÍTICAS:
 5. requirements: Genera TODOS los requisitos con criterios de aceptación VERIFICABLES (endpoints, validaciones, comportamientos).
 6. acceptance_criteria: Usa formato técnico concreto — no "debería funcionar", sino "POST /api/X devuelve 201 con { campo }".
 7. Sé específico del dominio — no genérico. Los nombres de endpoints, entidades y campos deben reflejar el negocio real.
-8. data_model: genera SIEMPRE esta sección completa con justificación, ORM, relaciones con tipos precisos, índices recomendados, diagrama Mermaid ER, instrucciones de seed y notas de seguridad.
+8. data_model: genera SIEMPRE esta sección completa con justificación, ORM, relaciones con tipos precisos, índices recomendados, constraints, convenciones de nombres, estrategia de migraciones, diagrama Mermaid ER, instrucciones de seed y notas de seguridad.
+10. Modelo profesional: toda entidad persistente debe tener PK UUID, created_at, updated_at y, cuando sea mutable, version para control optimista. Declara FK explícitas con política ON DELETE, enums/check constraints para estados e índices compuestos según los patrones de consulta. Evita tablas genéricas y relaciones implícitas.
 9. mermaid_diagram: diagrama ER válido con entidades, campos clave (tipos + PK/FK/UK) y relaciones. Formato: erDiagram con bloques de entidad y líneas de relación."""
 
 
@@ -429,6 +446,9 @@ class OpenSpecAgent:
                 for r in dm.relationships
             ],
             indexes=dm.indexes,
+            constraints=dm.constraints,
+            naming_conventions=dm.naming_conventions,
+            migration_strategy=dm.migration_strategy,
             mermaid_diagram=dm.mermaid_diagram or self._generate_mermaid(entities),
             seed_needed=dm.seed_needed,
             seed_instructions=dm.seed_instructions,
@@ -561,37 +581,134 @@ class OpenSpecAgent:
         entities: list[OpenSpecDataEntity] = []
 
         if idea.needs_auth:
-            entities.append(OpenSpecDataEntity(
-                name="User",
-                description="Usuario autenticado en la plataforma",
-                fields=[
-                    "id: UUID PRIMARY KEY DEFAULT gen_random_uuid()",
-                    "email: VARCHAR(255) UNIQUE NOT NULL",
-                    "password_hash: VARCHAR(255) NOT NULL",
-                    "name: VARCHAR(100) NOT NULL",
-                    "created_at: TIMESTAMPTZ DEFAULT now()",
-                ],
-                relations=["has_many Projects" if "proyecto" in idea.problem.lower() else ""],
-            ))
+            entities.extend(OpenSpecAgent._auth_entities())
 
-        for feature in idea.core_features[:3]:
-            name = feature.split()[0].capitalize()
+        for feature in idea.core_features[:4]:
+            name = OpenSpecAgent._entity_name_from_feature(feature)
             if name not in {e.name for e in entities}:
+                owner_field = (
+                    "user_id: UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE"
+                    if idea.needs_auth else
+                    "owner_reference: VARCHAR(100) NULL"
+                )
                 entities.append(OpenSpecDataEntity(
                     name=name,
                     description=f"Entidad principal para: {feature}",
                     fields=[
                         "id: UUID PRIMARY KEY DEFAULT gen_random_uuid()",
-                        "user_id: UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE",
+                        owner_field,
+                        "slug: VARCHAR(160) NOT NULL",
                         "name: VARCHAR(255) NOT NULL",
-                        "status: VARCHAR(50) DEFAULT 'active'",
-                        "created_at: TIMESTAMPTZ DEFAULT now()",
-                        "updated_at: TIMESTAMPTZ DEFAULT now()",
+                        "description: TEXT NULL",
+                        "status: VARCHAR(30) NOT NULL DEFAULT 'active' CHECK (status IN ('draft', 'active', 'archived'))",
+                        "metadata: JSONB NOT NULL DEFAULT '{}'",
+                        "version: INTEGER NOT NULL DEFAULT 1 CHECK (version > 0)",
+                        "created_at: TIMESTAMPTZ NOT NULL DEFAULT now()",
+                        "updated_at: TIMESTAMPTZ NOT NULL DEFAULT now()",
+                        "deleted_at: TIMESTAMPTZ NULL",
                     ],
-                    relations=["belongs_to User"],
+                    relations=["belongs_to User"] if idea.needs_auth else [],
                 ))
 
         return entities
+
+    @staticmethod
+    def _auth_entities() -> list[OpenSpecDataEntity]:
+        return [
+            OpenSpecDataEntity(
+                name="User",
+                description="Identidad y ciclo de vida de la cuenta de usuario",
+                fields=[
+                    "id: UUID PRIMARY KEY DEFAULT gen_random_uuid()",
+                    "email: VARCHAR(255) UNIQUE NOT NULL",
+                    "password_hash: VARCHAR(255) NOT NULL",
+                    "name: VARCHAR(120) NOT NULL",
+                    "is_active: BOOLEAN NOT NULL DEFAULT true",
+                    "email_verified_at: TIMESTAMPTZ NULL",
+                    "last_login_at: TIMESTAMPTZ NULL",
+                    "version: INTEGER NOT NULL DEFAULT 1 CHECK (version > 0)",
+                    "created_at: TIMESTAMPTZ NOT NULL DEFAULT now()",
+                    "updated_at: TIMESTAMPTZ NOT NULL DEFAULT now()",
+                    "deleted_at: TIMESTAMPTZ NULL",
+                ],
+                relations=[
+                    "has_many RefreshToken",
+                    "has_many UserRole",
+                    "has_many AuditLog",
+                ],
+            ),
+            OpenSpecDataEntity(
+                name="Role",
+                description="Catálogo estable de roles de autorización",
+                fields=[
+                    "id: UUID PRIMARY KEY DEFAULT gen_random_uuid()",
+                    "code: VARCHAR(50) UNIQUE NOT NULL",
+                    "name: VARCHAR(100) NOT NULL",
+                    "description: TEXT NULL",
+                    "is_system: BOOLEAN NOT NULL DEFAULT false",
+                    "created_at: TIMESTAMPTZ NOT NULL DEFAULT now()",
+                    "updated_at: TIMESTAMPTZ NOT NULL DEFAULT now()",
+                ],
+                relations=["has_many UserRole"],
+            ),
+            OpenSpecDataEntity(
+                name="UserRole",
+                description="Asignación auditable de roles a usuarios",
+                fields=[
+                    "id: UUID PRIMARY KEY DEFAULT gen_random_uuid()",
+                    "user_id: UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE",
+                    "role_id: UUID NOT NULL REFERENCES roles(id) ON DELETE RESTRICT",
+                    "assigned_by_user_id: UUID NULL REFERENCES users(id) ON DELETE SET NULL",
+                    "assigned_at: TIMESTAMPTZ NOT NULL DEFAULT now()",
+                ],
+                relations=["belongs_to User", "belongs_to Role"],
+            ),
+            OpenSpecDataEntity(
+                name="RefreshToken",
+                description="Sesión renovable almacenada mediante hash y revocable",
+                fields=[
+                    "id: UUID PRIMARY KEY DEFAULT gen_random_uuid()",
+                    "user_id: UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE",
+                    "token_hash: VARCHAR(128) UNIQUE NOT NULL",
+                    "user_agent: VARCHAR(500) NULL",
+                    "ip_address: VARCHAR(64) NULL",
+                    "expires_at: TIMESTAMPTZ NOT NULL",
+                    "revoked_at: TIMESTAMPTZ NULL",
+                    "created_at: TIMESTAMPTZ NOT NULL DEFAULT now()",
+                ],
+                relations=["belongs_to User"],
+            ),
+            OpenSpecDataEntity(
+                name="AuditLog",
+                description="Registro inmutable de acciones de seguridad y negocio",
+                fields=[
+                    "id: UUID PRIMARY KEY DEFAULT gen_random_uuid()",
+                    "actor_user_id: UUID NULL REFERENCES users(id) ON DELETE SET NULL",
+                    "action: VARCHAR(100) NOT NULL",
+                    "entity_type: VARCHAR(100) NOT NULL",
+                    "entity_id: UUID NULL",
+                    "request_id: VARCHAR(100) NULL",
+                    "ip_address: VARCHAR(64) NULL",
+                    "metadata: JSONB NOT NULL DEFAULT '{}'",
+                    "created_at: TIMESTAMPTZ NOT NULL DEFAULT now()",
+                ],
+                relations=["belongs_to User optional"],
+            ),
+        ]
+
+    @staticmethod
+    def _entity_name_from_feature(feature: str) -> str:
+        normalized = unicodedata.normalize("NFKD", feature)
+        ascii_feature = "".join(char for char in normalized if not unicodedata.combining(char))
+        words = re.findall(r"[A-Za-z0-9]+", ascii_feature)
+        ignored = {
+            "crud", "crear", "gestionar", "gestion", "administrar",
+            "sistema", "modulo", "panel", "control", "de", "del",
+            "la", "las", "el", "los", "y", "para",
+        }
+        meaningful = [word for word in words if word.lower() not in ignored]
+        selected = meaningful[:2] or words[:1] or ["Item"]
+        return "".join(word.capitalize() for word in selected)
 
     @staticmethod
     def _infer_endpoints(idea: IdeaRequest) -> list[OpenSpecApiEndpoint]:
@@ -638,6 +755,7 @@ class OpenSpecAgent:
         technology, orm, orm_rationale = db_info
 
         relationships: list[OpenSpecRelationship] = []
+        relationship_keys: set[tuple[str, str]] = set()
         for entity in entities:
             for rel in entity.relations:
                 if not rel:
@@ -647,21 +765,72 @@ class OpenSpecAgent:
                     continue
                 rel_type_word, target = parts[0].lower(), parts[1]
                 if rel_type_word == "has_many":
-                    relationships.append(OpenSpecRelationship(
-                        from_entity=entity.name, to_entity=target,
-                        type="one_to_many", cascade_delete=True,
-                    ))
+                    key = (entity.name, target)
+                    if key not in relationship_keys:
+                        relationships.append(OpenSpecRelationship(
+                            from_entity=entity.name, to_entity=target,
+                            type="one_to_many", cascade_delete=True,
+                        ))
+                        relationship_keys.add(key)
                 elif rel_type_word == "belongs_to":
-                    # already captured from the other side; skip to avoid duplicates
-                    pass
+                    key = (target, entity.name)
+                    if key not in relationship_keys:
+                        relationships.append(OpenSpecRelationship(
+                            from_entity=target, to_entity=entity.name,
+                            type="one_to_many", cascade_delete=True,
+                        ))
+                        relationship_keys.add(key)
 
         entity_names = [e.name for e in entities]
-        indexes = [f"CREATE UNIQUE INDEX idx_{e.name.lower()}s_email ON {e.name.lower()}s(email)"
-                   for e in entities if any("email" in f.lower() for f in e.fields)]
-        for entity in entities[1:]:
-            indexes.append(
-                f"CREATE INDEX idx_{entity.name.lower()}s_user_id ON {entity.name.lower()}s(user_id)"
-            )
+        indexes: list[str] = []
+        constraints: list[str] = []
+        for entity in entities:
+            table = OpenSpecAgent._table_name(entity.name)
+            field_text = " ".join(entity.fields).lower()
+            if "email" in field_text:
+                indexes.append(f"CREATE UNIQUE INDEX idx_{table}_email ON {table}(email)")
+            if "user_id" in field_text and "status" in field_text:
+                indexes.extend([
+                    f"CREATE INDEX idx_{table}_user_status ON {table}(user_id, status)",
+                    f"CREATE INDEX idx_{table}_user_created_at ON {table}(user_id, created_at DESC)",
+                ])
+            elif "user_id" in field_text:
+                indexes.append(f"CREATE INDEX idx_{table}_user_id ON {table}(user_id)")
+            if "role_id" in field_text:
+                indexes.append(f"CREATE INDEX idx_{table}_role_id ON {table}(role_id)")
+            if "actor_user_id" in field_text:
+                indexes.append(f"CREATE INDEX idx_{table}_actor_created_at ON {table}(actor_user_id, created_at DESC)")
+            if "expires_at" in field_text:
+                indexes.append(f"CREATE INDEX idx_{table}_expiry ON {table}(expires_at) WHERE revoked_at IS NULL")
+            if all(column in field_text for column in ("entity_type", "entity_id", "created_at")):
+                indexes.append(f"CREATE INDEX idx_{table}_entity_history ON {table}(entity_type, entity_id, created_at DESC)")
+            if "deleted_at" in field_text:
+                active_columns = "status" if "status" in field_text else "created_at"
+                indexes.append(f"CREATE INDEX idx_{table}_active ON {table}({active_columns}) WHERE deleted_at IS NULL")
+            if "status" in field_text:
+                constraints.append(
+                    f"ALTER TABLE {table} ADD CONSTRAINT chk_{table}_status "
+                    "CHECK (status IN ('draft', 'active', 'archived'))"
+                )
+            for field in entity.fields:
+                reference = re.search(
+                    r"^([a-zA-Z0-9_]+):.*REFERENCES\s+([a-zA-Z0-9_]+)\s*\(id\)"
+                    r"(?:\s+ON DELETE\s+(CASCADE|RESTRICT|SET NULL))?",
+                    field,
+                    re.IGNORECASE,
+                )
+                if reference:
+                    column, target, delete_policy = reference.groups()
+                    constraints.append(
+                        f"ALTER TABLE {table} ADD CONSTRAINT fk_{table}_{column} "
+                        f"FOREIGN KEY ({column}) REFERENCES {target}(id) "
+                        f"ON DELETE {delete_policy or 'RESTRICT'}"
+                    )
+
+        if {"UserRole", "Role", "User"}.issubset(entity_names):
+            indexes.append("CREATE UNIQUE INDEX uq_user_roles_user_role ON user_roles(user_id, role_id)")
+        if "RefreshToken" in entity_names:
+            indexes.append("CREATE UNIQUE INDEX uq_refresh_tokens_hash ON refresh_tokens(token_hash)")
 
         security_notes = [
             "Contraseñas almacenadas con bcrypt (mínimo 12 rondas) — nunca en texto plano.",
@@ -683,6 +852,16 @@ class OpenSpecAgent:
             orm_rationale=orm_rationale,
             relationships=relationships,
             indexes=indexes,
+            constraints=constraints,
+            naming_conventions=[
+                "Tablas y columnas en snake_case; modelos de dominio en PascalCase.",
+                "Claves primarias UUID en id y claves externas con formato <entidad>_id.",
+                "Índices idx_<tabla>_<columnas>; restricciones fk_, uq_ y chk_.",
+            ],
+            migration_strategy=(
+                "Migraciones versionadas e inmutables por cambio cohesivo; validar en CI, "
+                "probar rollback en staging y aplicar con el comando de despliegue del ORM."
+            ),
             mermaid_diagram=OpenSpecAgent._generate_mermaid(entities),
             seed_needed=True,
             seed_instructions=[
@@ -692,8 +871,13 @@ class OpenSpecAgent:
             ],
             security_notes=security_notes,
             mvp_scope=entity_names,
-            future_scope=["AuditLog", "Notification", "ActivityFeed"],
+            future_scope=["Notification", "ActivityFeed", "WebhookDelivery"],
         )
+
+    @staticmethod
+    def _table_name(entity_name: str) -> str:
+        snake = re.sub(r"(?<!^)(?=[A-Z])", "_", entity_name).lower()
+        return snake if snake.endswith("s") else f"{snake}s"
 
     @staticmethod
     def _generate_mermaid(entities: list[OpenSpecDataEntity]) -> str:

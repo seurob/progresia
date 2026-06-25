@@ -17,6 +17,8 @@ El diferenciador clave no es la velocidad de generación, sino la **trazabilidad
 - **Fallback chain de 4 LLMs** — Groq → OpenAI → Gemini → Ollama → generación determinista
 - **Exportación múltiple** — PDF, Markdown, ZIP descargable, publicación directa a GitHub
 - **Panel de administración** aislado con auth propia
+- **Modelo de datos profesional** — entidades, relaciones, índices, auditoría y diagrama ER adaptados al dominio
+- **Observabilidad opcional** — Sentry integrado en React, NestJS y FastAPI con filtrado de datos sensibles
 - **CI verde** — lint, tipos, tests y build validados en GitHub Actions
 
 ---
@@ -80,7 +82,10 @@ cp .env.example .env
 Editar `.env` con los valores reales. Los campos mínimos para arrancar:
 
 ```env
-DATABASE_URL=postgresql://progresia:change_me_in_production@localhost:5432/progresia_studio
+DATABASE_URL=postgresql://progresia:change_me_in_production@127.0.0.1:5432/progresia_studio
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6380
+MINIO_ENDPOINT=127.0.0.1
 JWT_SECRET=una_clave_secreta_larga_y_aleatoria
 JWT_REFRESH_SECRET=otra_clave_secreta_diferente
 GROQ_API_KEY=gsk_...          # O cualquier otro proveedor LLM
@@ -138,15 +143,14 @@ Verificar: `curl http://localhost:8003/health` → `{"status":"ok","service":"pr
 ### 6. Arrancar el API (NestJS)
 
 ```bash
-cd apps/api
-npm install
+# Desde la raíz. Así la API carga la configuración compartida correctamente.
+npm run build --workspace @progresia/api
 
-# Compilar y arrancar
-npx tsc --project tsconfig.build.json
-node --enable-source-maps dist/main
+# Arrancar el build
+node --enable-source-maps apps/api/dist/main
 ```
 
-> **Windows:** No usar `nest start --watch` — crea procesos zombi. Usar siempre `tsc + node`.
+> **Windows:** usar `127.0.0.1` para PostgreSQL, Redis y MinIO. Evita problemas de resolución IPv4/IPv6 del motor nativo de Prisma. Si se ejecuta desde `apps/api`, mantener su `.env` sincronizado con el de la raíz.
 
 Verificar: `curl http://localhost:3000/api/health`
 
@@ -231,7 +235,7 @@ El `ArchitectureAgent` selecciona la arquitectura óptima según el nivel técni
 | `LARAVEL_MONOLITH` | Laravel 11 REST API | Principiante | Web |
 | `LARAVEL_INERTIA_REACT` | Laravel + Inertia + React | Intermedio | Web |
 | `LARAVEL_INERTIA_VUE` | Laravel + Inertia + Vue 3 | Intermedio | Web |
-| `DJANGO_REST` | Django 5 + DRF | Principiante | Web |
+| `DJANGO_REST` | Django 5 + DRF | Avanzado / dominio pesado | Web |
 | `NEXTJS_APP` | Next.js 15 App Router | Intermedio | Web |
 | `NESTJS_REACT` | NestJS 11 + React desacoplado | Intermedio/Avanzado | Web |
 | `REACT_EXPRESS` | React + Express Node.js | Principiante | Web |
@@ -288,8 +292,8 @@ OLLAMA_CODE_MODEL=qwen2.5-coder
 | `JWT_SECRET` | Sí | Clave de firma del access token |
 | `JWT_REFRESH_SECRET` | Sí | Clave de firma del refresh token |
 | `JWT_EXPIRES_IN` | No | Duración del access token (default: `1d`) |
-| `REDIS_HOST` | No | Host de Redis (default: `localhost`) |
-| `REDIS_PORT` | No | Puerto interno de Redis (default: `6379`) |
+| `REDIS_HOST` | No | Host local de Redis (recomendado: `127.0.0.1`) |
+| `REDIS_PORT` | No | Puerto Redis desde el host (default del proyecto: `6380`) |
 | `REDIS_PUBLIC_PORT` | No | Puerto externo mapeado (default: `6380`) |
 | `AI_SERVICE_URL` | No | URL del AI service (default: `http://127.0.0.1:8003`) |
 | `CAPTCHA_ENABLED` | No | Activa CAPTCHA en backend (`true`/`false`, default: `false`) |
@@ -397,6 +401,45 @@ GET  /ollama/models              → modelos instalados en Ollama local
 
 ---
 
+## Observabilidad con Sentry
+
+Sentry es opcional y está integrado en React, NestJS y FastAPI. Sin DSN, los
+SDK permanecen desactivados y no alteran el arranque local.
+
+```env
+# NestJS API
+SENTRY_DSN=
+SENTRY_ENVIRONMENT=production
+SENTRY_RELEASE=<git-sha>
+SENTRY_TRACES_SAMPLE_RATE=0.1
+
+# React (se inyecta durante npm run build)
+VITE_SENTRY_DSN=
+VITE_SENTRY_ENVIRONMENT=production
+VITE_SENTRY_RELEASE=<git-sha>
+VITE_SENTRY_TRACES_SAMPLE_RATE=0.1
+
+# FastAPI AI service
+AI_SENTRY_DSN=
+AI_SENTRY_ENVIRONMENT=production
+AI_SENTRY_RELEASE=<git-sha>
+AI_SENTRY_TRACES_SAMPLE_RATE=0.1
+AI_SENTRY_ENABLE_LOGS=false
+```
+
+Se recomienda crear un proyecto Sentry por aplicación. La configuración elimina
+usuarios, cuerpos, cookies, cabeceras de autorización y API keys antes de enviar
+eventos. `sendDefaultPii` y Session Replay permanecen desactivados.
+
+Para obtener stack traces legibles del frontend, CI puede subir source maps
+definiendo `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` y `SENTRY_PROJECT`. El token debe
+guardarse exclusivamente como secreto del repositorio.
+
+El health check de la API indica `observability.sentry: true|false`, pero nunca
+expone el DSN.
+
+---
+
 ## Panel de administración
 
 Ruta: `http://localhost:5173/gestion-usuarios` — no aparece en ninguna navegación normal.
@@ -430,20 +473,28 @@ GET  /api/admin/projects       → lista proyectos (con ?search=)
 ## Tests
 
 ```bash
-# AI Service (pytest)
-cd apps/ai-service
-pytest -v
-
-# API — suite Jest (unitaria e integración)
-cd apps/api
-npm run test
-
-# Frontend — tipos
-cd apps/web
+# Desde la raíz
+npm test
+npm run lint
 npm run typecheck
+npm run build
+npm run openspec:check
+
+# AI Service
+cd apps/ai-service
+python -m pytest
+python -m ruff check app tests
 ```
 
-La CI ejecuta todos los checks en cada push (`lint → types → tests → build`).
+Estado verificado el 25 de junio de 2026:
+
+- Frontend: **10 pruebas superadas**
+- API: **50 pruebas superadas**
+- AI Service: **147 pruebas superadas y 70 omitidas condicionalmente**
+- Total ejecutado correctamente: **207 pruebas**
+- Lint, typecheck, build y validación OpenSpec: **correctos**
+
+La CI ejecuta los controles principales en cada push y pull request.
 
 ---
 
@@ -516,6 +567,7 @@ progresia/
 
 - **Redis** — mapeado al puerto 6380 (Docker Desktop ocupa el 6379)
 - **AI Service** — usar el puerto 8003 (Docker Desktop ocupa 8000 y 8001)
+- **Hosts locales** — usar `127.0.0.1` para PostgreSQL, Redis y MinIO
 - **NestJS** — no usar `nest start --watch`; compilar con `tsc` y lanzar con `node`
 - **Prisma** — detener el servidor API antes de `npx prisma generate` (lock de DLL)
 

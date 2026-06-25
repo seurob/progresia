@@ -9,7 +9,8 @@ describe("HealthService", () => {
     await expect(service.getHealth()).resolves.toMatchObject({
       status: "ok",
       service: "progresia-api",
-      dependencies: { db: "ok" }
+      dependencies: { db: "ok" },
+      observability: { sentry: false }
     });
   });
 

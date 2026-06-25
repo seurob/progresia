@@ -86,6 +86,9 @@ class OpenSpecDataModel(BaseModel):
     orm_rationale: str = ""
     relationships: list[OpenSpecRelationship] = Field(default_factory=list)
     indexes: list[str] = Field(default_factory=list)
+    constraints: list[str] = Field(default_factory=list)
+    naming_conventions: list[str] = Field(default_factory=list)
+    migration_strategy: str = ""
     mermaid_diagram: str = ""
     seed_needed: bool = False
     seed_instructions: list[str] = Field(default_factory=list)

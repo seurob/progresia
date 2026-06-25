@@ -1,0 +1,171 @@
+GUION DEL VIDEO DE PRESENTACION - PROGRESIA STUDIO
+
+Duracion nominal: 9 minutos y 45 segundos.
+Duracion maxima prevista con transiciones: 10 minutos.
+Ritmo recomendado: 130-140 palabras por minuto.
+
+PREPARACION
+- Abrir la presentacion, ProgresIA Studio, el panel de administracion y Visual Studio Code.
+- Preparar un proyecto ya generado para evitar esperar al pipeline completo.
+- Ocultar credenciales, tokens, archivos .env y datos personales.
+- Grabar los cambios de pantalla por separado y unirlos durante la edicion.
+
+
+DIAPOSITIVA 1 - PORTADA (0:00-0:20)
+
+"Hola, soy Roberto Manca y voy a presentar ProgresIA Studio, mi proyecto final del Master en Desarrollo de Software con IA. Es una plataforma educativa que transforma una idea en un proyecto software estructurado mediante especificaciones y agentes de inteligencia artificial."
+
+
+DIAPOSITIVA 2 - MOTIVACION EDUCATIVA (0:20-0:43)
+
+"La IA facilita escribir codigo, pero hace mas importante saber formular requisitos, elegir una arquitectura y verificar el resultado. ProgresIA busca desarrollar esas competencias. El estudiante no recibe solamente archivos: aprende un proceso de ingenieria reutilizable."
+
+
+DIAPOSITIVA 3 - FUTURO DEL DESARROLLO (0:43-1:05)
+
+"Estamos pasando del codigo manual a copilotos y agentes capaces de ejecutar planes completos. El desarrollador seguira siendo responsable de los objetivos, las restricciones y la calidad. Por eso, la especificacion sera el lenguaje comun entre personas, modelos y herramientas."
+
+
+DIAPOSITIVA 4 - MODELO PEDAGOGICO (1:05-1:28)
+
+"La IA actua como tutor de proceso. Primero pregunta para concretar la idea, despues explica las decisiones, genera una practica ejecutable y conserva la trazabilidad. El objetivo educativo es que el alumno pueda comprender y repetir la metodologia en otros proyectos."
+
+
+DIAPOSITIVAS 5 Y 6 - PROBLEMA Y SOLUCION (1:28-1:58)
+
+"El problema no es la falta de generadores de codigo, sino generar sin contexto. Los requisitos quedan dispersos y cada sesion puede producir decisiones distintas. ProgresIA responde con un flujo guiado que conecta la idea, la arquitectura, la documentacion, el codigo y la entrega final."
+
+
+DIAPOSITIVAS 7 Y 8 - PIPELINE Y OPENSPEC (1:58-2:30)
+
+"El pipeline tiene siete etapas: idea, requisitos, arquitectura, OpenSpec, issues, tutorial, codigo y ZIP. OpenSpec es la fuente de verdad. Contiene requisitos, entidades, endpoints, reglas y criterios de aceptacion. Todos los agentes posteriores utilizan ese mismo contrato."
+
+
+DIAPOSITIVA 9 - ARQUITECTURA (2:30-3:00)
+
+"La plataforma es un monorepo modular con tres aplicaciones. React implementa la experiencia web. NestJS gestiona usuarios, proyectos, seguridad, persistencia y trabajos asincronos. FastAPI ejecuta los agentes y RAG. PostgreSQL, Redis, Qdrant y MinIO completan la infraestructura."
+
+
+DIAPOSITIVAS 10 Y 11 - EXPERIENCIA Y AGENTES (3:00-3:28)
+
+"El usuario trabaja con un wizard adaptado a su nivel tecnico y puede revisar cada resultado. Diez agentes especializados analizan producto, requisitos y arquitectura, generan OpenSpec, issues, tutorial y codigo, y aportan contexto mediante RAG. Esta separacion facilita validar cada etapa."
+
+
+DIAPOSITIVAS 12 Y 13 - MODELOS Y RAG (3:28-3:55)
+
+"El sistema puede utilizar Groq, OpenAI, Gemini u Ollama. Si un proveedor falla, continua con otro o con un generador determinista. RAG permite recuperar documentos desde Qdrant y producir respuestas basadas en evidencia, no solamente en la memoria del modelo."
+
+
+DIAPOSITIVAS 14 A 16 - ENTREGA, SEGURIDAD, OBSERVABILIDAD Y CALIDAD (3:55-4:35)
+
+"La entrega incluye README, documentacion, SDD, codigo, Docker y GitHub Actions. Antes de descargar se comprueba la estructura, la coherencia y la presencia de secretos. La plataforma incluye JWT, autorizacion, CAPTCHA y administracion aislada. Sentry aporta observabilidad opcional en React, NestJS y FastAPI sin enviar usuarios, cookies, cuerpos ni credenciales. La base ha superado 207 pruebas junto con lint, tipos, build y validacion OpenSpec."
+
+
+DIAPOSITIVA 17 - DEMOSTRACION (4:35-8:50)
+
+TRANSICION (4:35-4:43)
+
+"Ahora voy a mostrar la aplicacion funcionando y despues su estructura tecnica."
+
+
+ESCENA A - APLICACION WEB Y ESTADO (4:43-5:12)
+
+Acciones:
+1. Abrir el login e iniciar sesion mediante un corte.
+2. Mostrar el dashboard y los proyectos.
+3. Mostrar brevemente el health check de la API con base de datos en estado ok.
+4. Pulsar "Nuevo proyecto".
+
+Narracion:
+"Tras iniciar sesion aparece el dashboard con los proyectos y su estado. La API expone un health check que confirma la conexion con PostgreSQL y si la observabilidad esta activa. Desde aqui puedo abrir un proyecto existente o comenzar uno nuevo."
+
+
+ESCENA B - GENERAR UNA APLICACION (5:12-6:25)
+
+Idea preparada:
+"Una aplicacion para gestionar reservas de aulas y tutorias. Profesores y alumnos pueden consultar disponibilidad, reservar, cancelar y recibir notificaciones."
+
+Acciones:
+1. Introducir el nombre y la idea.
+2. Avanzar rapidamente por el wizard.
+3. Mostrar nivel tecnico, datos, autenticacion y despliegue.
+4. Elegir una propuesta tecnologica.
+5. Iniciar la generacion.
+6. Mostrar brevemente los estados del pipeline.
+7. Cambiar mediante corte al proyecto ya completado.
+
+Narracion:
+"El wizard recoge el problema, los usuarios, las funciones y las restricciones sin exigir que el usuario conozca previamente el stack. La IA propone alternativas adaptadas a su nivel. La generacion se divide en trabajos asincronos. Para evitar una espera en el video, continuo con el resultado ya completado."
+
+
+ESCENA C - RESULTADOS Y DESCARGA (6:25-7:10)
+
+Acciones:
+1. Abrir requisitos y arquitectura.
+2. Mostrar OpenSpec.
+3. Mostrar issues y tutorial.
+4. Abrir la validacion previa.
+5. Mostrar el ZIP extraido.
+
+Narracion:
+"Los requisitos describen que debe hacer el sistema y la arquitectura explica como construirlo. OpenSpec conecta entidades, API, reglas de negocio, relaciones e indices. El modelo de datos generado incluye claves primarias, foraneas, auditoria y un diagrama entidad-relacion profesional. A partir de el se generan los issues, el tutorial y el codigo. Antes de descargar se validan README, documentacion, SDD, infraestructura y secretos."
+
+
+ESCENA D - ADMINISTRACION (7:10-7:40)
+
+Acciones:
+1. Abrir la ruta de administracion.
+2. Entrar mediante un corte sin mostrar la contrasena.
+3. Mostrar usuarios, buscador y proyectos.
+
+Narracion:
+"El panel de administracion esta separado de la aplicacion normal y utiliza autenticacion propia. Permite buscar y gestionar usuarios, consultar proyectos y revisar su estado sin conceder estos permisos a los usuarios normales."
+
+
+ESCENA E - CODIGO, ESTRUCTURA Y OBSERVABILIDAD (7:40-8:50)
+
+Acciones:
+1. Mostrar la raiz del monorepo.
+2. Expandir apps/web.
+3. Abrir NewProjectPage.tsx y useGeneratePipeline.ts.
+4. Expandir apps/api y mostrar modules, schema.prisma, jobs y artifacts.
+5. Expandir apps/ai-service y mostrar agents, core/llm.py y fallback/stacks.
+6. Mostrar instrument.ts y monitoring.py de Sentry.
+7. Mostrar openspec y .github/workflows.
+
+Narracion:
+"El repositorio se organiza como un monorepo modular. apps/web contiene React, el wizard y el seguimiento del pipeline. apps/api contiene NestJS, Prisma, autenticacion, trabajos y artefactos. apps/ai-service contiene FastAPI, los agentes, el selector de modelos, RAG y diecinueve generadores deterministas. La observabilidad se inicializa antes de cada aplicacion y filtra datos sensibles. OpenSpec documenta las decisiones y GitHub Actions automatiza las comprobaciones de calidad."
+
+CIERRE DE LA DEMO:
+"La demostracion conecta la experiencia del usuario, la generacion real y la arquitectura que la soporta."
+
+
+DIAPOSITIVA 18 - LIMITES Y EVOLUCION (8:50-9:15)
+
+"El MVP ya conecta el pipeline completo. Las siguientes mejoras son integrar RAG en el wizard, ampliar los itinerarios educativos, mejorar la edicion visual de OpenSpec, activar los proyectos reales de Sentry y completar un despliegue publico reproducible."
+
+
+DIAPOSITIVA 19 - CONCLUSION (9:15-9:45)
+
+"La principal conclusion es que la IA aporta mas valor cuando trabaja con contexto, especificaciones y controles. ProgresIA Studio convierte ese principio en una plataforma educativa, funcional y verificable. El proyecto integra frontend, backend, agentes, RAG, un modelo de datos profesional, seguridad, observabilidad e infraestructura. Gracias por vuestra atencion."
+
+
+MARGEN DE SEGURIDAD (9:45-10:00)
+
+Este margen absorbe:
+- Cambios entre PowerPoint, navegador y Visual Studio Code.
+- Tiempo de carga de pantallas.
+- Pausas naturales de la narracion.
+- Uno o dos segundos adicionales al mostrar OpenSpec, el ZIP o el panel admin.
+
+No agregar contenido nuevo durante este margen.
+
+
+RECOMENDACIONES DE EDICION
+
+- Cortar toda espera del pipeline y continuar con el proyecto preparado.
+- Usar rotulos breves: "Aplicacion", "Generacion", "Administracion" y "Codigo".
+- Aumentar la fuente de Visual Studio Code y ocultar terminal, minimapa y secretos.
+- Mantener el cursor visible y moverlo lentamente.
+- No leer el contenido completo de OpenSpec o del codigo; mostrar solo su estructura.
+- Comprobar que la exportacion final no supera 10 minutos.

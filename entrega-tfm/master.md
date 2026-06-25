@@ -70,7 +70,7 @@ El **OpenSpec** es el artefacto central: un documento JSON estructurado con enti
 | `LARAVEL_MONOLITH` | Laravel 11 + Blade | Principiante | Web |
 | `LARAVEL_INERTIA_REACT` | Laravel + Inertia.js + React | Intermedio | Web |
 | `LARAVEL_INERTIA_VUE` | Laravel + Inertia.js + Vue | Intermedio | Web |
-| `DJANGO_REST` | Django 5 + DRF | Principiante | Web |
+| `DJANGO_REST` | Django 5 + DRF | Avanzado / dominio pesado | Web |
 | `REACT_EXPRESS` | React + Express.js | Principiante | Web |
 | `NEXTJS_APP` | Next.js 15 App Router | Intermedio | Web |
 | `NESTJS_REACT` | NestJS 11 + React desacoplado | Intermedio/Avanzado | Web |
@@ -142,7 +142,8 @@ apps/ai-service (FastAPI)
 | **Zod** | 4.4 | Validación de esquemas en cliente |
 | **Axios** | 1.10 | HTTP client con interceptores de auth |
 | **Lucide React** | 1.21 | Iconografía |
-| **Vitest** | — | Testing unitario (pendiente de configurar) |
+| **Vitest** | 4.1 | Testing unitario de autenticación, instrumentación y UI crítica |
+| **Sentry React** | 10.61 | Errores y rendimiento, sin Session Replay ni PII |
 
 ### Páginas y rutas
 
@@ -188,6 +189,7 @@ apps/ai-service (FastAPI)
 | **JSZip** | 3.10 | Generación de bundles ZIP en memoria |
 | **MinIO SDK** | 8.0 | Object storage para ZIPs generados |
 | **TypeScript** | 5.9 | Tipado estático end-to-end |
+| **Sentry NestJS** | 10.61 | Captura de errores 5xx y trazas con sanitización |
 
 ### Módulos NestJS
 
@@ -217,6 +219,7 @@ src/modules/
 - **Rate limiting**: throttler en todos los endpoints públicos (300 req/min por IP)
 - **Secrets scanning**: en `validateBundle()` — detecta credenciales hardcodeadas en código generado antes de permitir descarga
 - **Refresh token rotation**: cada uso invalida el anterior (previene replay attacks)
+- **Observabilidad privada**: Sentry elimina usuarios, cuerpos, cookies, cabeceras de autorización y API keys antes de enviar eventos
 
 ---
 
@@ -240,6 +243,7 @@ src/modules/
 | **Qdrant Client** | 1.9 | Búsqueda vectorial para RAG |
 | **Ruff** | 0.12 | Linter + formatter Python |
 | **pytest** | 8.4 | Testing |
+| **Sentry SDK** | 2.63 | Errores, trazas y logs opcionales en FastAPI |
 
 ### Agentes implementados (10)
 
@@ -439,17 +443,17 @@ Usado como broker de colas por **BullMQ**. Cada job del pipeline (generar requis
 NODE_ENV=development
 API_PORT=3000
 
-DATABASE_URL=postgresql://progresia:progresia@localhost:5432/progresia_studio
+DATABASE_URL=postgresql://progresia:progresia@127.0.0.1:5432/progresia_studio
 
 JWT_SECRET=<string aleatorio seguro>
 JWT_EXPIRES_IN=1d
 
-REDIS_HOST=localhost
+REDIS_HOST=127.0.0.1
 REDIS_PORT=6380
 
 AI_SERVICE_URL=http://127.0.0.1:8003
 
-MINIO_ENDPOINT=localhost
+MINIO_ENDPOINT=127.0.0.1
 MINIO_PORT=9000
 MINIO_ACCESS_KEY=progresia
 MINIO_SECRET_KEY=progresia_secret
@@ -457,9 +461,14 @@ MINIO_BUCKET=progresia-artifacts
 
 CORS_ORIGINS=http://localhost:5173
 
-CAPTCHA_ENABLED=true
+CAPTCHA_ENABLED=false
 CAPTCHA_PROVIDER=turnstile
 CAPTCHA_SECRET_KEY=<Cloudflare Turnstile secret key>
+
+SENTRY_DSN=
+SENTRY_ENVIRONMENT=development
+SENTRY_RELEASE=
+SENTRY_TRACES_SAMPLE_RATE=0.1
 
 ADMIN_JWT_SECRET=<string aleatorio seguro>
 ADMIN_EMAIL=admin@progresia.local
@@ -484,6 +493,11 @@ GEMINI_MODEL=gemini-2.0-flash
 OLLAMA_BASE_URL=http://localhost:11434
 
 QDRANT_URL=http://localhost:6333
+
+AI_SENTRY_DSN=
+AI_SENTRY_ENVIRONMENT=development
+AI_SENTRY_RELEASE=
+AI_SENTRY_TRACES_SAMPLE_RATE=0.1
 ```
 
 ### Variables de entorno — `apps/web/.env`
@@ -493,6 +507,11 @@ VITE_API_URL=http://localhost:3000/api
 
 VITE_CAPTCHA_PROVIDER=turnstile
 VITE_CAPTCHA_SITE_KEY=<Cloudflare Turnstile site key>
+
+VITE_SENTRY_DSN=
+VITE_SENTRY_ENVIRONMENT=development
+VITE_SENTRY_RELEASE=
+VITE_SENTRY_TRACES_SAMPLE_RATE=0.1
 ```
 
 ---
@@ -504,6 +523,20 @@ VITE_CAPTCHA_SITE_KEY=<Cloudflare Turnstile site key>
 - `validateBundle()` escanea el código generado con regex para detectar credenciales hardcodeadas antes de permitir la descarga
 - El registro crea la cuenta en estado activo sin verificación de email (flujo simplificado para MVP educativo)
 - CAPTCHA configurable: Cloudflare Turnstile, hCaptcha o reCAPTCHA
+- Sentry opcional en las tres aplicaciones, con DSN independientes y filtrado de datos sensibles
+- Source maps del frontend subidos solo desde CI mediante secretos de GitHub
+
+### Observabilidad con Sentry
+
+La plataforma incorpora Sentry en React, NestJS y FastAPI. La integración es
+opcional: si no existe DSN, los SDK permanecen desactivados. Se recomienda crear
+un proyecto Sentry por aplicación para separar errores del navegador, API y
+servicio de IA.
+
+La política de privacidad desactiva el envío de PII y elimina usuario, cookies,
+cuerpo de la petición, `Authorization`, `x-api-key` y otras credenciales. El
+health check de NestJS informa únicamente si la captura está configurada, sin
+exponer el DSN.
 
 ---
 
@@ -511,10 +544,14 @@ VITE_CAPTCHA_SITE_KEY=<Cloudflare Turnstile site key>
 
 | Capa | Framework | Cobertura actual |
 |------|-----------|-----------------|
-| AI Service | pytest 8.4 | Agentes principales — requirements, architecture, openspec |
-| API — unitario | Jest 30 + ts-jest | auth.service, artifacts.service, health.service, specifications.service |
-| API — integración | Supertest | workflow.integration (registro → proyecto → pipeline completo) |
-| Frontend | Vitest 4 + Testing Library | Pendiente |
+| AI Service | pytest 9.1 | 147 pruebas superadas, 70 omitidas condicionalmente |
+| API — unitario e integración | Jest 30 + Supertest | 50 pruebas superadas |
+| Frontend | Vitest 4 + Testing Library | 10 pruebas superadas |
+| Calidad estática | ESLint, TypeScript, Ruff | lint y typecheck correctos |
+| Entrega | Builds + OpenSpec validator | build completo y 13 cambios OpenSpec válidos |
+
+**Resultado verificado el 25 de junio de 2026:** 207 pruebas superadas, además
+de lint, typecheck, build y validación OpenSpec.
 
 ---
 
@@ -541,26 +578,26 @@ VITE_CAPTCHA_SITE_KEY=<Cloudflare Turnstile site key>
 - [x] Rate limiting en todos los endpoints públicos
 - [x] Documentación OpenAPI automática (`/api/docs`)
 - [x] NotFoundPage (404) con navegación de vuelta al dashboard
+- [x] **Modelo de datos profesional** — entidades enriquecidas, relaciones, índices, restricciones, auditoría y diagrama ER
+- [x] **PDF de especificaciones** y exportación Markdown desde la aplicación
+- [x] **Sentry opcional** en React, NestJS y FastAPI con privacidad por defecto
+- [x] **GitHub Actions** para lint, tipos, tests, build, CodeQL y revisión de dependencias
 
 ---
 
 ## 12. Lo que falta / Mejoras pendientes ⏳
 
-### Alta prioridad
-
-- [ ] **Tests completos del AI service** — `TutorialAgent`, `CodeGenerationAgent`, `TechProposalAgent` e `IssueGeneratorAgent` no tienen tests
-- [ ] **Dependabot alerts** — 1 alerta alta + 2 moderadas en GitHub — revisar y actualizar dependencias
-
 ### Media prioridad
 
 - [ ] **Visor de OpenSpec en el frontend** — el JSON se guarda pero no hay UI para inspeccionarlo ni editarlo inline
-- [ ] **Exportación de especificaciones** — `/export-pdf` y `/export-md` existen en el controlador pero la generación de contenido es básica (sin estilos, sin maquetación)
 - [ ] **CodeGenAgent multi-step** — plan → implementar módulo por módulo → revisar (mejor calidad que generación en paso único)
 - [ ] **RAG en el wizard** — el pipeline RAG existe pero no está conectado al wizard de nueva idea (podría sugerir funcionalidades basadas en proyectos anteriores)
+- [ ] **Itinerarios formativos ampliados** — convertir las rutas pedagógicas en una experiencia navegable y evaluable
+- [ ] **Activación operativa de Sentry** — crear los tres proyectos, configurar DSN y alertas en despliegue
 
 ### Baja prioridad / Post-MVP
 
-- [ ] **Despliegue en producción** — Dockerfiles preparados pero sin CI/CD configurado (GitHub Actions pendiente)
+- [ ] **Despliegue público reproducible** — CI configurada; falta automatizar el despliegue a un entorno público
 - [ ] **Colaboradores en workspace** — el modelo de datos soporta `WorkspaceMember` con roles, pero la UI solo permite al owner trabajar
 - [ ] **MinIO activo** — el SDK está integrado pero el flujo de subida de ZIPs al object storage no está activo (se devuelve directamente como stream)
 - [ ] **Historial de generaciones** — los `ArtifactBundle` anteriores se listan pero no permiten restaurar una versión anterior completa
@@ -694,17 +731,17 @@ ollama list
 NODE_ENV=development
 API_PORT=3000
 
-DATABASE_URL=postgresql://progresia:progresia@localhost:5432/progresia_studio
+DATABASE_URL=postgresql://progresia:progresia@127.0.0.1:5432/progresia_studio
 
 JWT_SECRET=cambia_esto_por_un_string_aleatorio_largo
 JWT_EXPIRES_IN=1d
 
-REDIS_HOST=localhost
+REDIS_HOST=127.0.0.1
 REDIS_PORT=6380
 
 AI_SERVICE_URL=http://127.0.0.1:8003
 
-MINIO_ENDPOINT=localhost
+MINIO_ENDPOINT=127.0.0.1
 MINIO_PORT=9000
 MINIO_ACCESS_KEY=progresia
 MINIO_SECRET_KEY=progresia_secret
@@ -712,8 +749,8 @@ MINIO_BUCKET=progresia-artifacts
 
 CORS_ORIGINS=http://localhost:5173
 
-# CAPTCHA — usar test keys en desarrollo (no necesitan registro)
-CAPTCHA_ENABLED=true
+# CAPTCHA — desactivado por defecto en desarrollo
+CAPTCHA_ENABLED=false
 CAPTCHA_PROVIDER=turnstile
 CAPTCHA_SECRET_KEY=1x0000000000000000000000000000000AA
 
@@ -799,18 +836,19 @@ Abre **tres terminales separadas**:
 #### Terminal 1 — API (NestJS)
 
 ```bash
-cd apps/api
-
-# Compilar TypeScript (obligatorio en Windows — no usar nest start --watch)
-npx tsc --project tsconfig.build.json
+# Ejecutar desde la raíz para cargar la configuración compartida
+npm run build --workspace @progresia/api
 
 # Arrancar el servidor
-node --enable-source-maps dist/main
+node --enable-source-maps apps/api/dist/main
 ```
 
 Verás: `Nest application successfully started`
 
-> **Windows:** `nest start --watch` crea procesos zombi. Siempre compilar con `tsc` y arrancar con `node`.
+> **Windows:** usar `127.0.0.1` en `DATABASE_URL`, `REDIS_HOST` y
+> `MINIO_ENDPOINT`. Esto evita fallos intermitentes de resolución IPv4/IPv6 en
+> Prisma y los SDK nativos. No usar `nest start --watch`; compilar y arrancar el
+> build explícitamente.
 
 #### Terminal 2 — AI Service (FastAPI)
 

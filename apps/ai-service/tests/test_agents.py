@@ -10,7 +10,12 @@ from app.agents.issue_generator_agent import IssueGeneratorAgent
 from app.agents.openspec_agent import OpenSpecAgent, _OpenSpecLLMOutput
 from app.agents.requirements_agent import RequirementsAgent
 from app.agents.supervisor_agent import SupervisorAgent
-from app.agents.tech_proposal_agent import TechProposalAgent, _catalog_key
+from app.agents.tech_proposal_agent import (
+    TechProposalAgent,
+    _catalog_key,
+    _django_is_justified,
+)
+from app.agents.fallback.shared.prisma import generate_prisma_schema
 from app.agents.tutorial_agent import TutorialAgent
 from app.main import app
 from app.schemas.architecture import ArchitectureRequest
@@ -121,6 +126,10 @@ class TestRequirementsAgent:
 # ── OpenSpecAgent ─────────────────────────────────────────────────────────────
 
 class TestOpenSpecAgent:
+    def test_entity_names_ignore_generic_verbs_and_accents(self) -> None:
+        assert OpenSpecAgent._entity_name_from_feature("Gestión de aulas") == "Aulas"
+        assert OpenSpecAgent._entity_name_from_feature("Reserva de tutorías") == "ReservaTutorias"
+
     def test_uses_llm_when_available(self) -> None:
         mock_llm = MagicMock()
         mock_structured = MagicMock()
@@ -149,6 +158,32 @@ class TestOpenSpecAgent:
             result = OpenSpecAgent().generate(IDEA, MOCK_REQUIREMENTS)
 
         assert len(result.spec["requirements"]) == len(MOCK_REQUIREMENTS.functional_requirements)
+
+    def test_deterministic_data_model_has_professional_constraints(self) -> None:
+        with patch("app.agents.openspec_agent.get_llm", return_value=None):
+            result = OpenSpecAgent().generate(IDEA, MOCK_REQUIREMENTS)
+
+        data_model = result.spec["data_model"]
+        entities = result.spec["data_entities"]
+        domain_entity = next(
+            entity for entity in entities
+            if any(field.startswith("status:") for field in entity["fields"])
+            and any(field.startswith("user_id:") for field in entity["fields"])
+        )
+        entity_names = {entity["name"] for entity in entities}
+
+        assert {"User", "Role", "UserRole", "RefreshToken", "AuditLog"}.issubset(entity_names)
+        assert data_model["relationships"]
+        assert any("user_status" in index for index in data_model["indexes"])
+        assert any("uq_user_roles_user_role" in index for index in data_model["indexes"])
+        assert any("refresh_tokens_hash" in index for index in data_model["indexes"])
+        assert data_model["constraints"]
+        assert data_model["naming_conventions"]
+        assert data_model["migration_strategy"]
+        assert any(field.startswith("version:") for field in domain_entity["fields"])
+        assert any(field.startswith("updated_at:") for field in domain_entity["fields"])
+        assert any(field.startswith("deleted_at:") for field in domain_entity["fields"])
+        assert any(field.startswith("metadata:") for field in domain_entity["fields"])
 
 
 # ── SupervisorAgent ───────────────────────────────────────────────────────────
@@ -1619,6 +1654,107 @@ class TestTechProposalAgent:
             result = TechProposalAgent().propose(_TECH_REQ_INTERMEDIATE_AI)
 
         assert all(p.ai_ready for p in result.proposals), "All INTERMEDIATE_ai_service proposals must be ai_ready"
+
+    def test_regular_web_catalog_does_not_offer_django(self) -> None:
+        for req in (
+            _TECH_REQ_BEGINNER_SINGLE,
+            _TECH_REQ_BEGINNER_AI,
+            _TECH_REQ_INTERMEDIATE_SINGLE,
+            _TECH_REQ_INTERMEDIATE_FRONTEND_API,
+        ):
+            with patch("app.agents.tech_proposal_agent.get_llm", return_value=None):
+                result = TechProposalAgent().propose(req)
+            stacks = [" ".join(proposal.stack).lower() for proposal in result.proposals]
+            assert all("django" not in stack for stack in stacks)
+
+    def test_heavy_data_project_gets_exactly_one_django_alternative(self) -> None:
+        req = _TECH_REQ_INTERMEDIATE_SINGLE.model_copy(update={
+            "sector": "Finanzas",
+            "main_objective": "ERP con reporting, auditoría y aprobaciones",
+            "data_needs": ["datos relacionales", "histórico", "reporting"],
+            "core_features": [
+                "Contabilidad", "Facturación", "Inventario", "Aprobaciones",
+                "Auditoría", "Reporting", "Permisos",
+            ],
+        })
+        assert _django_is_justified(req)
+
+        with patch("app.agents.tech_proposal_agent.get_llm", return_value=None):
+            result = TechProposalAgent().propose(req)
+
+        django_proposals = [
+            proposal for proposal in result.proposals
+            if "django" in " ".join(proposal.stack).lower()
+        ]
+        assert len(django_proposals) == 1
+        assert django_proposals[0].id == 3
+
+    def test_unjustified_django_llm_response_falls_back_to_catalog(self) -> None:
+        from app.schemas.tech_proposal import TechProposal as TP
+        django_response = TechProposalResponse(
+            proposals=[
+                TP(id=1, name="Django A", tagline="Django", stack=["Django 5", "PostgreSQL"],
+                   difficulty="Principiante", description="d", advantages=["a"], limitations=["l"],
+                   recommended_for="r", learning_outcomes=["o"], docker_ready=True,
+                   ai_ready=False, estimated_setup_minutes=10),
+                TP(id=2, name="Django B", tagline="DRF", stack=["Django REST Framework", "React"],
+                   difficulty="Principiante", description="d", advantages=["a"], limitations=["l"],
+                   recommended_for="r", learning_outcomes=["o"], docker_ready=True,
+                   ai_ready=False, estimated_setup_minutes=10),
+            ],
+            recommended_id=1,
+            recommendation_reason="Django everywhere",
+        )
+        mock_llm = MagicMock()
+        mock_llm.with_structured_output.return_value.invoke.return_value = django_response
+
+        result = TechProposalAgent().propose(_TECH_REQ_BEGINNER_SINGLE, llm=mock_llm)
+
+        assert len(result.proposals) == 3
+        assert all("django" not in " ".join(p.stack).lower() for p in result.proposals)
+
+    def test_prisma_schema_includes_relations_indexes_and_table_mapping(self) -> None:
+        generated = generate_prisma_schema(
+            modules=["Bookings"],
+            needs_auth=True,
+            data_entities=[
+                {
+                    "name": "Booking",
+                    "fields": [
+                        "id: UUID PRIMARY KEY",
+                        "user_id: UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE",
+                        "status: VARCHAR(30) NOT NULL DEFAULT 'active'",
+                        "created_at: TIMESTAMPTZ NOT NULL DEFAULT now()",
+                        "updated_at: TIMESTAMPTZ NOT NULL DEFAULT now()",
+                    ],
+                    "relations": ["belongs_to User"],
+                }
+            ],
+        )
+
+        assert "userId" in generated.content
+        assert "@relation(fields: [userId], references: [id], onDelete: Cascade)" in generated.content
+        assert "bookings" in generated.content
+        assert "@@index([userId, status])" in generated.content
+        assert '@@map("bookings")' in generated.content
+        booking_model = generated.content.split("model Booking {", 1)[1]
+        assert booking_model.count("\n  id ") == 1
+
+    def test_complete_auth_schema_supports_multiple_user_relations(self) -> None:
+        with patch("app.agents.openspec_agent.get_llm", return_value=None):
+            openspec = OpenSpecAgent().generate(IDEA, MOCK_REQUIREMENTS)
+
+        generated = generate_prisma_schema(
+            modules=openspec.spec["modules"],
+            needs_auth=True,
+            data_entities=openspec.spec["data_entities"],
+        )
+
+        for model in ("User", "Role", "UserRole", "RefreshToken", "AuditLog"):
+            assert f"model {model} {{" in generated.content
+        assert "UserRoleUser" in generated.content
+        assert "UserRoleAssignedByUser" in generated.content
+        assert "onDelete: SetNull" in generated.content
 
     def test_uses_llm_when_available(self) -> None:
         from app.schemas.tech_proposal import TechProposal as TP

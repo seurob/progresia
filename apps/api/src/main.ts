@@ -1,7 +1,9 @@
+import "./instrument";
 import { ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { NestFactory } from "@nestjs/core";
+import { HttpAdapterHost, NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import { SentryExceptionFilter } from "./common/filters/sentry-exception.filter";
 import { AppModule } from "./modules/app.module";
 
 async function bootstrap() {
@@ -27,6 +29,7 @@ async function bootstrap() {
       transform: true
     })
   );
+  app.useGlobalFilters(new SentryExceptionFilter(app.get(HttpAdapterHost)));
 
   const openApiConfig = new DocumentBuilder()
     .setTitle("ProgresIA Studio API")

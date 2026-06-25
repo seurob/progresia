@@ -35,7 +35,7 @@ Devuelve un JSON con este esquema:
 }
 
 CRITERIOS POR NIVEL TÉCNICO (usar como guía principal):
-- BEGINNER → priorizar LARAVEL_MONOLITH, DJANGO_REST o REACT_EXPRESS (simple, bien documentado, curva baja)
+- BEGINNER → priorizar LARAVEL_MONOLITH, NEXTJS_APP o REACT_EXPRESS (simple, bien documentado, curva baja)
 - INTERMEDIATE → NEXTJS_APP o NESTJS_REACT (moderno, escalable, buenas prácticas)
 - ADVANCED → NESTJS_REACT, FASTAPI_AI o arquitecturas desacopladas (máxima flexibilidad)
 
@@ -46,7 +46,8 @@ CRITERIOS POR TIPO DE PROYECTO:
 - NESTJS_REACT: frontend+backend desacoplados, escalabilidad alta, TypeScript
 - REACT_EXPRESS: proyectos Node.js simples, equipos JavaScript puros
 - FASTAPI_AI: IA, RAG, LLMs, procesamiento de datos, Python
-- DJANGO_REST: admin panel nativo, CMS, Python, ecosistema científico
+- DJANGO_REST: reservar para back-office pesado, CMS complejo, muchos modelos relacionales,
+  permisos/workflows/reporting o preferencia explícita por Django/Python. No usarlo como opción web por defecto.
 
 REGLA CRÍTICA: Si technical_level es BEGINNER, NO recomendar NESTJS_REACT ni FASTAPI_AI.
 Si el proyecto tiene necesidades de IA, puede hacerse una excepción para FASTAPI_AI.
@@ -411,6 +412,24 @@ _WEB_ARCH_TYPES = frozenset({
     "NEXTJS_APP", "NESTJS_REACT", "REACT_EXPRESS", "FASTAPI_AI", "DJANGO_REST",
 })
 
+_DJANGO_HEAVY_TERMS = {
+    "erp", "backoffice", "back-office", "cms", "reporting", "auditor",
+    "workflow", "inventario", "contabilidad", "historial clínico",
+    "multi-tenant", "permisos", "logística", "finanzas", "facturación",
+}
+
+
+def _django_is_justified(req: ArchitectureRequest) -> bool:
+    preferred = req.preferred_stack.lower()
+    if any(term in preferred for term in ("django", "drf", "python web")):
+        return True
+    if (req.technical_level or "INTERMEDIATE") == "BEGINNER":
+        return False
+    context = " ".join([req.sector, req.problem, *req.key_features]).lower()
+    domain_signals = sum(term in context for term in _DJANGO_HEAVY_TERMS)
+    structural_signals = int(len(req.key_features) >= 7) + int(req.needs_admin_panel)
+    return domain_signals + structural_signals >= 3
+
 
 class ArchitectureAgent:
     def recommend(self, req: ArchitectureRequest) -> ArchitectureRecommendation:
@@ -431,7 +450,9 @@ class ArchitectureAgent:
                 if match:
                     data = json.loads(match.group())
                     arch_type = data.get("architecture_type", "")
-                    if arch_type in _WEB_ARCH_TYPES:
+                    if arch_type in _WEB_ARCH_TYPES and (
+                        arch_type != "DJANGO_REST" or _django_is_justified(req)
+                    ):
                         return ArchitectureRecommendation(
                             architecture_type=arch_type,
                             name=data.get("name", arch_type),

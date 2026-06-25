@@ -1,3 +1,5 @@
+process.env.DISABLE_QUEUES = "true";
+
 module.exports = {
   moduleFileExtensions: ["js", "json", "ts"],
   rootDir: ".",

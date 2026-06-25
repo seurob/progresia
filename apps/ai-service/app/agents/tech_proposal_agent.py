@@ -17,8 +17,11 @@ Rules:
 - Tailor difficulty to the stated technical level
 - For BEGINNER: prefer frameworks with fewer moving parts, strong documentation, single language
 - For INTERMEDIATE: prefer modern architecture, TypeScript, containerization, production-ready
+- Django is a specialized option, not a default web recommendation. Include it in at most ONE
+  proposal and only for data-heavy back-office systems with many relational models, complex
+  administration/workflows/reporting, or when the user explicitly requires Django/Python.
 - Consider architecture_style strictly:
-  * single: monolith — Next.js, Laravel, Django (everything in one project)
+  * single: monolith — Next.js, Laravel, SvelteKit (everything in one project)
   * frontend_api: separate SPA + API — React/Vue + NestJS/FastAPI/Laravel
   * ai_service: SPA + API + AI microservice — React + NestJS + FastAPI/LangChain
   * mobile_api: NATIVE/CROSS-PLATFORM MOBILE client + API — Flutter, React Native, Expo, KMP. NEVER suggest Next.js, React, Vue or any web framework as the primary client for mobile_api.
@@ -78,15 +81,15 @@ _STACKS: dict[str, list[TechProposal]] = {
             docker_ready=True, ai_ready=False, estimated_setup_minutes=20,
         ),
         TechProposal(
-            id=3, name="Stack Python Backend", tagline="Django + React + PostgreSQL",
-            stack=["Python 3.12", "Django 5", "Django REST Framework", "React 18", "PostgreSQL 16", "Tailwind CSS"],
+            id=3, name="Stack Svelte Full-stack", tagline="SvelteKit + Prisma + PostgreSQL",
+            stack=["TypeScript 5", "SvelteKit 2", "Prisma ORM", "PostgreSQL 16", "Tailwind CSS 4"],
             difficulty="Principiante",
-            description="Django maneja el backend con REST API automática, React el frontend. Python es más fácil de aprender y tiene el mejor ecosistema de IA.",
-            advantages=["Django genera migraciones, panel admin y auth automáticamente", "Python es el lenguaje con más tutoriales y comunidad IA", "Fácil añadir IA más adelante con LangChain o FastAPI"],
-            limitations=["Dos proyectos separados (Django + React) — más configuración inicial", "El panel admin de Django no es responsivo por defecto"],
-            recommended_for="Si planeas añadir IA en el futuro o ya sabes algo de Python",
-            learning_outcomes=["Django ORM y migraciones", "REST API con DRF", "Separación frontend/backend"],
-            docker_ready=True, ai_ready=True, estimated_setup_minutes=25,
+            description="SvelteKit combina interfaz y backend en un proyecto TypeScript compacto, con Prisma para un modelo relacional seguro.",
+            advantages=["Menos boilerplate que React para formularios y estado", "Frontend y endpoints en un solo proyecto", "Prisma mantiene el esquema PostgreSQL tipado"],
+            limitations=["Ecosistema laboral menor que React", "Algunas integraciones empresariales tienen menos ejemplos"],
+            recommended_for="MVP web compacto con formularios, autenticación y datos relacionales",
+            learning_outcomes=["Svelte 5 y SvelteKit", "Form actions y endpoints server-side", "Modelado relacional con Prisma"],
+            docker_ready=True, ai_ready=False, estimated_setup_minutes=20,
         ),
     ],
 
@@ -152,14 +155,14 @@ _STACKS: dict[str, list[TechProposal]] = {
             docker_ready=True, ai_ready=True, estimated_setup_minutes=15,
         ),
         TechProposal(
-            id=3, name="Stack Python Full-stack IA", tagline="Django + LangChain + Groq",
-            stack=["Python 3.12", "Django 5", "LangChain 0.3", "Groq API", "PostgreSQL 16", "Tailwind CSS (CDN)", "Docker Compose"],
+            id=3, name="Stack Python IA Compacto", tagline="FastAPI + HTMX + LangChain + Groq",
+            stack=["Python 3.12", "FastAPI", "Jinja2", "HTMX 2", "LangChain 0.3", "Groq API", "PostgreSQL 16", "Docker Compose"],
             difficulty="Principiante",
-            description="Django con LangChain integrado directamente. Sin framework frontend separado. Groq ofrece inferencia gratuita muy rápida.",
-            advantages=["Un solo lenguaje Python para todo — backend, IA y plantillas HTML", "Groq es gratuito con modelos Llama muy rápidos", "Django genera el panel admin para gestionar conversaciones automáticamente"],
-            limitations=["Sin streaming nativo — el chat responde de golpe (requiere WebSockets para streaming)", "LangChain cambia la API frecuentemente — fijar versión exacta en requirements.txt"],
-            recommended_for="Desarrollador Python que quiere añadir un chatbot o asistente a una app Django",
-            learning_outcomes=["LangChain básico con modelos online", "Integración IA en vistas Django", "Historial de conversaciones con Django ORM"],
+            description="FastAPI sirve plantillas y endpoints de IA en un proyecto Python pequeño. HTMX aporta interactividad sin mantener una SPA separada.",
+            advantages=["Un solo servicio Python para interfaz, API e IA", "Streaming sencillo con Server-Sent Events", "Menos estructura accidental para un primer asistente"],
+            limitations=["HTMX no sustituye una SPA compleja", "El panel administrativo debe construirse o integrarse aparte"],
+            recommended_for="Asistente o chatbot educativo con interfaz web sencilla y backend Python",
+            learning_outcomes=["FastAPI y validación Pydantic", "Streaming de LLM", "Interacciones hypermedia con HTMX"],
             docker_ready=True, ai_ready=True, estimated_setup_minutes=25,
         ),
     ],
@@ -320,15 +323,15 @@ _STACKS: dict[str, list[TechProposal]] = {
 
     "INTERMEDIATE_single": [
         TechProposal(
-            id=1, name="Stack Django Moderno", tagline="Django 5 + HTMX + PostgreSQL + Tailwind",
-            stack=["Python 3.12", "Django 5", "HTMX 2", "Alpine.js", "PostgreSQL 16", "Celery + Redis", "Tailwind CSS 3", "Docker Compose"],
+            id=1, name="Stack Next.js de Producción", tagline="Next.js + Prisma + PostgreSQL + Redis",
+            stack=["TypeScript 5", "Next.js 15", "Prisma 6", "PostgreSQL 16", "Redis 7", "Tailwind CSS 4", "Docker Compose"],
             difficulty="Intermedio",
-            description="Monolito Django con HTMX para interactividad sin JavaScript pesado. El stack más productivo para un desarrollador solo.",
-            advantages=["HTMX añade interactividad sin escribir casi nada de JavaScript", "Django incluye auth, admin, ORM y migraciones — todo listo", "Un solo proyecto en Python — sin cambios de contexto de lenguaje"],
-            limitations=["HTMX no es apto para SPAs muy complejas o juegos en tiempo real", "Difícil añadir una app móvil nativa después (necesitarías añadir REST API)"],
-            recommended_for="Aplicación web clásica con formularios, admin y operaciones CRUD complejas",
-            learning_outcomes=["Django ORM avanzado y señales", "HTMX y arquitectura hypermedia", "Celery para tareas asíncronas"],
-            docker_ready=True, ai_ready=True, estimated_setup_minutes=20,
+            description="Monolito TypeScript con renderizado híbrido, endpoints server-side y modelo PostgreSQL tipado mediante Prisma.",
+            advantages=["Un solo lenguaje para UI, backend y validación", "Despliegue flexible en contenedor o plataformas serverless", "Prisma ofrece migraciones e integridad tipada"],
+            limitations=["Hay que entender bien la frontera Server/Client Components", "Los procesos largos requieren una cola externa"],
+            recommended_for="SaaS y aplicaciones web modernas con SEO, paneles y flujos transaccionales moderados",
+            learning_outcomes=["App Router y Server Actions", "Diseño de esquema con Prisma", "Caché y jobs con Redis"],
+            docker_ready=True, ai_ready=False, estimated_setup_minutes=20,
         ),
         TechProposal(
             id=2, name="Stack Laravel Avanzado", tagline="Laravel 11 + Livewire + PostgreSQL + Redis",
@@ -439,7 +442,7 @@ _RECOMMENDATION_TEXTS: dict[str, str] = {
     "BEGINNER_desktop":         "Para tu primera app de escritorio, recomendamos **Tauri + React**. Apps ultraligeras, sin instalar Rust manualmente gracias al CLI de Tauri, con React que ya conoces.",
     "INTERMEDIATE_frontend_api": "Para un MVP productivo, recomendamos el **Stack Producción Estándar (React + NestJS)**. Arquitectura escalable, type-safety end-to-end y listo para Docker desde el primer commit.",
     "INTERMEDIATE_ai_service":  "Para un proyecto centrado en IA, recomendamos el **Stack IA Estándar**. La separación NestJS/FastAPI es la arquitectura correcta cuando la IA es el corazón del negocio.",
-    "INTERMEDIATE_single":      "Para máxima productividad individual, recomendamos **Django + HTMX**. Un solo lenguaje, sin frontend framework pesado, con el ecosistema IA de Python disponible.",
+    "INTERMEDIATE_single":      "Para máxima productividad individual, recomendamos **Next.js + Prisma**. Un solo proyecto TypeScript, modelo relacional tipado y despliegue flexible.",
     "INTERMEDIATE_mobile":      "Para una app móvil intermedia, recomendamos **React Native + Expo + NestJS**. TypeScript en todo el proyecto — mobile y backend comparten tipos, reduciendo los bugs de integración.",
     "INTERMEDIATE_desktop":     "Para una app de escritorio intermedia, recomendamos **Tauri 2 + React + NestJS**. La combinación más moderna: apps ligeras, seguras y con backend escalable cuando lo necesites.",
 }
@@ -452,6 +455,66 @@ _ARCH_MAP: dict[str, str] = {
     "mobile_api":   "mobile",
     "desktop_api":  "desktop",
 }
+
+_DJANGO_HEAVY_PROPOSAL = TechProposal(
+    id=3,
+    name="Stack Back-office de Datos",
+    tagline="Django + DRF + PostgreSQL + Celery",
+    stack=[
+        "Python 3.12", "Django 5", "Django REST Framework", "PostgreSQL 16",
+        "Celery 5", "Redis 7", "React 19", "Docker Compose",
+    ],
+    difficulty="Intermedio",
+    description=(
+        "Arquitectura reservada para dominios con muchos modelos relacionales, permisos, "
+        "flujos administrativos, reporting y procesamiento en segundo plano."
+    ),
+    advantages=[
+        "Django Admin acelera la gestión interna de catálogos y operaciones",
+        "ORM y migraciones maduros para dominios relacionales extensos",
+        "Celery cubre informes, importaciones y procesos largos",
+    ],
+    limitations=[
+        "Sobredimensionado para un CRUD o SaaS pequeño",
+        "Django Admin no sustituye una interfaz de producto para usuarios finales",
+    ],
+    recommended_for="ERP, salud, finanzas, logística o back-office con numerosos modelos y workflows",
+    learning_outcomes=["Modelado relacional avanzado", "Permisos y workflows", "Jobs asíncronos con Celery"],
+    docker_ready=True,
+    ai_ready=True,
+    estimated_setup_minutes=45,
+)
+
+_HEAVY_DOMAIN_TERMS = {
+    "erp", "backoffice", "back-office", "cms", "reporting", "auditor",
+    "workflow", "aprobacion", "aprobación", "inventario", "contabilidad",
+    "historial clinico", "historial clínico", "multi-tenant", "permisos",
+    "logistica", "logística", "finanzas", "facturacion", "facturación",
+}
+
+
+def _django_is_justified(req: TechProposalRequest) -> bool:
+    """Reserve Django for explicit requests or genuinely data-heavy web systems."""
+    mandatory = (req.mandatory_techs or "").lower()
+    if "django" in mandatory or "drf" in mandatory:
+        return True
+    if req.level != "INTERMEDIATE" or req.product_type not in {"web", "saas", "api"}:
+        return False
+
+    context = " ".join([
+        req.sector,
+        req.main_objective,
+        *req.data_needs,
+        *req.core_features,
+    ]).lower()
+    domain_signals = sum(term in context for term in _HEAVY_DOMAIN_TERMS)
+    structural_signals = int(len(req.core_features) >= 6) + int(len(req.data_needs) >= 3)
+    return domain_signals + structural_signals >= 3
+
+
+def _proposal_uses_django(proposal: TechProposal) -> bool:
+    text = " ".join([proposal.name, proposal.tagline, *proposal.stack]).lower()
+    return "django" in text or "drf" in text
 
 
 def _catalog_key(req: TechProposalRequest) -> str:
@@ -475,8 +538,16 @@ _DESKTOP_KEYWORDS = {"tauri", "electron", "customtkinter", "tkinter", "wxpython"
 _WEB_CLIENT_KEYWORDS = {"next.js", "nextjs", "nuxt", "sveltekit", "angular", "vue ", "react ", "vite "}
 
 
-def _validate_arch_proposals(proposals: list, arch: str) -> bool:
-    """Return False if the LLM ignored the mobile/desktop architecture constraint."""
+def _validate_arch_proposals(
+    proposals: list[TechProposal],
+    arch: str,
+    req: TechProposalRequest | None = None,
+) -> bool:
+    """Validate client architecture and prevent unjustified Django recommendations."""
+    django_count = sum(_proposal_uses_django(p) for p in proposals)
+    if django_count > 1 or (django_count and req is not None and not _django_is_justified(req)):
+        return False
+
     if arch not in ("mobile_api", "desktop_api"):
         return True
     required = _MOBILE_KEYWORDS if arch == "mobile_api" else _DESKTOP_KEYWORDS
@@ -514,7 +585,7 @@ class TechProposalAgent:
                 if (
                     isinstance(result, TechProposalResponse)
                     and len(result.proposals) >= 2
-                    and _validate_arch_proposals(result.proposals, req.architecture_style)
+                    and _validate_arch_proposals(result.proposals, req.architecture_style, req)
                 ):
                     return result
                 if isinstance(result, TechProposalResponse):
@@ -529,8 +600,15 @@ class TechProposalAgent:
 
     def _catalog_fallback(self, req: TechProposalRequest) -> TechProposalResponse:
         key = _catalog_key(req)
-        proposals = _STACKS.get(key) or _STACKS["INTERMEDIATE_frontend_api"]
+        proposals = list(_STACKS.get(key) or _STACKS["INTERMEDIATE_frontend_api"])
+        if _django_is_justified(req) and req.architecture_style not in ("mobile_api", "desktop_api"):
+            proposals[-1] = _DJANGO_HEAVY_PROPOSAL.model_copy(update={"id": proposals[-1].id})
         reason = _RECOMMENDATION_TEXTS.get(key, _RECOMMENDATION_TEXTS["INTERMEDIATE_frontend_api"])
+        if _django_is_justified(req):
+            reason = (
+                f"{reason} Django se incluye únicamente como alternativa pesada por la "
+                "complejidad relacional, administrativa o de reporting detectada."
+            )
         if req.mandatory_techs:
             reason = f"{reason} Tus tecnologías requeridas (**{req.mandatory_techs}**) deberán integrarse en el stack elegido."
         return TechProposalResponse(

@@ -114,7 +114,7 @@ GitHub Actions en `main`:
 | 5 | Evaluar ESLint 10 y plugins asociados. | #19 |
 | 6 | RAG con Qdrant — embeddings de specs y busqueda semantica. | Pendiente |
 | 7 | E2E Playwright — smoke tests del flujo idea-to-GitHub. | Pendiente |
-| 8 | Sentry — observabilidad en API y frontend. | Pendiente |
+| 8 | Sentry — errores y trazas en web, API y servicio IA con filtrado de PII. | Implementado |
 
 ## Regla Operativa
 

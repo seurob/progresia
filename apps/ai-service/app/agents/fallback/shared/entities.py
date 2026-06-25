@@ -13,7 +13,8 @@ def slug(name: str) -> str:
 
 def pascal(name: str) -> str:
     """Convierte un nombre a PascalCase."""
-    return "".join(w.capitalize() for w in re.split(r"[\s\-_]+", name.strip()))
+    separated = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", name.strip())
+    return "".join(w[:1].upper() + w[1:] for w in re.split(r"[\s\-_]+", separated) if w)
 
 
 def camel(name: str) -> str:
@@ -77,6 +78,8 @@ def get_entity_camel(entity: dict) -> str:
 def pluralize(name: str) -> str:
     """Pluraliza un nombre simple en inglés/español."""
     name_lower = name.lower()
+    if name_lower.endswith("s") and not name_lower.endswith(("ss", "us")):
+        return name
     if name_lower.endswith(("s", "x", "z", "ch", "sh")):
         return name + "es"
     if name_lower.endswith("y") and len(name) > 1 and name_lower[-2] not in "aeiou":

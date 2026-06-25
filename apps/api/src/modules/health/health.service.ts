@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { isExceptionCaptureConfigured } from "../../common/monitoring/exception-capture";
 import { PrismaService } from "../../database/prisma.service";
 
 @Injectable()
@@ -17,7 +18,8 @@ export class HealthService {
       status: dbStatus === "ok" ? "ok" : "degraded",
       service: "progresia-api",
       timestamp: new Date().toISOString(),
-      dependencies: { db: dbStatus }
+      dependencies: { db: dbStatus },
+      observability: { sentry: isExceptionCaptureConfigured() }
     };
   }
 }

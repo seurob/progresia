@@ -29,6 +29,12 @@ class Settings(BaseSettings):
 
     qdrant_url: str = "http://localhost:6333"
 
+    ai_sentry_dsn: str | None = None
+    ai_sentry_environment: str = "development"
+    ai_sentry_release: str | None = None
+    ai_sentry_traces_sample_rate: float = 0.1
+    ai_sentry_enable_logs: bool = False
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

@@ -10,6 +10,7 @@ import { PrismaService } from "../../src/database/prisma.service";
 import { AiServiceClient } from "../../src/modules/ai-service/ai-service.client";
 import { GithubService } from "../../src/modules/github/github.service";
 import { CaptchaService } from "../../src/modules/auth/captcha.service";
+import { StorageService } from "../../src/modules/storage/storage.service";
 
 // Stable fixture data
 const USER_ID      = "00000000-0000-4000-8000-000000000001";
@@ -211,6 +212,11 @@ describe("API workflow integration", () => {
       .useValue(githubServiceMock)
       .overrideProvider(CaptchaService)
       .useValue({ verify: jest.fn().mockResolvedValue(undefined) })
+      .overrideProvider(StorageService)
+      .useValue({
+        uploadBuffer: jest.fn().mockResolvedValue(undefined),
+        getSignedUrl: jest.fn().mockResolvedValue("http://localhost/test-artifact")
+      })
       .compile();
 
     app = moduleRef.createNestApplication();
@@ -219,7 +225,9 @@ describe("API workflow integration", () => {
     await app.init();
   });
 
-  afterAll(() => app.close());
+  afterAll(async () => {
+    await app?.close();
+  });
 
   beforeEach(() => jest.clearAllMocks());
 
