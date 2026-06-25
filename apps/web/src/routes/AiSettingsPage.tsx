@@ -496,7 +496,7 @@ function OllamaStatus({ config, ollama, isFetching, onRefresh }: OllamaStatusPro
           </table>
           <p className="mt-4 text-xs text-zinc-500">
             Para instalar los perfiles recomendados usa{" "}
-            <code>ollama pull gemma4:26b-a4b</code> o{" "}
+            <code>ollama pull gemma4:26b-a4b-it-qat</code> o{" "}
             <code>ollama pull gemma4:31b</code> y pulsa Actualizar.
           </p>
         </>
@@ -528,7 +528,7 @@ function OllamaStatus({ config, ollama, isFetching, onRefresh }: OllamaStatusPro
               </li>
               <li className="flex gap-2">
                 <ChevronRight size={13} />
-                <code>ollama pull gemma4:26b-a4b</code>
+                <code>ollama pull gemma4:26b-a4b-it-qat</code>
               </li>
               <li className="flex gap-2">
                 <ChevronRight size={13} />

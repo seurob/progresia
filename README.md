@@ -268,13 +268,13 @@ se descarta y se intenta con el siguiente modelo.
 ### Perfiles locales Gemma 4
 
 ```bash
-ollama pull gemma4:26b-a4b
+ollama pull gemma4:26b-a4b-it-qat
 ollama pull gemma4:31b
 ```
 
 | Equipo | Modelo recomendado | Uso |
 |--------|--------------------|-----|
-| Ordenador normal, sin GPU potente | `gemma4:26b-a4b` | Razonamiento, agentes, planificación y código con activación eficiente |
+| Ordenador normal, sin GPU potente | `gemma4:26b-a4b-it-qat` | Razonamiento, agentes, planificación y código con activación eficiente |
 | Buena GPU o bastante RAM | `gemma4:31b` | Arquitectura, refactorización, análisis de repositorios y código largo |
 
 El perfil equilibrado es el predeterminado. Para activar el perfil de máxima
@@ -296,8 +296,8 @@ GEMINI_API_KEY=AIza...
 GEMINI_MODEL=gemini-2.0-flash
 
 OLLAMA_BASE_URL=http://localhost:11434     # solo si tienes Ollama instalado
-OLLAMA_REASONING_MODEL=gemma4:26b-a4b
-OLLAMA_CODE_MODEL=gemma4:26b-a4b
+OLLAMA_REASONING_MODEL=gemma4:26b-a4b-it-qat
+OLLAMA_CODE_MODEL=gemma4:26b-a4b-it-qat
 ```
 
 ---

@@ -8,10 +8,10 @@ const providers = [
   {
     name: "ollama" as const,
     has_key: true,
-    model: "gemma4:26b-a4b",
-    default_model: "gemma4:26b-a4b",
-    code_model: "gemma4:26b-a4b",
-    default_code_model: "gemma4:26b-a4b",
+    model: "gemma4:26b-a4b-it-qat",
+    default_model: "gemma4:26b-a4b-it-qat",
+    code_model: "gemma4:26b-a4b-it-qat",
+    default_code_model: "gemma4:26b-a4b-it-qat",
   },
 ];
 
@@ -28,6 +28,6 @@ it("shows recommended Gemma models even when they are not installed", () => {
     />,
   );
 
-  expect(screen.getAllByRole("option", { name: "gemma4:26b-a4b" })).toHaveLength(2);
+  expect(screen.getAllByRole("option", { name: "gemma4:26b-a4b-it-qat" })).toHaveLength(2);
   expect(screen.getAllByRole("option", { name: "gemma4:31b" })).toHaveLength(2);
 });

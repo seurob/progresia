@@ -20,7 +20,7 @@ template.
 
 ### Requirement: Ollama hardware profiles
 
-The project SHALL document `gemma4:26b-a4b` for balanced computers and
+The project SHALL document `gemma4:26b-a4b-it-qat` for balanced computers and
 `gemma4:31b` for machines with a strong GPU or abundant RAM.
 
 #### Scenario: Models are not installed yet

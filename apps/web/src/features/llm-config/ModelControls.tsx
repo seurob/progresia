@@ -11,7 +11,7 @@ const PROVIDER_LABELS: Record<CloudProvider, string> = {
 };
 
 export const OLLAMA_RECOMMENDED_MODELS = [
-  "gemma4:26b-a4b",
+  "gemma4:26b-a4b-it-qat",
   "gemma4:31b",
 ] as const;
 

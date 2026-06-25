@@ -9,5 +9,5 @@ Each AI result is validated. Invalid architecture, malformed output or runtime
 failure advances to the next candidate. Deterministic catalogs and
 `FallbackGenerator` execute only after every AI candidate fails.
 
-The default local profile is `gemma4:26b-a4b`. Users with a strong GPU or
+The default local profile is `gemma4:26b-a4b-it-qat`. Users with a strong GPU or
 abundant RAM can set both Ollama model variables to `gemma4:31b`.

@@ -714,7 +714,7 @@ Ollama ejecuta los modelos de lenguaje en tu ordenador. Es necesario para que el
 # https://ollama.com
 
 # 2. Instalar los modelos necesarios (4-5 GB cada uno, descarga única):
-ollama pull gemma4:26b-a4b    # perfil equilibrado: ordenador normal
+ollama pull gemma4:26b-a4b-it-qat    # perfil equilibrado: ordenador normal
 ollama pull gemma4:31b        # máxima calidad: buena GPU o bastante RAM
 
 # 3. Verificar que los modelos están instalados:
@@ -726,7 +726,7 @@ ollama list
 
 | Hardware | Configuración |
 |----------|---------------|
-| Ordenador normal, sin GPU potente | `OLLAMA_REASONING_MODEL=gemma4:26b-a4b` y `OLLAMA_CODE_MODEL=gemma4:26b-a4b` |
+| Ordenador normal, sin GPU potente | `OLLAMA_REASONING_MODEL=gemma4:26b-a4b-it-qat` y `OLLAMA_CODE_MODEL=gemma4:26b-a4b-it-qat` |
 | Buena GPU o bastante RAM | `OLLAMA_REASONING_MODEL=gemma4:31b` y `OLLAMA_CODE_MODEL=gemma4:31b` |
 
 ---
@@ -785,8 +785,8 @@ OPENAI_MODEL=gpt-4o-mini
 GEMINI_MODEL=gemini-2.0-flash
 
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_REASONING_MODEL=gemma4:26b-a4b
-OLLAMA_CODE_MODEL=gemma4:26b-a4b
+OLLAMA_REASONING_MODEL=gemma4:26b-a4b-it-qat
+OLLAMA_CODE_MODEL=gemma4:26b-a4b-it-qat
 
 QDRANT_URL=http://localhost:6333
 ```

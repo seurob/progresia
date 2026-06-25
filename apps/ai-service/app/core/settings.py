@@ -25,8 +25,8 @@ class Settings(BaseSettings):
     # Ollama — local, no API key. The 26B-A4B profile is the balanced default;
     # users with a strong GPU or abundant RAM can switch both values to gemma4:31b.
     ollama_base_url: str = "http://localhost:11434"
-    ollama_reasoning_model: str = "gemma4:26b-a4b"
-    ollama_code_model: str = "gemma4:26b-a4b"
+    ollama_reasoning_model: str = "gemma4:26b-a4b-it-qat"
+    ollama_code_model: str = "gemma4:26b-a4b-it-qat"
 
     qdrant_url: str = "http://localhost:6333"
 

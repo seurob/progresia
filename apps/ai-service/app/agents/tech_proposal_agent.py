@@ -545,20 +545,33 @@ def _validate_arch_proposals(
     req: TechProposalRequest | None = None,
 ) -> bool:
     """Validate client architecture and prevent unjustified Django recommendations."""
+    return _arch_validation_error(proposals, arch, req) is None
+
+
+def _arch_validation_error(
+    proposals: list[TechProposal],
+    arch: str,
+    req: TechProposalRequest | None = None,
+) -> str | None:
+    """Return a concise rejection reason for logs, or None when valid."""
     django_count = sum(_proposal_uses_django(p) for p in proposals)
-    if django_count > 1 or (django_count and req is not None and not _django_is_justified(req)):
-        return False
+    if django_count > 1:
+        return f"Django appears in {django_count} proposals; maximum is one"
+    if django_count and req is not None and not _django_is_justified(req):
+        return "Django is not justified by the project requirements"
 
     if arch not in ("mobile_api", "desktop_api"):
-        return True
+        return None
     required = _MOBILE_KEYWORDS if arch == "mobile_api" else _DESKTOP_KEYWORDS
-    for p in proposals:
-        stack_lower = " ".join(p.stack).lower() + " " + p.tagline.lower()
+    for proposal in proposals:
+        stack_lower = " ".join(proposal.stack).lower() + " " + proposal.tagline.lower()
         has_required = any(kw in stack_lower for kw in required)
         has_web_client = any(kw in stack_lower for kw in _WEB_CLIENT_KEYWORDS)
-        if not has_required or has_web_client:
-            return False
-    return True
+        if not has_required:
+            return f"proposal {proposal.id} has no compatible {arch} client"
+        if has_web_client:
+            return f"proposal {proposal.id} uses a web client for {arch}"
+    return None
 
 
 class TechProposalAgent:
@@ -580,16 +593,20 @@ class TechProposalAgent:
                     SystemMessage(content=_SYSTEM_PROMPT),
                     HumanMessage(content=_build_human_message(req)),
                 ])
-                if (
-                    isinstance(result, TechProposalResponse)
-                    and len(result.proposals) >= 2
-                    and _validate_arch_proposals(result.proposals, req.architecture_style, req)
-                ):
-                    return result
                 if isinstance(result, TechProposalResponse):
-                    logger.warning(
-                        "AI proposal failed architecture validation for '%s'; trying next model",
+                    validation_error = _arch_validation_error(
+                        result.proposals,
                         req.architecture_style,
+                        req,
+                    )
+                    if len(result.proposals) >= 2 and validation_error is None:
+                        return result
+                    logger.warning(
+                        "AI proposal rejected for '%s': %s; trying next model",
+                        req.architecture_style,
+                        validation_error or (
+                            f"expected at least 2 proposals, received {len(result.proposals)}"
+                        ),
                     )
             except Exception as exc:
                 logger.warning("AI tech proposal failed; trying next model: %s", exc)
