@@ -621,7 +621,7 @@ de lint, typecheck, build y validación OpenSpec.
 
 - [ ] **Despliegue público reproducible** — CI configurada; falta automatizar el despliegue a un entorno público
 - [ ] **Colaboradores en workspace** — el modelo de datos soporta `WorkspaceMember` con roles, pero la UI solo permite al owner trabajar
-- [ ] **MinIO activo** — el SDK está integrado pero el flujo de subida de ZIPs al object storage no está activo (se devuelve directamente como stream)
+- [x] **MinIO activo** — `StorageService.uploadBuffer()` sube el ZIP a MinIO y `getSignedUrl()` devuelve la URL firmada de descarga (TTL 1 hora)
 - [ ] **Historial de generaciones** — los `ArtifactBundle` anteriores se listan pero no permiten restaurar una versión anterior completa
 
 ---

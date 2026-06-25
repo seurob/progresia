@@ -8,6 +8,25 @@ El diferenciador clave no es la velocidad de generación, sino la **trazabilidad
 
 ---
 
+## Demo
+
+| Recurso | Enlace |
+|---------|--------|
+| Aplicación | _URL de despliegue_ |
+| Vídeo de presentación | _enlace al vídeo_ |
+| Slides TFM | _enlace a las slides_ |
+
+**Credenciales de prueba (entorno de desarrollo):**
+
+| Rol | Email | Password |
+|-----|-------|----------|
+| Usuario demo | `demo@progresia.local` | `change_me_123` |
+| Administrador | `admin@progresia.local` | `$eurobman2026` |
+
+> Para crear estos usuarios en local: `cd apps/api && npm run prisma:seed`
+
+---
+
 ## Características principales
 
 - **Wizard conversacional** — guía al usuario en 6 pasos adaptados a su nivel técnico

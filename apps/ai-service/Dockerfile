@@ -4,7 +4,7 @@ WORKDIR /app
 RUN addgroup --system progresia && adduser --system --ingroup progresia progresia
 COPY apps/ai-service/pyproject.toml .
 RUN pip install --no-cache-dir -e .
-COPY apps/ai-service .
+COPY apps/ai-service/ .
 RUN chown -R progresia:progresia /app
 USER progresia
 EXPOSE 8000
