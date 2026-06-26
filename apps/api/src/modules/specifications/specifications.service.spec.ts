@@ -103,6 +103,54 @@ describe("SpecificationsService", () => {
     );
   });
 
+  it("passes wizard technology preferences to the architecture agent", async () => {
+    const fullIdea = {
+      ...idea,
+      complexity: "standard",
+      mandatoryTechs: "React, NestJS, PostgreSQL",
+      architectureStyle: "frontend_api",
+      dataNeeds: ["relational", "cache"],
+      aiNeeds: "local",
+      deploymentTarget: "vps"
+    };
+    const prisma = {
+      idea: {
+        findUnique: jest.fn().mockResolvedValue(fullIdea)
+      },
+      specification: {
+        create: jest.fn().mockResolvedValue({ id: "arch-1" })
+      }
+    };
+    const projectsService = {
+      ensureProjectAccess: jest.fn().mockResolvedValue({ ...project, productType: "web" })
+    };
+    const aiServiceClient = {
+      recommendArchitecture: jest.fn().mockResolvedValue({
+        architecture_type: "NESTJS_REACT",
+        name: "NestJS + React",
+        tech_stack: []
+      })
+    };
+    const service = new SpecificationsService(
+      prisma as never,
+      projectsService as never,
+      aiServiceClient as never,
+      new SpecificationExportService()
+    );
+
+    await expect(service.generateArchitecture("user-1", "project-1")).resolves.toEqual({ id: "arch-1" });
+
+    expect(aiServiceClient.recommendArchitecture).toHaveBeenCalledWith(
+      expect.objectContaining({
+        preferred_stack: "React, NestJS, PostgreSQL",
+        architecture_style: "frontend_api",
+        data_needs: ["relational", "cache"],
+        ai_needs: "local",
+        deployment_target: "vps"
+      })
+    );
+  });
+
   it("exports a generated specification as PDF", async () => {
     const prisma = {
       specification: {

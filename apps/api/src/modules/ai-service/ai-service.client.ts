@@ -87,6 +87,14 @@ export interface AiArchitectureRequest {
   technical_level?: string;
   /** web | mobile | desktop | api | saas | ai_tool — bypasses LLM for mobile/desktop */
   product_type?: string;
+  /** single | modular | frontend_api | ai_service | mobile_api | desktop_api */
+  architecture_style?: string;
+  /** relational | document | cache | vector */
+  data_needs?: string[];
+  /** none | online | local | hybrid | chat_docs | rag | agents | recommendation */
+  ai_needs?: string;
+  /** local | docker_local | vps | cloud | recommendation */
+  deployment_target?: string;
 }
 
 export interface AiTechStackItem {

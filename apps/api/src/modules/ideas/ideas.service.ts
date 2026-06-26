@@ -21,7 +21,15 @@ export class IdeasService {
       needsAi: dto.needsAi ?? false,
       needsAuth: dto.needsAuth ?? true,
       needsAdminPanel: dto.needsAdminPanel ?? true,
-      constraints: dto.constraints
+      constraints: dto.constraints,
+      mainObjective: dto.mainObjective,
+      techPreference: dto.techPreference,
+      mandatoryTechs: dto.mandatoryTechs,
+      architectureStyle: dto.architectureStyle,
+      dataNeeds: dto.dataNeeds ?? [],
+      aiNeeds: dto.aiNeeds,
+      deploymentTarget: dto.deploymentTarget,
+      expectedResults: dto.expectedResults ?? []
     };
 
     return this.prisma.idea.upsert({

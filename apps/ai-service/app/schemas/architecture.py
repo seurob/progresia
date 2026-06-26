@@ -22,6 +22,10 @@ class ArchitectureRequest(BaseModel):
     technical_level: str = Field(default="INTERMEDIATE")
     # web | mobile | desktop | api | saas | ai_tool — bypasses LLM for mobile/desktop
     product_type: str = Field(default="web")
+    architecture_style: str | None = Field(default=None)
+    data_needs: list[str] = Field(default_factory=list)
+    ai_needs: str | None = Field(default=None)
+    deployment_target: str | None = Field(default=None)
 
 
 class LearningResource(BaseModel):

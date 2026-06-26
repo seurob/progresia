@@ -311,9 +311,13 @@ export class SpecificationsService {
       needs_auth:        idea.needsAuth,
       needs_admin_panel: idea.needsAdminPanel,
       needs_ai:          idea.needsAi,
-      preferred_stack:   "",
+      preferred_stack:   idea.mandatoryTechs ?? "",
       technical_level:   complexityToLevel(idea.complexity),
-      product_type:      project.productType ?? "web"
+      product_type:      project.productType ?? "web",
+      architecture_style: idea.architectureStyle ?? undefined,
+      data_needs:        idea.dataNeeds ?? [],
+      ai_needs:          idea.aiNeeds ?? undefined,
+      deployment_target: idea.deploymentTarget ?? undefined
     });
 
     return this.prisma.specification.create({

@@ -412,6 +412,13 @@ _WEB_ARCH_TYPES = frozenset({
     "NEXTJS_APP", "NESTJS_REACT", "REACT_EXPRESS", "FASTAPI_AI", "DJANGO_REST",
 })
 
+_STYLE_ARCH_HINTS: dict[str, str] = {
+    "single": "NEXTJS_APP",
+    "modular": "LARAVEL_MONOLITH",
+    "frontend_api": "NESTJS_REACT",
+    "ai_service": "FASTAPI_AI",
+}
+
 _DJANGO_HEAVY_TERMS = {
     "erp", "backoffice", "back-office", "cms", "reporting", "auditor",
     "workflow", "inventario", "contabilidad", "historial clínico",
@@ -485,6 +492,10 @@ class ArchitectureAgent:
             f"Necesita panel admin: {req.needs_admin_panel}\n"
             f"Necesita IA: {req.needs_ai}\n"
             f"Nivel técnico del usuario: {level}\n"
+            f"Estilo de arquitectura elegido: {req.architecture_style or 'sin preferencia'}\n"
+            f"Necesidades de datos: {', '.join(req.data_needs) if req.data_needs else 'no especificadas'}\n"
+            f"Tipo de IA preferida: {req.ai_needs or 'no especificada'}\n"
+            f"Objetivo de despliegue: {req.deployment_target or 'no especificado'}\n"
             f"Stack preferido: {req.preferred_stack or 'ninguno especificado'}"
         )
 
@@ -496,6 +507,8 @@ class ArchitectureAgent:
         if mobile_desktop_map:
             arch_type = mobile_desktop_map.get(level, mobile_desktop_map["INTERMEDIATE"])
             return self._build_recommendation(arch_type, req)
+
+        style_arch = _STYLE_ARCH_HINTS.get(req.architecture_style or "")
 
         if any(k in preferred for k in ["inertia vue", "laravel vue", "laravel inertia vue"]):
             arch_type = "LARAVEL_INERTIA_VUE"
@@ -509,6 +522,10 @@ class ArchitectureAgent:
             arch_type = "DJANGO_REST"
         elif any(k in preferred for k in ["express", "react express", "node simple"]):
             arch_type = "REACT_EXPRESS"
+        elif style_arch == "FASTAPI_AI" and req.needs_ai:
+            arch_type = "FASTAPI_AI"
+        elif style_arch in _WEB_ARCH_TYPES and style_arch != "FASTAPI_AI":
+            arch_type = style_arch
         elif req.needs_ai:
             arch_type = "FASTAPI_AI"
         elif level == "BEGINNER":

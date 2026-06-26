@@ -753,6 +753,18 @@ class TestArchitectureAgent:
         assert result.architecture_type == "REACT_EXPRESS"
         assert any("express" in step.lower() for step in result.first_steps)
 
+    def test_frontend_api_style_prefers_decoupled_stack(self) -> None:
+        req = ARCH_REQUEST.model_copy(update={
+            "preferred_stack": "",
+            "architecture_style": "frontend_api",
+            "data_needs": ["relational", "cache"],
+            "deployment_target": "vps",
+        })
+        with patch("app.agents.architecture_agent.get_llm", return_value=None):
+            result = ArchitectureAgent().recommend(req)
+
+        assert result.architecture_type == "NESTJS_REACT"
+
     def test_laravel_inertia_react_first_steps_contain_composer(self) -> None:
         req = ARCH_REQUEST.model_copy(update={"preferred_stack": "laravel react"})
         with patch("app.agents.architecture_agent.get_llm", return_value=None):

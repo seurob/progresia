@@ -506,7 +506,11 @@ export function NewProjectPage() {
     const normalized = val.trim();
     const isEmpty = !normalized || /^(no|ninguna|ninguno|skip|saltar|nada|n\/a)$/i.test(normalized);
     pushUser(isEmpty ? "La IA elige el stack" : normalized);
-    setData(d => ({ ...d, mandatoryTechs: isEmpty ? "" : normalized }));
+    setData(d => ({
+      ...d,
+      mandatoryTechs: isEmpty ? "" : normalized,
+      techPreference: isEmpty ? "ai_recommends" : "mandatory"
+    }));
     pushAI(
       `Ya casi. Las **funcionalidades esenciales** del MVP.\n\n**¿Qué 3-5 funciones son imprescindibles?** Sin ellas el producto no tendría valor.\n\n💡 *Sé específico: "Gestión de reservas con calendario" > "Gestión de reservas".*`,
       () => setStep("features")
@@ -606,7 +610,7 @@ export function NewProjectPage() {
         expectedResults: data.expectedResults
       });
 
-      navigate(`/projects/${project.slug}`);
+      navigate(`/projects/${project.slug}?autoGenerate=1`);
     } catch (err) {
       setServerError(getErrorMessage(err));
       setSubmitting(false);

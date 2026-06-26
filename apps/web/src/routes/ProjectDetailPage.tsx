@@ -4,8 +4,8 @@ import {
   Code2, Cpu, Database, Download, ExternalLink, FileText, GitBranch, Layers,
   Loader2, PackageCheck, RefreshCw, Rocket, Terminal, Trash2, Upload, X, Zap
 } from "lucide-react";
-import { useCallback, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { api, getErrorMessage } from "../lib/api";
 import { getAccessToken } from "../lib/auth-token";
 import {
@@ -1475,9 +1475,11 @@ function Tag({ children }: { readonly children: React.ReactNode }) {
 export function ProjectDetailPage() {
   const { projectId } = useParams();
   const navigate      = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient   = useQueryClient();
   const [ideaOpen, setIdeaOpen]         = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const autoGenerateStartedRef = useRef(false);
 
   const deleteMutation = useMutation({
     mutationFn: () => api.delete(`/projects/${projectId}`),
@@ -1499,6 +1501,7 @@ export function ProjectDetailPage() {
   }, [queryClient, projectId]);
 
   const pipeline = useGeneratePipeline(projectId, refetch);
+  const { isRunning: pipelineIsRunning, start: startPipeline } = pipeline;
 
   const project      = projectQuery.data;
   const specs        = project?.specifications ?? [];
@@ -1511,6 +1514,18 @@ export function ProjectDetailPage() {
     && Array.isArray((s.content as IssuesContent).issues));
   const tutorialSpec      = specs.find(s => s.type === "TUTORIAL"       && s.status === "GENERATED");
   const techProposalSpec  = specs.find(s => s.type === "TECH_PROPOSAL"  && s.status === "GENERATED");
+
+  useEffect(() => {
+    if (autoGenerateStartedRef.current) return;
+    if (searchParams.get("autoGenerate") !== "1") return;
+    if (!project?.idea || isGenerated || pipelineIsRunning) return;
+
+    autoGenerateStartedRef.current = true;
+    const next = new URLSearchParams(searchParams);
+    next.delete("autoGenerate");
+    setSearchParams(next, { replace: true });
+    startPipeline();
+  }, [isGenerated, pipelineIsRunning, project?.idea, searchParams, setSearchParams, startPipeline]);
 
   if (projectQuery.isLoading) {
     return (

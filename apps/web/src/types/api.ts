@@ -43,7 +43,14 @@ export interface Idea {
   needsAuth: boolean;
   needsAdminPanel: boolean;
   constraints?: string | null;
+  mainObjective?: string | null;
+  techPreference?: string | null;
   mandatoryTechs?: string | null;
+  architectureStyle?: string | null;
+  dataNeeds?: string[];
+  aiNeeds?: string | null;
+  deploymentTarget?: string | null;
+  expectedResults?: string[];
 }
 
 export interface RequirementItem {
