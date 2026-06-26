@@ -18,11 +18,13 @@ FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 RUN addgroup -S progresia && adduser -S progresia -G progresia
+ENV NODE_PATH=/app/apps/api/node_modules:/app/node_modules
 COPY --from=build /app/node_modules node_modules
+COPY --from=build /app/apps/api/node_modules apps/api/node_modules
 COPY --from=build /app/apps/api/dist dist
 COPY --from=build /app/apps/api/prisma prisma
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget -qO- http://localhost:3000/api/health || exit 1
 USER progresia
-CMD ["sh", "-c", "node node_modules/.bin/prisma migrate deploy --schema ./prisma/schema.prisma && node dist/main.js"]
+CMD ["sh", "-c", "node apps/api/node_modules/prisma/build/index.js migrate deploy --schema ./prisma/schema.prisma && node dist/main.js"]
