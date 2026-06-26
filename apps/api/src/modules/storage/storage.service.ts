@@ -32,9 +32,21 @@ export class StorageService implements OnModuleInit {
   }
 
   async uploadBuffer(objectName: string, buffer: Buffer, contentType: string): Promise<void> {
-    await this.client.putObject(this.bucket, objectName, buffer, buffer.length, {
-      "Content-Type": contentType
-    });
+    try {
+      await this.client.putObject(this.bucket, objectName, buffer, buffer.length, {
+        "Content-Type": contentType
+      });
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code;
+      if (code === "NoSuchBucket") {
+        await this.client.makeBucket(this.bucket);
+        await this.client.putObject(this.bucket, objectName, buffer, buffer.length, {
+          "Content-Type": contentType
+        });
+      } else {
+        throw err;
+      }
+    }
   }
 
   async getSignedUrl(objectName: string, expirySeconds = 3600): Promise<string> {
