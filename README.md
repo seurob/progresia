@@ -527,6 +527,11 @@ Ruta: `http://localhost:5173/gestion-usuarios` — no aparece en ninguna navegac
 cd apps/api && npm run prisma:seed
 ```
 
+El seed es idempotente: si el administrador ya existe, sincroniza `name`,
+`passwordHash` y `role` con las variables de entorno actuales. En producción,
+ejecutarlo con el `.env.production` del servidor o crear el usuario desde el
+contenedor API para que coincida con las credenciales documentadas.
+
 | Campo | Valor por defecto |
 |-------|-----------------|
 | Email | `admin@progresia.local` |
