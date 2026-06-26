@@ -91,6 +91,7 @@ def _ollama(model: str) -> BaseChatModel | None:
             model=model,
             base_url=settings.ollama_base_url,
             temperature=0,
+            reasoning=False,
         )
     except Exception as exc:
         logger.debug("Ollama unavailable: %s", exc)

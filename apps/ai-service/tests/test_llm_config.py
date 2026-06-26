@@ -62,6 +62,21 @@ def test_ai_candidates_can_prioritize_local_ollama() -> None:
     assert candidates == [ollama_model, groq_model]
 
 
+def test_ollama_disables_reasoning_output_for_chat_models() -> None:
+    captured: dict[str, object] = {}
+
+    def fake_chat_ollama(**kwargs: object) -> object:
+        captured.update(kwargs)
+        return object()
+
+    with patch("langchain_ollama.ChatOllama", side_effect=fake_chat_ollama):
+        model = llm._ollama("gemma4:26b-a4b-it-qat")
+
+    assert model is not None
+    assert captured["model"] == "gemma4:26b-a4b-it-qat"
+    assert captured["reasoning"] is False
+
+
 def test_model_catalog_filters_openai_chat_models() -> None:
     def fetch_json(url: str, headers: dict[str, str], timeout: float) -> dict:
         assert url == "https://api.openai.com/v1/models"
