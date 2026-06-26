@@ -27,26 +27,37 @@ function CloudflareIcon() {
 export function CaptchaBox({ onToken }: { readonly onToken: (token: string) => void }) {
   const siteKey = import.meta.env.VITE_CAPTCHA_SITE_KEY as string | undefined;
   const [state, setState] = useState<"idle" | "verifying" | "verified">("idle");
+  const verifyTimerRef = useRef<number | null>(null);
   const onTokenRef = useRef(onToken);
   onTokenRef.current = onToken;
 
   useEffect(() => {
-    if (!siteKey) return;
-    const t1 = setTimeout(() => setState("verifying"), 350);
-    const t2 = setTimeout(() => {
+    return () => {
+      if (verifyTimerRef.current) {
+        window.clearTimeout(verifyTimerRef.current);
+      }
+    };
+  }, []);
+
+  function handleVerify() {
+    if (state !== "idle") return;
+
+    setState("verifying");
+    verifyTimerRef.current = window.setTimeout(() => {
       setState("verified");
       onTokenRef.current(generateToken());
-    }, 1050);
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
-  }, [siteKey]);
+    }, 700);
+  }
 
   if (!siteKey) return null;
 
   return (
-    <div className="flex min-h-[65px] items-center justify-between rounded border border-white/10 bg-white/4 px-4 py-3">
+    <button
+      type="button"
+      className="flex min-h-[65px] w-full items-center justify-between rounded border border-white/10 bg-white/4 px-4 py-3 text-left transition-colors hover:border-emerald-400/40 hover:bg-white/6 focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
+      onClick={handleVerify}
+      aria-pressed={state === "verified"}
+    >
       <div className="flex items-center gap-3">
         {state === "verified" ? (
           <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-emerald-500">
@@ -79,7 +90,9 @@ export function CaptchaBox({ onToken }: { readonly onToken: (token: string) => v
             />
           </svg>
         ) : (
-          <div className="size-6 shrink-0 rounded border-2 border-zinc-600" aria-hidden="true" />
+          <span className="grid size-6 shrink-0 place-items-center rounded-full border-2 border-zinc-600" aria-hidden="true">
+            <span className="size-2.5 rounded-full bg-transparent" />
+          </span>
         )}
 
         <span
@@ -88,14 +101,14 @@ export function CaptchaBox({ onToken }: { readonly onToken: (token: string) => v
           }`}
         >
           {state === "verified"
-            ? "Humano detectado"
+            ? "Verificación completada"
             : state === "verifying"
-              ? "Verificando..."
-              : "No soy un robot"}
+              ? "Comprobando navegador..."
+              : "Haz clic para verificar que eres humano"}
         </span>
       </div>
 
       <CloudflareIcon />
-    </div>
+    </button>
   );
 }

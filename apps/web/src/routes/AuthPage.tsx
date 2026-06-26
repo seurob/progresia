@@ -15,7 +15,10 @@ const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_=+{};:
 const baseSchema = z.object({
   name: z.string(),
   email: z.string().email("Introduce un email válido"),
-  password: z.string().min(8, "Mínimo 8 caracteres")
+  password: z.string().min(8, "Mínimo 8 caracteres"),
+  confirmPassword: z.string().optional(),
+  termsAccepted: z.boolean().optional(),
+  cookiesAccepted: z.boolean().optional()
 });
 
 function buildSchema(isRegister: boolean) {
@@ -26,6 +29,15 @@ function buildSchema(isRegister: boolean) {
     }
     if (!PASSWORD_REGEX.test(data.password)) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Debe incluir mayúscula, minúscula, número y carácter especial (!@#$%...)", path: ["password"] });
+    }
+    if (data.confirmPassword !== data.password) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Las contraseñas deben ser idénticas", path: ["confirmPassword"] });
+    }
+    if (!data.termsAccepted) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Debes aceptar las condiciones para crear la cuenta", path: ["termsAccepted"] });
+    }
+    if (!data.cookiesAccepted) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Debes aceptar el uso de cookies necesarias", path: ["cookiesAccepted"] });
     }
   });
 }
@@ -43,7 +55,10 @@ export function AuthPage({ mode }: Readonly<{ mode: "login" | "register" }>) {
     defaultValues: {
       name: "",
       email: "",
-      password: ""
+      password: "",
+      confirmPassword: "",
+      termsAccepted: false,
+      cookiesAccepted: false
     }
   });
 
@@ -55,7 +70,7 @@ export function AuthPage({ mode }: Readonly<{ mode: "login" | "register" }>) {
     setServerError(null);
     const endpoint = isRegister ? "/auth/register" : "/auth/login";
     const payload = isRegister
-      ? { ...values, captchaToken }
+      ? { name: values.name, email: values.email, password: values.password, captchaToken }
       : { email: values.email, password: values.password, captchaToken };
 
     try {
@@ -114,6 +129,41 @@ export function AuthPage({ mode }: Readonly<{ mode: "login" | "register" }>) {
             >
               <input className="input" type="password" {...form.register("password")} autoComplete={isRegister ? "new-password" : "current-password"} />
             </FormField>
+            {isRegister ? (
+              <>
+                <FormField label="Confirmar contraseña" error={form.formState.errors.confirmPassword?.message}>
+                  <input className="input" type="password" {...form.register("confirmPassword")} autoComplete="new-password" />
+                </FormField>
+
+                <label className="flex items-start gap-3 rounded-md border border-white/10 bg-white/4 p-3 text-sm text-zinc-300">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 size-4 shrink-0 accent-emerald-400"
+                    {...form.register("termsAccepted")}
+                  />
+                  <span>
+                    Acepto las condiciones de uso y la política de privacidad de ProgresIA.
+                    {form.formState.errors.termsAccepted ? (
+                      <span className="mt-1 block text-xs text-rose-300">{form.formState.errors.termsAccepted.message}</span>
+                    ) : null}
+                  </span>
+                </label>
+
+                <label className="flex items-start gap-3 rounded-md border border-white/10 bg-white/4 p-3 text-sm text-zinc-300">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 size-4 shrink-0 accent-emerald-400"
+                    {...form.register("cookiesAccepted")}
+                  />
+                  <span>
+                    Acepto las cookies necesarias para mantener la sesión y proteger el acceso.
+                    {form.formState.errors.cookiesAccepted ? (
+                      <span className="mt-1 block text-xs text-rose-300">{form.formState.errors.cookiesAccepted.message}</span>
+                    ) : null}
+                  </span>
+                </label>
+              </>
+            ) : null}
             <CaptchaBox onToken={setCaptchaToken} />
           </div>
 
