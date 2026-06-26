@@ -1,114 +1,123 @@
 import { useEffect, useRef, useState } from "react";
 
-function generateToken(): string {
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
+const TURNSTILE_SCRIPT_ID = "cloudflare-turnstile-script";
+const TURNSTILE_SCRIPT_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+
+type TurnstileRenderOptions = {
+  sitekey: string;
+  theme?: "light" | "dark" | "auto";
+  size?: "normal" | "compact" | "flexible";
+  callback?: (token: string) => void;
+  "expired-callback"?: () => void;
+  "error-callback"?: () => void;
+};
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (container: HTMLElement, options: TurnstileRenderOptions) => string;
+      reset: (widgetId?: string) => void;
+      remove: (widgetId: string) => void;
+    };
+  }
 }
 
-function CloudflareIcon() {
-  return (
-    <div className="flex flex-col items-center gap-0.5">
-      <svg viewBox="0 0 54 41" className="w-7" aria-hidden="true">
-        <path
-          d="M36.7 7.7C34.5 3.1 29.8 0 24.4 0 18 0 12.6 4.2 10.6 10 7.8 10.3 5.4 11.6 3.6 13.6 1.4 15.9 0 19 0 22.4c0 7 5.7 12.7 12.7 12.7H41c7 0 12.7-5.7 12.7-12.7C53.7 15.3 45.8 7.9 36.7 7.7z"
-          fill="#F6821F"
-        />
-        <path
-          d="M40.5 14.4c-.2 0-.3 0-.5.1C39.3 10.3 35.5 7.2 31 7.2c-2.8 0-5.3 1.1-7.1 2.9-.3-.1-.6-.1-.9-.1-3.5 0-6.4 2.8-6.4 6.4 0 .3 0 .5.1.8C14.5 17.7 13 19.6 13 21.8c0 2.6 2.1 4.7 4.7 4.7h22.8c2.6 0 4.7-2.1 4.7-4.7-.1-4.1-3.5-7.4-4.7-7.4z"
-          fill="#FBAD41"
-        />
-      </svg>
-      <span className="text-[8px] leading-none tracking-wide text-zinc-500">Cloudflare</span>
-    </div>
-  );
+function loadTurnstileScript(): Promise<void> {
+  if (window.turnstile) return Promise.resolve();
+
+  const existing = document.getElementById(TURNSTILE_SCRIPT_ID) as HTMLScriptElement | null;
+  if (existing) {
+    return new Promise((resolve, reject) => {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", () => reject(new Error("Turnstile script failed")), { once: true });
+    });
+  }
+
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.id = TURNSTILE_SCRIPT_ID;
+    script.src = TURNSTILE_SCRIPT_SRC;
+    script.async = true;
+    script.defer = true;
+    script.addEventListener("load", () => resolve(), { once: true });
+    script.addEventListener("error", () => reject(new Error("Turnstile script failed")), { once: true });
+    document.head.appendChild(script);
+  });
 }
 
 export function CaptchaBox({ onToken }: { readonly onToken: (token: string) => void }) {
   const siteKey = import.meta.env.VITE_CAPTCHA_SITE_KEY as string | undefined;
-  const [state, setState] = useState<"idle" | "verifying" | "verified">("idle");
-  const verifyTimerRef = useRef<number | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const widgetIdRef = useRef<string | null>(null);
   const onTokenRef = useRef(onToken);
+  const [status, setStatus] = useState<"loading" | "ready" | "verified" | "error">("loading");
   onTokenRef.current = onToken;
 
   useEffect(() => {
+    if (!siteKey) return undefined;
+
+    let cancelled = false;
+    setStatus("loading");
+    onTokenRef.current("");
+
+    loadTurnstileScript()
+      .then(() => {
+        if (cancelled || !containerRef.current || !window.turnstile || widgetIdRef.current) return;
+
+        widgetIdRef.current = window.turnstile.render(containerRef.current, {
+          sitekey: siteKey,
+          theme: "dark",
+          size: "flexible",
+          callback: (token) => {
+            setStatus("verified");
+            onTokenRef.current(token);
+          },
+          "expired-callback": () => {
+            setStatus("ready");
+            onTokenRef.current("");
+          },
+          "error-callback": () => {
+            setStatus("error");
+            onTokenRef.current("");
+          }
+        });
+        setStatus("ready");
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setStatus("error");
+          onTokenRef.current("");
+        }
+      });
+
     return () => {
-      if (verifyTimerRef.current) {
-        window.clearTimeout(verifyTimerRef.current);
+      cancelled = true;
+      if (widgetIdRef.current && window.turnstile) {
+        window.turnstile.remove(widgetIdRef.current);
       }
+      widgetIdRef.current = null;
+      onTokenRef.current("");
     };
-  }, []);
-
-  function handleVerify() {
-    if (state !== "idle") return;
-
-    setState("verifying");
-    verifyTimerRef.current = window.setTimeout(() => {
-      setState("verified");
-      onTokenRef.current(generateToken());
-    }, 700);
-  }
+  }, [siteKey]);
 
   if (!siteKey) return null;
 
   return (
-    <button
-      type="button"
-      className="flex min-h-[65px] w-full items-center justify-between rounded border border-white/10 bg-white/4 px-4 py-3 text-left transition-colors hover:border-emerald-400/40 hover:bg-white/6 focus:outline-none focus:ring-2 focus:ring-emerald-400/40"
-      onClick={handleVerify}
-      aria-pressed={state === "verified"}
-    >
-      <div className="flex items-center gap-3">
-        {state === "verified" ? (
-          <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-emerald-500">
-            <svg
-              viewBox="0 0 14 14"
-              className="size-3.5"
-              fill="none"
-              stroke="white"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M2.5 7l3 3 6-6" />
-            </svg>
-          </div>
-        ) : state === "verifying" ? (
-          <svg
-            className="size-6 shrink-0 animate-spin text-zinc-500"
-            viewBox="0 0 24 24"
-            fill="none"
-            aria-hidden="true"
-          >
-            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" opacity="0.2" />
-            <path
-              d="M12 3a9 9 0 019 9"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          </svg>
-        ) : (
-          <span className="grid size-6 shrink-0 place-items-center rounded-full border-2 border-zinc-600" aria-hidden="true">
-            <span className="size-2.5 rounded-full bg-transparent" />
-          </span>
-        )}
-
-        <span
-          className={`text-sm font-medium transition-colors ${
-            state === "verified" ? "text-zinc-100" : "text-zinc-400"
-          }`}
-        >
-          {state === "verified"
-            ? "Verificación completada"
-            : state === "verifying"
-              ? "Comprobando navegador..."
-              : "Haz clic para verificar que eres humano"}
-        </span>
+    <div className="rounded-md border border-white/10 bg-white/4 p-3">
+      <div className="flex min-h-[65px] items-center justify-center">
+        <div ref={containerRef} className="w-full" />
+        {status === "loading" ? (
+          <p className="text-sm text-zinc-400">Cargando verificacion de Cloudflare...</p>
+        ) : null}
       </div>
-
-      <CloudflareIcon />
-    </button>
+      {status === "verified" ? (
+        <p className="mt-2 text-xs text-emerald-300">Verificacion de Cloudflare completada.</p>
+      ) : null}
+      {status === "error" ? (
+        <p className="mt-2 text-xs text-rose-300">
+          No se pudo cargar Cloudflare Turnstile. Recarga la pagina o revisa la conexion.
+        </p>
+      ) : null}
+    </div>
   );
 }

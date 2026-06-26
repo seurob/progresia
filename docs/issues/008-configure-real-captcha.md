@@ -12,11 +12,13 @@ Enable real CAPTCHA verification in production registration/login flows using Cl
 
 ## Context
 
-Production is currently deployed with `CAPTCHA_ENABLED=false` so the initial launch can work before real Cloudflare keys exist.
+Production is currently deployed with `CAPTCHA_ENABLED=false` so the initial launch can work before real Cloudflare keys exist. The frontend integration uses the real Cloudflare Turnstile script when `VITE_CAPTCHA_SITE_KEY` is present; activation still requires production keys.
 
 ## Tasks
 
 - [ ] Create Cloudflare Turnstile site for `progresia.alumnes-monlau.com`.
+- [x] Replace the simulated frontend control with the real Cloudflare Turnstile widget.
+- [x] Pass `VITE_CAPTCHA_SITE_KEY` through the web Docker build.
 - [ ] Add production site key to `VITE_CAPTCHA_SITE_KEY`.
 - [ ] Add production secret key to `CAPTCHA_SECRET_KEY`.
 - [ ] Set `CAPTCHA_PROVIDER=turnstile`.

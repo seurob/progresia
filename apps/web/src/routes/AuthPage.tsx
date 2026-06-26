@@ -50,6 +50,7 @@ export function AuthPage({ mode }: Readonly<{ mode: "login" | "register" }>) {
   const [serverError, setServerError] = useState<string | null>(null);
   const [captchaToken, setCaptchaToken] = useState("");
   const isRegister = mode === "register";
+  const captchaRequired = Boolean(import.meta.env.VITE_CAPTCHA_SITE_KEY);
   const form = useForm<AuthForm>({
     resolver: zodResolver(buildSchema(isRegister)),
     defaultValues: {
@@ -68,6 +69,11 @@ export function AuthPage({ mode }: Readonly<{ mode: "login" | "register" }>) {
 
   async function onSubmit(values: AuthForm) {
     setServerError(null);
+    if (captchaRequired && !captchaToken) {
+      setServerError("Completa la verificacion de Cloudflare antes de continuar.");
+      return;
+    }
+
     const endpoint = isRegister ? "/auth/register" : "/auth/login";
     const payload = isRegister
       ? { name: values.name, email: values.email, password: values.password, captchaToken }
@@ -169,7 +175,11 @@ export function AuthPage({ mode }: Readonly<{ mode: "login" | "register" }>) {
 
           {serverError ? <p className="mt-4 rounded-md border border-rose-400/30 bg-rose-400/10 p-3 text-sm text-rose-200">{serverError}</p> : null}
 
-          <button className="primary-button mt-6 w-full" type="submit" disabled={form.formState.isSubmitting}>
+          <button
+            className="primary-button mt-6 w-full"
+            type="submit"
+            disabled={form.formState.isSubmitting || (captchaRequired && !captchaToken)}
+          >
             {form.formState.isSubmitting ? (
               <>
                 <Loader2 size={18} className="animate-spin" aria-hidden="true" />
