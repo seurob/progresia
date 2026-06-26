@@ -2,11 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 const TURNSTILE_SCRIPT_ID = "cloudflare-turnstile-script";
 const TURNSTILE_SCRIPT_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
-const CLOUDFLARE_TURNSTILE_TEST_SITE_KEYS = new Set([
-  "1x00000000000000000000AA",
-  "2x00000000000000000000AB",
-  "3x00000000000000000000FF"
-]);
+const CLOUDFLARE_TURNSTILE_TEST_SITE_KEY_PATTERN = /^[123]x0{18,}(AA|AB|FF)$/;
 
 type TurnstileRenderOptions = {
   sitekey: string;
@@ -52,7 +48,7 @@ function loadTurnstileScript(): Promise<void> {
 
 export function getConfiguredCaptchaSiteKey(): string {
   const siteKey = ((import.meta.env.VITE_CAPTCHA_SITE_KEY as string | undefined) ?? "").trim();
-  return CLOUDFLARE_TURNSTILE_TEST_SITE_KEYS.has(siteKey) ? "" : siteKey;
+  return CLOUDFLARE_TURNSTILE_TEST_SITE_KEY_PATTERN.test(siteKey) ? "" : siteKey;
 }
 
 export function CaptchaBox({ onToken }: { readonly onToken: (token: string) => void }) {
