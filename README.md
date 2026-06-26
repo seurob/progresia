@@ -12,7 +12,7 @@ El diferenciador clave no es la velocidad de generación, sino la **trazabilidad
 
 | Recurso | Enlace |
 |---------|--------|
-| Aplicación | _URL de despliegue_ |
+| Aplicación | https://progresia.alumnes-monlau.com |
 | Vídeo de presentación | _enlace al vídeo_ |
 | Slides TFM | _enlace a las slides_ |
 
@@ -24,6 +24,25 @@ El diferenciador clave no es la velocidad de generación, sino la **trazabilidad
 | Administrador | `admin@progresia.local` | `$eurobman2026` |
 
 > Para crear estos usuarios en local: `cd apps/api && npm run prisma:seed`
+
+---
+
+## Entorno público
+
+El proyecto dispone de un despliegue operativo para la demostración del TFM:
+
+| Elemento | Valor |
+|----------|-------|
+| Dominio | `https://progresia.alumnes-monlau.com` |
+| Servidor | Ubuntu / Plesk |
+| IP pública | `212.227.227.190` |
+| Ruta de despliegue | `/var/www/vhosts/alumnes-monlau.com/progresia.alumnes-monlau.com/app` |
+| Proxy interno | `127.0.0.1:8088` |
+| Health check | `https://progresia.alumnes-monlau.com/api/health` |
+
+El despliegue usa `docker-compose.prod.yml` con servicios para frontend, API,
+AI service, PostgreSQL, Redis, Qdrant, MinIO, Ollama y Nginx. Los secretos se
+mantienen fuera del repositorio en `.env.production`.
 
 ---
 

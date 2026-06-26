@@ -5,10 +5,11 @@ Duracion maxima prevista con transiciones: 10 minutos.
 Ritmo recomendado: 130-140 palabras por minuto.
 
 PREPARACION
-- Abrir la presentacion, ProgresIA Studio, el panel de administracion y Visual Studio Code.
+- Abrir la presentacion, https://progresia.alumnes-monlau.com, el panel de administracion y Visual Studio Code.
 - Preparar un proyecto ya generado para evitar esperar al pipeline completo.
 - Ocultar credenciales, tokens, archivos .env y datos personales.
 - Grabar los cambios de pantalla por separado y unirlos durante la edicion.
+- Tener preparada la URL publica de health check: https://progresia.alumnes-monlau.com/api/health.
 
 
 DIAPOSITIVA 1 - PORTADA (0:00-0:20)
@@ -71,13 +72,13 @@ TRANSICION (4:38-4:46)
 ESCENA A - APLICACION WEB Y ESTADO (4:46-5:15)
 
 Acciones:
-1. Abrir el login e iniciar sesion mediante un corte.
+1. Abrir el dominio publico https://progresia.alumnes-monlau.com e iniciar sesion mediante un corte.
 2. Mostrar el dashboard y los proyectos.
-3. Mostrar brevemente el health check de la API con base de datos en estado ok.
+3. Mostrar brevemente https://progresia.alumnes-monlau.com/api/health con base de datos en estado ok.
 4. Pulsar "Nuevo proyecto".
 
 Narracion:
-"Tras iniciar sesion aparece el dashboard con los proyectos y su estado. La API expone un health check que confirma la conexion con PostgreSQL y si la observabilidad esta activa. Desde aqui puedo abrir un proyecto existente o comenzar uno nuevo."
+"La aplicacion ya esta desplegada en un dominio publico sobre un servidor Ubuntu/Plesk. Tras iniciar sesion aparece el dashboard con los proyectos y su estado. La API expone un health check que confirma la conexion con PostgreSQL y si la observabilidad esta activa. Desde aqui puedo abrir un proyecto existente o comenzar uno nuevo."
 
 
 ESCENA B - CONFIGURACION IA Y GENERAR UNA APLICACION (5:15-6:28)
@@ -143,7 +144,7 @@ CIERRE DE LA DEMO:
 
 DIAPOSITIVA 18 - LIMITES Y EVOLUCION (8:50-9:15)
 
-"El MVP ya conecta el pipeline completo y la IA local esta verificada. Las siguientes mejoras son integrar RAG en el wizard, ampliar los itinerarios educativos, evaluar modelos locales de mayor capacidad, activar los proyectos reales de Sentry y completar un despliegue publico reproducible."
+"El MVP ya conecta el pipeline completo, la IA local esta verificada y existe un despliegue publico operativo en progresia.alumnes-monlau.com. Las siguientes mejoras son integrar RAG en el wizard, ampliar los itinerarios educativos, evaluar modelos locales de mayor capacidad, activar los proyectos reales de Sentry y automatizar el despliegue por CI/CD."
 
 
 DIAPOSITIVA 19 - CONCLUSION (9:15-9:45)

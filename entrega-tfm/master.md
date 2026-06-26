@@ -84,6 +84,24 @@ El **OpenSpec** es el artefacto central: un documento JSON estructurado con enti
 
 ## 3. Arquitectura del sistema
 
+### Despliegue público para la defensa
+
+Además del entorno local de desarrollo, el proyecto queda desplegado en un
+servidor Ubuntu/Plesk para la demostración del TFM.
+
+| Elemento | Valor |
+|----------|-------|
+| Dominio público | `https://progresia.alumnes-monlau.com` |
+| IP del servidor | `212.227.227.190` |
+| Ruta en servidor | `/var/www/vhosts/alumnes-monlau.com/progresia.alumnes-monlau.com/app` |
+| Proxy interno | `127.0.0.1:8088` |
+| Composición Docker | `docker-compose.prod.yml` |
+| Health check | `https://progresia.alumnes-monlau.com/api/health` |
+
+El despliegue mantiene las credenciales y claves fuera del repositorio mediante
+`.env.production`. La aplicación se sirve por Nginx/Plesk y conserva el mismo
+monorepo modular usado en desarrollo.
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                        MONOREPO                             │
@@ -604,6 +622,7 @@ de lint, typecheck, build y validación OpenSpec.
 - [x] **PDF de especificaciones** y exportación Markdown desde la aplicación
 - [x] **Sentry opcional** en React, NestJS y FastAPI con privacidad por defecto
 - [x] **GitHub Actions** para lint, tipos, tests, build, CodeQL y revisión de dependencias
+- [x] **Despliegue público operativo** en `https://progresia.alumnes-monlau.com` con Docker Compose de producción
 
 ---
 
@@ -619,7 +638,7 @@ de lint, typecheck, build y validación OpenSpec.
 
 ### Baja prioridad / Post-MVP
 
-- [ ] **Despliegue público reproducible** — CI configurada; falta automatizar el despliegue a un entorno público
+- [ ] **Automatización completa del despliegue** — el entorno público ya está operativo; queda convertir el despliegue manual por SSH en una acción CI/CD reproducible
 - [ ] **Colaboradores en workspace** — el modelo de datos soporta `WorkspaceMember` con roles, pero la UI solo permite al owner trabajar
 - [x] **MinIO activo** — `StorageService.uploadBuffer()` sube el ZIP a MinIO y `getSignedUrl()` devuelve la URL firmada de descarga (TTL 1 hora)
 - [ ] **Historial de generaciones** — los `ArtifactBundle` anteriores se listan pero no permiten restaurar una versión anterior completa
@@ -922,11 +941,25 @@ Verás: `Local: http://localhost:5173/`
 Las test keys incluidas en la configuración de desarrollo muestran un widget funcional. Para producción o para eliminar el indicador de "modo prueba":
 
 1. Crea una cuenta gratuita en [dash.cloudflare.com](https://dash.cloudflare.com)
-2. Ve a **Turnstile** → **Add site** → elige `localhost` como dominio
+2. Ve a **Turnstile** → **Add site** → añade `localhost` para desarrollo y `progresia.alumnes-monlau.com` para producción
 3. Copia la **Site Key** y la **Secret Key**
 4. Reemplaza en `apps/web/.env`: `VITE_CAPTCHA_SITE_KEY=<tu site key>`
 5. Reemplaza en `apps/api/.env`: `CAPTCHA_SECRET_KEY=<tu secret key>`
 6. Reinicia ambos servicios
+
+---
+
+### Entorno público de demostración
+
+| URL | Descripción | Resultado esperado |
+|-----|-------------|-------------------|
+| `https://progresia.alumnes-monlau.com` | Frontend público | Pantalla de login / registro |
+| `https://progresia.alumnes-monlau.com/api/health` | API health pública | `{"status":"ok"}` |
+| `https://progresia.alumnes-monlau.com/gestion-usuarios` | Panel admin público | Login de administración |
+
+El entorno público se ejecuta en Ubuntu/Plesk con Docker Compose de producción.
+La aplicación usa Nginx como proxy y conserva los servicios internos de API,
+AI service, PostgreSQL, Redis, Qdrant, MinIO y Ollama.
 
 ---
 
