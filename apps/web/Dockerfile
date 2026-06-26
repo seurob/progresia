@@ -17,7 +17,10 @@ COPY apps/web/package*.json apps/web/
 COPY packages/config/package*.json packages/config/
 COPY packages/contracts/package*.json packages/contracts/
 COPY packages/shared/package*.json packages/shared/
-RUN npm ci
+RUN npm ci && npm install --no-save \
+  @rolldown/binding-linux-x64-musl@1.0.3 \
+  @tailwindcss/oxide-linux-x64-musl@4.3.1 \
+  lightningcss-linux-x64-musl@1.32.0
 COPY apps/web apps/web
 COPY packages packages
 RUN npm run build -w apps/web
