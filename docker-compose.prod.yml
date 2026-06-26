@@ -32,6 +32,20 @@ services:
     volumes:
       - progresia_qdrant_data:/qdrant/storage
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: progresia-ollama
+    restart: unless-stopped
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+    volumes:
+      - progresia_ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
   minio:
     image: minio/minio:latest
     container_name: progresia-minio
@@ -58,9 +72,9 @@ services:
     environment:
       AI_SERVICE_PORT: 8000
       QDRANT_URL: http://qdrant:6333
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     depends_on:
+      ollama:
+        condition: service_healthy
       qdrant:
         condition: service_started
     healthcheck:
@@ -132,4 +146,5 @@ services:
 volumes:
   progresia_postgres_data:
   progresia_qdrant_data:
+  progresia_ollama_data:
   progresia_minio_data:
