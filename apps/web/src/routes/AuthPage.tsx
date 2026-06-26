@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, Navigate, useNavigate } from "react-router";
 import { z } from "zod";
-import { CaptchaBox } from "../components/CaptchaBox";
+import { CaptchaBox, getConfiguredCaptchaSiteKey } from "../components/CaptchaBox";
 import { FormField } from "../components/FormField";
 import { useAuth } from "../features/auth/auth-context";
 import { api, getErrorMessage } from "../lib/api";
@@ -50,7 +50,7 @@ export function AuthPage({ mode }: Readonly<{ mode: "login" | "register" }>) {
   const [serverError, setServerError] = useState<string | null>(null);
   const [captchaToken, setCaptchaToken] = useState("");
   const isRegister = mode === "register";
-  const captchaRequired = Boolean(import.meta.env.VITE_CAPTCHA_SITE_KEY);
+  const captchaRequired = Boolean(getConfiguredCaptchaSiteKey());
   const form = useForm<AuthForm>({
     resolver: zodResolver(buildSchema(isRegister)),
     defaultValues: {
