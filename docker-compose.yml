@@ -75,7 +75,10 @@ services:
       dockerfile: apps/ai-service/Dockerfile
     container_name: progresia-ai-service
     restart: unless-stopped
-    env_file: .env
+    env_file:
+      - .env
+      - path: apps/ai-service/.env
+        required: false
     environment:
       AI_SERVICE_PORT: 8000
     ports:

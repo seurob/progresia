@@ -111,9 +111,10 @@ GROQ_API_KEY=gsk_...          # O cualquier otro proveedor LLM
 ```
 
 ```bash
-# Variables del AI service (LLM keys)
+# Variables del AI service (LLM keys) — para desarrollo local
 cp apps/ai-service/.env.example apps/ai-service/.env
-# Añadir al menos una clave LLM en GROQ_API_KEY, OPENAI_API_KEY o GEMINI_API_KEY
+# Añadir al menos una clave LLM en apps/ai-service/.env
+# Para Docker: el docker-compose.yml carga apps/ai-service/.env automáticamente
 ```
 
 ### 3. Levantar la infraestructura (Docker)
