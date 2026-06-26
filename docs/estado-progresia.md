@@ -115,6 +115,9 @@ GitHub Actions en `main`:
 | 6 | RAG con Qdrant — embeddings de specs y busqueda semantica. | Pendiente |
 | 7 | E2E Playwright — smoke tests del flujo idea-to-GitHub. | Pendiente |
 | 8 | Sentry — errores y trazas en web, API y servicio IA con filtrado de PII. | Implementado |
+| 9 | Cloudflare Turnstile real en produccion. | #27 |
+| 10 | SMTP y confirmacion de email. | #28 |
+| 11 | Ollama local con modelos cargados en servidor. | #29 |
 
 ## Regla Operativa
 

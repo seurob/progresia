@@ -9,6 +9,9 @@ Tags: #backlog #issues
 - [[../issues/003-ai-service-integration|003 AI service integration]]
 - [[../issues/004-generated-artifacts|004 Generated artifacts]]
 - [[../issues/005-obsidian-project-knowledge|005 Obsidian project knowledge]]
+- [[../issues/008-configure-real-captcha|008 Configure real CAPTCHA]]
+- [[../issues/009-enable-smtp-email-confirmation|009 Enable SMTP email confirmation]]
+- [[../issues/010-enable-ollama-local-ai|010 Enable Ollama local AI]]
 
 ## Estado actual
 

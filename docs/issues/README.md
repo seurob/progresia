@@ -21,6 +21,9 @@ Remote issues seeded:
 - #12 `[OpenSpec] Maintain Obsidian project knowledge base`
 - #13 `[OpenSpec] GitHub security and quality automation`
 - #14 `[Security] Remediate Dependabot alerts`
+- #27 `[Security] Configure real Cloudflare Turnstile CAPTCHA`
+- #28 `[Auth] Enable SMTP email confirmation`
+- #29 `[AI] Enable local Ollama models in production`
 
 Current local consolidation:
 
