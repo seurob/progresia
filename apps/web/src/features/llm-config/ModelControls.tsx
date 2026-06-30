@@ -95,16 +95,19 @@ interface ModelSelectProps {
 }
 
 function ModelSelect({ value, options, fallback, onChange }: ModelSelectProps) {
-  const uniqueOptions = Array.from(new Set([value, ...options].filter(Boolean)));
+  const uniqueOptions = Array.from(
+    new Set([value, fallback, ...options].filter(Boolean)),
+  );
 
-  if (uniqueOptions.length <= 1) {
+  if (uniqueOptions.length === 0) {
     return (
-      <input
-        value={value}
-        placeholder={fallback}
-        onChange={event => onChange(event.target.value)}
+      <select
+        value=""
+        disabled
         className="rounded border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-xs text-zinc-200"
-      />
+      >
+        <option value="">Sin modelos disponibles</option>
+      </select>
     );
   }
 

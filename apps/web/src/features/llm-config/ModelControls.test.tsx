@@ -31,3 +31,20 @@ it("shows recommended Gemma models even when they are not installed", () => {
   expect(screen.getAllByRole("option", { name: "gemma4:26b-a4b-it-qat" })).toHaveLength(2);
   expect(screen.getAllByRole("option", { name: "gemma4:31b" })).toHaveLength(2);
 });
+
+it("uses locked model selectors instead of free text inputs", () => {
+  render(
+    <ModelControls
+      cloudOrder={["groq", "openai", "gemini"]}
+      providers={providers}
+      providerModels={{}}
+      ollamaModels={[]}
+      modelDrafts={{}}
+      onCloudOrderChange={() => undefined}
+      onModelChange={() => undefined}
+    />,
+  );
+
+  expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  expect(screen.getAllByRole("combobox")).toHaveLength(8);
+});
