@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Header, HttpCode, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Header, HttpCode, Param, Post, Res, UseGuards } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bullmq";
 import { ApiBearerAuth, ApiAcceptedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
+import { Response } from "express";
 import { Queue } from "bullmq";
 import { CurrentUser } from "../../common/auth/current-user.decorator";
 import { JwtAuthGuard } from "../../common/auth/jwt-auth.guard";
@@ -85,7 +86,8 @@ export class JobsController {
   @Header("Pragma", "no-cache")
   @Header("Expires", "0")
   @ApiOkResponse({ description: "Returns the status of a job." })
-  getStatus(@Param("jobId") jobId: string) {
+  getStatus(@Param("jobId") jobId: string, @Res({ passthrough: true }) res: Response) {
+    res.setHeader("ETag", `"job-${jobId}-${Date.now()}"`);
     return this.jobsService.getStatus(jobId);
   }
 }
