@@ -1,4 +1,5 @@
 import logging
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -7,6 +8,7 @@ from app.core.llm import TaskType, get_llm_candidates
 from app.schemas.tech_proposal import TechProposal, TechProposalRequest, TechProposalResponse
 
 logger = logging.getLogger(__name__)
+_TECH_PROPOSAL_TIMEOUT_SECONDS = 12
 
 _SYSTEM_PROMPT = """You are a senior software architect proposing technology stacks for new software projects.
 
@@ -575,6 +577,17 @@ def _arch_validation_error(
 
 
 class TechProposalAgent:
+    def _invoke_candidate(
+        self,
+        candidate: BaseChatModel,
+        req: TechProposalRequest,
+    ) -> TechProposalResponse:
+        structured = candidate.with_structured_output(TechProposalResponse)
+        return structured.invoke([
+            SystemMessage(content=_SYSTEM_PROMPT),
+            HumanMessage(content=_build_human_message(req)),
+        ])
+
     def propose(
         self,
         req: TechProposalRequest,
@@ -587,12 +600,12 @@ class TechProposalAgent:
         )
 
         for candidate in candidates:
+            executor: ThreadPoolExecutor | None = None
             try:
-                structured = candidate.with_structured_output(TechProposalResponse)
-                result = structured.invoke([
-                    SystemMessage(content=_SYSTEM_PROMPT),
-                    HumanMessage(content=_build_human_message(req)),
-                ])
+                executor = ThreadPoolExecutor(max_workers=1)
+                result = executor.submit(self._invoke_candidate, candidate, req).result(
+                    timeout=_TECH_PROPOSAL_TIMEOUT_SECONDS
+                )
                 if isinstance(result, TechProposalResponse):
                     validation_error = _arch_validation_error(
                         result.proposals,
@@ -608,8 +621,16 @@ class TechProposalAgent:
                             f"expected at least 2 proposals, received {len(result.proposals)}"
                         ),
                     )
+            except TimeoutError:
+                logger.warning(
+                    "AI tech proposal timed out after %ss; trying next model",
+                    _TECH_PROPOSAL_TIMEOUT_SECONDS,
+                )
             except Exception as exc:
                 logger.warning("AI tech proposal failed; trying next model: %s", exc)
+            finally:
+                if executor is not None:
+                    executor.shutdown(wait=False, cancel_futures=True)
 
         logger.warning("All AI technology proposal candidates failed; using catalog fallback")
         return self._catalog_fallback(req)

@@ -83,7 +83,10 @@ export function useGeneratePipeline(projectId: string | undefined, onDone: () =>
 
     const interval = setInterval(async () => {
       try {
-        const { data } = await api.get<JobStatus>(`/jobs/${jobId}`);
+        const { data } = await api.get<JobStatus>(`/jobs/${jobId}`, {
+          headers: { "Cache-Control": "no-cache" },
+          params: { _: Date.now() }
+        });
         if (data.status === "completed") {
           clearInterval(interval);
           setJobId(null);

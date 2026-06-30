@@ -34,7 +34,10 @@ export function useJobPoller(onComplete: () => void) {
       }
 
       try {
-        const res = await api.get<JobStatus>(`/jobs/${jobId}`);
+        const res = await api.get<JobStatus>(`/jobs/${jobId}`, {
+          headers: { "Cache-Control": "no-cache" },
+          params: { _: Date.now() }
+        });
         const { status } = res.data;
         if (status === "completed") {
           clearInterval(intervalRef.current!);

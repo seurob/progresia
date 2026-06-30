@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Header, HttpCode, Param, Post, UseGuards } from "@nestjs/common";
 import { InjectQueue } from "@nestjs/bullmq";
 import { ApiBearerAuth, ApiAcceptedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { Queue } from "bullmq";
@@ -81,6 +81,9 @@ export class JobsController {
   }
 
   @Get(":jobId")
+  @Header("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate")
+  @Header("Pragma", "no-cache")
+  @Header("Expires", "0")
   @ApiOkResponse({ description: "Returns the status of a job." })
   getStatus(@Param("jobId") jobId: string) {
     return this.jobsService.getStatus(jobId);
