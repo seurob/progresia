@@ -34,6 +34,17 @@ def generate_readme(
         for p in prerequisites
     )
 
+    prereqs_text = " ".join(prerequisites).lower()
+    verify_commands = ["git --version", "docker --version"]
+    if "node" in prereqs_text or "npm" in prereqs_text:
+        verify_commands.extend(["node --version", "npm --version"])
+    if "php" in prereqs_text:
+        verify_commands.append("php --version")
+    if "composer" in prereqs_text:
+        verify_commands.append("composer --version")
+    if "python" in prereqs_text:
+        verify_commands.append("python --version")
+    verify_str = " && ".join(dict.fromkeys(verify_commands))
     # Setup commands
     if setup_commands is None:
         setup_commands = [
@@ -108,15 +119,20 @@ Antes de empezar, asegúrate de tener instalado:
 ## Instalación rápida
 
 ```bash
-# 1. Clona el repositorio
+# 1. Obten el proyecto desde Git o ZIP
 git clone <URL-del-repositorio> {project_slug}
 cd {project_slug}
+# Si descargaste un ZIP, descomprimelo y entra en la carpeta del proyecto.
 
-# 2. Copia el archivo de variables de entorno
+# 2. Verifica herramientas base
+{verify_str}
+# Si algun comando falla, instala la herramienta indicada en Requisitos previos.
+
+# 3. Copia el archivo de variables de entorno
 cp .env.example .env
 # Edita .env con tus valores reales
 
-# 3. Inicia los servicios
+# 4. Inicia servicios e instala dependencias del stack
 {setup_str}
 ```
 

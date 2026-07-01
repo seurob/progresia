@@ -101,6 +101,14 @@ _STACKS: dict[str, list[TechStackItem]] = {
         TechStackItem(name="PostgreSQL", version="16", purpose=_PURPOSE_PG_MAIN, official_docs=_URL_PG_DOCS),
         TechStackItem(name="Docker", version="26.x", purpose=_PURPOSE_DOCKER, official_docs=_URL_DOCKER_DOCS),
     ],
+    "REACT_EXPRESS": [
+        TechStackItem(name="React", version="19.x", purpose="Frontend SPA para la interfaz de usuario", official_docs=_URL_REACT_DOCS),
+        TechStackItem(name="Express.js", version="5.x", purpose="Backend Node.js sencillo para APIs REST", official_docs="https://expressjs.com/"),
+        TechStackItem(name="TypeScript", version="5.x", purpose="Tipado estatico en frontend y backend", official_docs="https://www.typescriptlang.org/docs/"),
+        TechStackItem(name="Prisma", version="6.x", purpose="ORM type-safe con migraciones", official_docs="https://www.prisma.io/docs"),
+        TechStackItem(name="PostgreSQL", version="16", purpose=_PURPOSE_PG_MAIN, official_docs=_URL_PG_DOCS),
+        TechStackItem(name="Docker", version="26.x", purpose=_PURPOSE_DOCKER, official_docs=_URL_DOCKER_DOCS),
+    ],
     "FASTAPI_AI": [
         TechStackItem(name="FastAPI", version="0.115.x", purpose="Framework Python async para el microservicio IA", official_docs="https://fastapi.tiangolo.com/"),
         TechStackItem(name="LangChain", version="0.3.x", purpose="Integración con LLMs y cadenas de razonamiento", official_docs="https://python.langchain.com/docs/"),
@@ -538,6 +546,44 @@ class ArchitectureAgent:
         return self._build_recommendation(arch_type, req)
 
     @staticmethod
+    def _generated_project_first_steps(arch_type: str, slug: str) -> list[str]:
+        stack_items = _STACKS.get(arch_type, _STACKS["NESTJS_REACT"])
+        stack_text = " ".join(f"{item.name} {item.version}" for item in stack_items).lower()
+        stack_line = ", ".join(item.name for item in stack_items[:5])
+
+        verify_commands = ["git --version", "docker --version"]
+        install_notes = ["Git", "Docker Desktop"]
+
+        if any(key in stack_text for key in ["node", "react", "next", "nestjs", "express", "vite", "inertia", "vue", "angular", "svelte", "tauri", "electron"]):
+            verify_commands.extend(["node --version", "npm --version"])
+            install_notes.append("Node.js 20 LTS")
+        if any(key in stack_text for key in ["php", "laravel"]):
+            verify_commands.extend(["php --version", "composer --version"])
+            install_notes.extend(["PHP 8.3+", "Composer 2.x"])
+        if any(key in stack_text for key in ["python", "fastapi", "django", "flask"]):
+            verify_commands.append("python --version")
+            install_notes.append("Python 3.12+")
+        if "flutter" in stack_text:
+            verify_commands.append("flutter --version")
+            install_notes.append("Flutter SDK")
+        if "rust" in stack_text or "tauri" in stack_text:
+            verify_commands.append("rustc --version")
+            install_notes.append("Rust")
+
+        verify_line = " && ".join(dict.fromkeys(verify_commands))
+        install_line = ", ".join(dict.fromkeys(install_notes))
+
+        return [
+            f"Revisar stack aprobado: {stack_line}",
+            f"Descargar el ZIP generado por ProgresIA o clonar el repositorio: `git clone <url> {slug} && cd {slug}`",
+            f"Verificar herramientas base: `{verify_line}`",
+            f"Si falta alguna herramienta, instalar: {install_line}",
+            "Copiar variables de entorno: `cp .env.example .env` (Windows: `Copy-Item .env.example .env`)",
+            "Levantar servicios locales: `docker compose up -d`",
+            "Instalar dependencias y ejecutar migraciones siguiendo `README.md` y el tutorial generado",
+        ]
+
+    @staticmethod
     def _build_recommendation(arch_type: str, req: ArchitectureRequest) -> ArchitectureRecommendation:
         slug = req.project_name.lower().replace(" ", "-")
         configs: dict[str, dict] = {
@@ -871,7 +917,7 @@ class ArchitectureAgent:
             alternatives=cfg["alternatives"],
             difficulty=cfg["difficulty"],
             risks=cfg["risks"],
-            first_steps=cfg["first_steps"],
+            first_steps=ArchitectureAgent._generated_project_first_steps(arch_type, slug),
             educational_notes=_NOTES.get(arch_type, _NOTES.get("NESTJS_REACT", [])),
             learning_path=_LEARNING_PATHS.get(arch_type, []),
             when_to_upgrade=_WHEN_TO_UPGRADE.get(arch_type, []),

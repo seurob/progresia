@@ -174,19 +174,20 @@ def _laravel(req: TutorialRequest, has_frontend: bool = False) -> list[TutorialP
 
     phases: list[TutorialPhase] = [
         _p("Fase 0: Configuración del entorno", "Instala dependencias PHP y levanta los servicios.", [
-            _s("Clonar el repositorio", f"git clone <url> {slug} && cd {slug}"),
+            _s("Obtener el proyecto desde Git o ZIP", f"git clone <url> {slug} && cd {slug}", "Si descargaste un ZIP, descomprimelo y entra en la carpeta del proyecto."),
+            _s("Verificar herramientas base", "git --version && docker --version && php --version && composer --version && node --version && npm --version"),
+            _s("Instalar herramientas faltantes", None, "Instala Git, Docker Desktop, PHP 8.3+, Composer 2.x y Node.js 20 LTS si algun comando anterior falla."),
             _s("Instalar dependencias PHP con Composer", "composer install"),
+            *([_s("Instalar dependencias frontend", "npm install", "Necesario para Inertia/React/Vue y Vite.")] if has_frontend else []),
             _s("Copiar variables de entorno", "cp .env.example .env"),
             _s("Generar clave de aplicación Laravel", "php artisan key:generate"),
             _s("Levantar PostgreSQL con Docker", "docker compose up -d postgres"),
             _s("Actualizar .env con las credenciales de la BD"),
             _s("Ejecutar migraciones y seeders", "php artisan migrate --seed"),
+            *([_s("Iniciar Vite para el frontend", "npm run dev", "Mantener esta terminal abierta para assets React/Vue.")] if has_frontend else []),
             _s("Iniciar el servidor de desarrollo", "php artisan serve", "Accede a http://localhost:8000"),
         ]),
     ]
-
-    if has_frontend:
-        phases[0].steps.insert(-1, _s("Instalar dependencias frontend", "npm install && npm run dev", "El servidor de Vite arranca en http://localhost:5173"))
 
     phases.append(_p("Fase 1: Eloquent Models y migraciones", "Define las entidades con Eloquent y crea las migraciones.", [
         _s("Crear modelo con migración", "php artisan make:model NombreModelo -m"),
@@ -242,7 +243,9 @@ def _nestjs_react(req: TutorialRequest) -> list[TutorialPhase]:
 
     phases: list[TutorialPhase] = [
         _p("Fase 0: Configuración del entorno", "Instala dependencias y levanta los servicios.", [
-            _s("Clonar e ir al directorio", f"git clone <url> {slug} && cd {slug}"),
+            _s("Obtener el proyecto desde Git o ZIP", f"git clone <url> {slug} && cd {slug}", "Si descargaste un ZIP, descomprimelo y entra en la carpeta del proyecto."),
+            _s("Verificar herramientas base", "git --version && docker --version && node --version && npm --version"),
+            _s("Instalar herramientas faltantes", None, "Instala Git, Docker Desktop y Node.js 20 LTS si algun comando anterior falla."),
             _s("Instalar dependencias del monorepo", "npm install"),
             _s("Copiar variables de entorno", "cp .env.example .env"),
             _s("Levantar PostgreSQL y Redis", "docker compose up -d postgres redis"),

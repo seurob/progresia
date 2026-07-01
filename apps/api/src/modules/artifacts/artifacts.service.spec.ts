@@ -88,6 +88,73 @@ describe("ArtifactsService", () => {
     );
   });
 
+  it("passes OpenSpec architecture stack to code generation", async () => {
+    const specification = {
+      id: "spec-1",
+      content: {
+        modules: ["Cursos"],
+        requirements: [],
+        architecture: {
+          type: "LARAVEL_INERTIA_REACT",
+          stack: ["PHP 8.3", "Laravel 11", "Inertia.js", "React 19", "PostgreSQL 16"]
+        },
+        constraints: {}
+      }
+    };
+    const prisma = {
+      specification: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValueOnce(specification)
+          .mockResolvedValueOnce(null)
+      },
+      idea: {
+        findUnique: jest.fn().mockResolvedValue({
+          needsAuth: true,
+          needsAdminPanel: true,
+          needsAi: false,
+          complexity: "simple"
+        })
+      },
+      artifactBundle: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({ id: "bundle-1" })
+      },
+      project: {
+        update: jest.fn().mockResolvedValue({ id: "project-1" })
+      },
+      $transaction: jest.fn((operations: Array<Promise<unknown>>) => Promise.all(operations))
+    };
+    const projectsService = {
+      ensureProjectAccess: jest.fn().mockResolvedValue({
+        ...project,
+        sector: "Educacion y formacion"
+      })
+    };
+    const aiServiceClient = {
+      generateCode: jest.fn().mockResolvedValue({
+        project_name: "Reservas Clinica",
+        files: [{ path: "README.md", language: "markdown", content: "# Laravel" }]
+      })
+    };
+    const service = new ArtifactsService(
+      prisma as never,
+      projectsService as never,
+      aiServiceClient as never,
+      githubServiceMock,
+      storageServiceMock
+    );
+
+    await expect(service.generateCode("user-1", "project-1")).resolves.toEqual({ id: "bundle-1" });
+
+    expect(aiServiceClient.generateCode).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stack: ["PHP 8.3", "Laravel 11", "Inertia.js", "React 19", "PostgreSQL 16"],
+        architecture_type: "LARAVEL_INERTIA_REACT"
+      })
+    );
+  });
+
   it("validates generated code without losing SDD files from the manifest", async () => {
     const prisma = {
       artifactBundle: {

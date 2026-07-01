@@ -65,7 +65,20 @@ def detect_stack(req: CodeGenerationRequest) -> ScaffoldStack:
     ).lower()
 
     if req.technical_level == "BEGINNER" and not any(
-        keyword in arch for keyword in ("MOBILE", "FLUTTER", "REACT_NATIVE", "DESKTOP", "ELECTRON", "TAURI")
+        keyword in arch or keyword.lower() in stack_lower
+        for keyword in (
+            "LARAVEL",
+            "DJANGO",
+            "FASTAPI",
+            "FLASK",
+            "MOBILE",
+            "FLUTTER",
+            "REACT_NATIVE",
+            "DESKTOP",
+            "ELECTRON",
+            "TAURI",
+            "EXPRESS",
+        )
     ):
         return ScaffoldStack.EXPRESS
 

@@ -109,7 +109,10 @@ export class ArtifactsService {
       ? (spec.requirements as Array<{ id: string; title: string; description: string }>)
       : [];
     const constraints = (spec.constraints ?? {}) as Record<string, unknown>;
-    const stack = Array.isArray(constraints.stack) ? (constraints.stack as string[]) : [];
+    const archSection = (typeof spec.architecture === "object" && spec.architecture)
+      ? (spec.architecture as Record<string, unknown>)
+      : {};
+    const stack = this.extractStack(constraints, archSection);
 
     const dataEntities = Array.isArray(spec.data_entities)
       ? (spec.data_entities as Array<{ name: string; description?: string; fields?: string[]; relations?: string[] }>)
@@ -124,7 +127,9 @@ export class ArtifactsService {
       where: { projectId: id, type: SpecificationType.ARCHITECTURE, status: SpecificationStatus.GENERATED },
       orderBy: { createdAt: "desc" }
     });
-    const architectureType = (archSpec?.content as Record<string, unknown>)?.architecture_type as string | undefined;
+    const architectureType =
+      ((archSpec?.content as Record<string, unknown> | undefined)?.architecture_type as string | undefined)
+      ?? (archSection.type as string | undefined);
 
     const technicalLevel = complexityToLevel(idea?.complexity);
 
@@ -186,6 +191,20 @@ export class ArtifactsService {
       })
     ]);
     return bundle;
+  }
+
+  private extractStack(
+    constraints: Record<string, unknown>,
+    architecture: Record<string, unknown>
+  ): string[] {
+    const architectureStack = Array.isArray(architecture.stack)
+      ? (architecture.stack as string[])
+      : [];
+    const constraintsStack = Array.isArray(constraints.stack)
+      ? (constraints.stack as string[])
+      : [];
+
+    return architectureStack.length > 0 ? architectureStack : constraintsStack;
   }
 
   async pushToGithub(

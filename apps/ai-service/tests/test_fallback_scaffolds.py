@@ -66,12 +66,21 @@ def test_generated_scaffold_has_required_files_and_unique_paths(
     assert len(paths) == len(set(paths))
 
 
-def test_beginner_web_projects_use_express_scaffold() -> None:
-    request = request_for("NESTJS_REACT", ["NestJS", "React"]).model_copy(
+def test_beginner_without_explicit_stack_uses_express_scaffold() -> None:
+    request = request_for("", ["Unknown"]).model_copy(
         update={"technical_level": "BEGINNER"}
     )
 
     assert detect_stack(request) == ScaffoldStack.EXPRESS
+
+
+def test_beginner_respects_approved_architecture_stack() -> None:
+    request = request_for(
+        "LARAVEL_INERTIA_REACT",
+        ["PHP 8.3", "Laravel 11", "Inertia.js", "React 19", "PostgreSQL 16"],
+    ).model_copy(update={"technical_level": "BEGINNER"})
+
+    assert detect_stack(request) == ScaffoldStack.LARAVEL
 
 
 def test_nestjs_scaffold_includes_runtime_modules_and_dependencies() -> None:
