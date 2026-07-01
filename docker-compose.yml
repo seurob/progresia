@@ -81,6 +81,9 @@ services:
         required: false
     environment:
       AI_SERVICE_PORT: 8000
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "${AI_SERVICE_PORT:-8000}:8000"
     depends_on:

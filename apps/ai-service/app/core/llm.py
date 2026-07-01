@@ -22,7 +22,7 @@ from app.core.settings import settings
 
 logger = logging.getLogger(__name__)
 
-TaskType = Literal["reasoning", "code", "spec", "general"]
+TaskType = Literal["technology", "reasoning", "code", "spec", "general"]
 
 # ── Runtime overrides (reset on process restart) ──────────────────────────────
 _lock = threading.Lock()
@@ -119,7 +119,7 @@ def _get_task_chain(task: TaskType) -> list[Callable[[], BaseChatModel | None]]:
     def ollama_code() -> BaseChatModel | None:
         return _ollama(_eff("ollama_code_model", settings.ollama_code_model))
 
-    if task == "code":
+    if task in ("code", "technology"):
         return [ollama_code, *cloud]
     return [*cloud, ollama_reasoning]
 

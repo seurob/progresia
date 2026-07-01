@@ -72,6 +72,7 @@ services:
     environment:
       AI_SERVICE_PORT: 8000
       QDRANT_URL: http://qdrant:6333
+      OLLAMA_BASE_URL: http://ollama:11434
     depends_on:
       ollama:
         condition: service_healthy

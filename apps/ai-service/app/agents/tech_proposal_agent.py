@@ -592,7 +592,7 @@ class TechProposalAgent:
         self,
         req: TechProposalRequest,
         llm: BaseChatModel | None = None,
-        task: TaskType = "reasoning",
+        task: TaskType = "technology",
     ) -> TechProposalResponse:
         candidates = [llm] if llm is not None else get_llm_candidates(
             task,

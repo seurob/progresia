@@ -781,6 +781,29 @@ class TestArchitectureAgent:
         assert result.architecture_type == "REACT_EXPRESS"
         assert any("npm" in step.lower() for step in result.first_steps)
 
+    def test_llm_first_steps_are_replaced_with_generated_project_flow(self) -> None:
+        req = ARCH_REQUEST.model_copy(update={"preferred_stack": "laravel react"})
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value.content = """
+        {
+          "architecture_type": "LARAVEL_INERTIA_REACT",
+          "name": "Laravel + Inertia",
+          "justification": "ok",
+          "alternatives": [],
+          "difficulty": "BEGINNER",
+          "risks": [],
+          "first_steps": ["Crear proyecto: `composer create-project laravel/laravel demo`"],
+          "educational_notes": []
+        }
+        """
+
+        with patch("app.agents.architecture_agent.get_llm", return_value=mock_llm):
+            result = ArchitectureAgent().recommend(req)
+
+        assert result.architecture_type == "LARAVEL_INERTIA_REACT"
+        assert not any("create-project" in step for step in result.first_steps)
+        assert any("ZIP generado por ProgresIA" in step for step in result.first_steps)
+
 
 # ── CodeGenerationAgent — sector templates (Sprint 0009) ────────────────────
 

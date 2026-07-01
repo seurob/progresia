@@ -62,6 +62,30 @@ def test_ai_candidates_can_prioritize_local_ollama() -> None:
     assert candidates == [ollama_model, groq_model]
 
 
+def test_technology_task_prioritizes_local_ollama() -> None:
+    ollama_model = object()
+    groq_model = object()
+    with (
+        patch("app.core.llm._ollama", return_value=ollama_model),
+        patch.dict(
+            "app.core.llm._CLOUD_FACTORIES",
+            {
+                "groq": lambda: groq_model,
+                "openai": lambda: None,
+                "gemini": lambda: None,
+            },
+        ),
+    ):
+        candidates = llm.get_llm_candidates("technology")
+
+    assert candidates == [ollama_model, groq_model]
+
+
+def test_config_state_matches_technology_routing() -> None:
+    state = llm.get_config_state()
+    assert state["task_routing"]["technology"] in {"ollama", "groq", "openai", "gemini", "none"}
+
+
 def test_ollama_disables_reasoning_output_for_chat_models() -> None:
     captured: dict[str, object] = {}
 
@@ -86,6 +110,9 @@ def test_model_catalog_filters_openai_chat_models() -> None:
             "data": [
                 {"id": "gpt-4.1-mini"},
                 {"id": "o3-mini"},
+                {"id": "gpt-image-1"},
+                {"id": "gpt-4o-mini-transcribe"},
+                {"id": "gpt-realtime"},
                 {"id": "text-embedding-3-small"},
             ]
         }
@@ -98,6 +125,29 @@ def test_model_catalog_filters_openai_chat_models() -> None:
         catalogs = ModelCatalogService(fetch_json).list_cloud_models()
 
     assert catalogs == {"openai": ["gpt-4.1-mini", "o3-mini"]}
+
+
+def test_model_catalog_filters_groq_non_chat_models() -> None:
+    def fetch_json(url: str, headers: dict[str, str], timeout: float) -> dict:
+        assert url == "https://api.groq.com/openai/v1/models"
+        return {
+            "data": [
+                {"id": "llama-3.3-70b-versatile"},
+                {"id": "openai/gpt-oss-120b"},
+                {"id": "whisper-large-v3"},
+                {"id": "meta-llama/llama-prompt-guard-2-86m"},
+                {"id": "openai/gpt-oss-safeguard-20b"},
+            ]
+        }
+
+    with (
+        patch("app.services.model_catalog_service.settings.groq_api_key", "test-key"),
+        patch("app.services.model_catalog_service.settings.openai_api_key", ""),
+        patch("app.services.model_catalog_service.settings.gemini_api_key", ""),
+    ):
+        catalogs = ModelCatalogService(fetch_json).list_cloud_models()
+
+    assert catalogs == {"groq": ["llama-3.3-70b-versatile", "openai/gpt-oss-120b"]}
 
 
 def test_model_catalog_returns_configured_fallback_on_provider_error() -> None:

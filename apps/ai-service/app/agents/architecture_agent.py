@@ -476,7 +476,7 @@ class ArchitectureAgent:
                             alternatives=data.get("alternatives", []),
                             difficulty=data.get("difficulty", "INTERMEDIATE"),
                             risks=data.get("risks", []),
-                            first_steps=data.get("first_steps", []),
+                            first_steps=self._generated_project_first_steps(arch_type, req.project_name.lower().replace(" ", "-")),
                             educational_notes=_NOTES.get(arch_type, []),
                             learning_path=_LEARNING_PATHS.get(arch_type, []),
                             when_to_upgrade=_WHEN_TO_UPGRADE.get(arch_type, []),
