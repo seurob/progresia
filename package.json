@@ -20,7 +20,7 @@
     "format": "prettier --write ."
   },
   "devDependencies": {
-    "prettier": "^3.6.2"
+    "prettier": "^3.9.6"
   },
   "overrides": {
     "@istanbuljs/load-nyc-config": {
