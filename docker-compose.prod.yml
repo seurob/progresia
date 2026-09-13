@@ -15,15 +15,18 @@ services:
       timeout: 5s
       retries: 5
 
-  redis:
-    image: redis:7
-    container_name: progresia-redis
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  # Servicio de mensajeria/colas desactivado temporalmente.
+  # Para reactivar jobs asincronos, descomenta Redis, REDIS_HOST/REDIS_PORT,
+  # la dependencia redis del api y elimina DISABLE_QUEUES=true.
+  # redis:
+  #   image: redis:7
+  #   container_name: progresia-redis
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
 
   qdrant:
     image: qdrant/qdrant:latest
@@ -94,16 +97,17 @@ services:
     environment:
       NODE_ENV: production
       API_PORT: 3000
+      DISABLE_QUEUES: "true"
       DATABASE_URL: postgresql://${POSTGRES_USER:-progresia}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-progresia_studio}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
+      # REDIS_HOST: redis
+      # REDIS_PORT: 6379
       MINIO_ENDPOINT: minio
       AI_SERVICE_URL: http://ai-service:8000
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
+      # redis:
+      #   condition: service_healthy
       ai-service:
         condition: service_healthy
     healthcheck:
