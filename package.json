@@ -27,7 +27,7 @@
       "js-yaml": "4.2.0"
     },
     "@nestjs/platform-express": {
-      "multer": "2.2.0"
+      "multer": "2.4.0"
     },
     "@nestjs/swagger": {
       "js-yaml": "4.2.0"
